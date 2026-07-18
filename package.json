@@ -1,0 +1,40 @@
+{
+  "name": "audio-leveller",
+  "version": "0.1.0",
+  "description": "Levelator-style drag-and-drop loudness leveller. Normalizes each speech segment of a WAV file to -23 LUFS with smooth gain ramps across silences.",
+  "author": "Nino Annighoefer",
+  "license": "MIT",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-assets.mjs",
+    "start": "pnpm build && electron .",
+    "dev": "pnpm build && electron .",
+    "cli": "node dist/cli.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dist": "pnpm build && electron-builder"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["electron", "esbuild"]
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  },
+  "build": {
+    "appId": "com.ninoan.audioleveller",
+    "productName": "Audio Leveller",
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "target": "dmg"
+    }
+  }
+}

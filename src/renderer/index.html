@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audio Leveller</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <div id="drop" class="dropzone">
+        <div class="icon">🎚️</div>
+        <h1>Audio Leveller</h1>
+        <p class="hint">Drop a <strong>.wav</strong> file here</p>
+        <p class="sub">Each segment is normalised to −23 LUFS</p>
+      </div>
+      <section id="status" class="status" hidden></section>
+    </main>
+    <script type="module" src="./renderer.js"></script>
+  </body>
+</html>
