@@ -29,33 +29,39 @@ the segments and gains.
 
 Edit `M.defaults` at the top of the script:
 
-| option          | default | meaning                                             |
-| --------------- | ------- | --------------------------------------------------- |
-| `targetLufs`    | `-23`   | target loudness per speech segment                  |
-| `maxBoostDb`    | `6`     | cap on boost, to fit REAPER's envelope range (see below) |
-| `minSilenceSec` | `1.0`   | minimum gap length to count as silence              |
-| `windowSec`     | `0.1`   | analysis window / gating block unit                 |
-| `fraction`      | `0.25`  | silence threshold: `floor + fraction·(integrated−floor)` |
-| `maxGainDb`     | `30`    | clamp on per-segment gain                            |
+| option            | default | meaning                                             |
+| ----------------- | ------- | --------------------------------------------------- |
+| `targetLufs`      | `-23`   | desired **final** loudness of the speech            |
+| `makeupGainDb`    | `12`    | makeup applied on the item volume (see below)       |
+| `maxSpeechDropDb` | `18`    | a segment is speech only within this of the program |
+| `maxBoostDb`      | `6`     | per-segment boost cap (fits the envelope range)     |
+| `minSilenceSec`   | `1.0`   | minimum gap length to count as silence              |
+| `windowSec`       | `0.1`   | analysis window / gating block unit                 |
+| `fraction`        | `0.25`  | silence threshold: `floor + fraction·(integrated−floor)` |
+| `maxGainDb`       | `30`    | cut cap                                              |
 
-### Boost range / clamping
+### One fixed level: envelope target + item makeup
 
 REAPER limits how far a **volume envelope** can boost — set globally in
 **Preferences → Envelope Display → "Volume envelope range"** (often only +6 dB;
-the volume *fader* goes to +24 dB, but the envelope doesn't). A quiet recording
-would need bigger boosts than that to reach −23 LUFS, so the points would clamp
-at the ceiling.
+the volume *fader* goes to +24 dB, but the envelope doesn't). Spoken-word
+recordings are usually quieter than −23 LUFS, so leveling straight to −23 in the
+envelope would need big boosts and clamp.
 
-To avoid this, the script never boosts more than `maxBoostDb`: if reaching the
-target needs more, it **lowers the whole target uniformly** so the loudest
-segment's boost is exactly `maxBoostDb`. Every segment stays equally leveled
-(the whole thing just sits a few dB lower) and nothing clamps — you make up the
-level with the track fader. The console prints the adjusted target when this
-happens.
+Instead the script splits the gain: the **envelope levels every segment to
+`targetLufs − makeupGainDb`** (−35 LUFS with the defaults), which only ever
+*cuts* (unlimited range, never clamps), and then adds **`makeupGainDb` on the
+item volume** so the speech lands at the final `targetLufs` (−23). Because both
+numbers are fixed, every file comes out at the same level — the point of the
+action. Adjust the split if you like (e.g. `makeupGainDb = 6`), keeping
+`makeupGainDb` within the item volume's range.
 
-For a louder result: raise **both** the REAPER preference *and* `maxBoostDb`.
-For guaranteed no-clamping regardless of the preference, set `maxBoostDb = 0`
-(cuts only — everything drops to the quietest segment).
+### Speech vs. quiet room
+
+Very quiet passages between silences (mic handling, breaths, room tone ~30 dB
+below the narration) are **not** boosted up to the speech level: a segment only
+counts as speech if it's within `maxSpeechDropDb` of the file's integrated
+loudness. Quieter segments inherit their neighbour's gain instead.
 
 ## What's been verified — and what to check in REAPER
 
@@ -81,6 +87,11 @@ could not be tested outside REAPER, so on first run please sanity-check:
   straight `sample/fs`. Check the ramps line up with the silences.
 - **Level** — envelope values are written through `ScaleToEnvelopeMode`, so the
   automation should read the intended dB values on the envelope.
+- **Makeup gain** — the makeup is applied on the **item volume**
+  (`SetMediaItemInfo_Value(item, "D_VOL", …)`), which stacks with the take
+  envelope. Check the item's volume reads +12 dB after a run. If you'd rather
+  apply makeup yourself (e.g. on the take knob or a track), set
+  `makeupGainDb = 0` and add it manually.
 
 Use `DRY_RUN = true` first to confirm the analysis looks right, then switch it
 off to write envelopes. Everything runs inside a single undo block, so a single

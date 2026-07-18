@@ -53,9 +53,9 @@ local channels = { signal }
 
 print(string.format("signal: %d samples (%.1fs @ %dHz)", #signal, #signal / fs, fs))
 
--- Target -23 exactly (disable the envelope-range auto-fit) so we can verify the
--- leveling maths directly.
-local result = M.analyze(channels, fs, { maxBoostDb = 1000 })
+-- Level straight to -23 (no makeup split, no boost cap, wide speech window) so
+-- we can verify the leveling maths directly.
+local result = M.analyze(channels, fs, { makeupGainDb = 0, maxBoostDb = 1000, maxSpeechDropDb = 40 })
 print(string.format("integrated %.1f LUFS, floor %.1f, threshold %.1f",
   result.integratedLufs, result.floorLufs, result.thresholdLufs))
 for i, s in ipairs(result.segments) do
@@ -90,18 +90,33 @@ for i, s in ipairs(result.segments) do
   check(string.format("segment #%d within 1 LU of -23", i), math.abs(measured - (-23)) <= 1.0)
 end
 
--- Envelope-range auto-fit: with a +6 dB boost ceiling, the quiet segment can't
--- reach -23, so the whole target should drop and no boost should exceed +6 dB.
+-- Makeup split: with the defaults the envelope targets (target - makeup) and
+-- only ever cuts, so nothing hits REAPER's boost range.
 print("")
-local fitted = M.analyze(channels, fs, { maxBoostDb = 6 })
-print(string.format("auto-fit: target %.1f → effective %.1f LUFS",
-  fitted.targetLufs, fitted.effectiveTargetLufs))
-check("auto-fit lowered the target below -23", fitted.effectiveTargetLufs < -23)
-local maxGain = -math.huge
-for _, s in ipairs(fitted.segments) do
-  if s.isSpeech and s.gainDb > maxGain then maxGain = s.gainDb end
+local split = M.analyze(channels, fs, { targetLufs = -23, makeupGainDb = 12, maxSpeechDropDb = 40 })
+print(string.format("makeup split: envelope %.1f LUFS + %.1f dB → %.1f LUFS",
+  split.envelopeTargetLufs, split.makeupGainDb, split.targetLufs))
+check("envelope target = target - makeup (-35)", math.abs(split.envelopeTargetLufs - (-35)) < 1e-6)
+local anyBoost = false
+for _, s in ipairs(split.segments) do if s.isSpeech and s.gainDb > 1e-6 then anyBoost = true end end
+check("no boosts needed (envelope only cuts)", not anyBoost)
+
+-- Classification: a segment ~30 dB below the program is room, not speech, and
+-- must not be boosted up — it inherits a neighbour's (cut) gain instead.
+print("")
+local sigC = concat(
+  sine(300, 3, 0.5), noise(1.5, 0.0002),
+  sine(500, 3, 0.016), noise(1.5, 0.0002), -- ~-40 LUFS: quiet room, not speech
+  sine(300, 3, 0.5)
+)
+local rc = M.analyze({ sigC }, fs) -- defaults, incl. maxSpeechDropDb = 18
+for i, s in ipairs(rc.segments) do
+  print(string.format("  seg #%d  %.1f LUFS  %s", i, s.lufs, s.isSpeech and "speech" or "room"))
 end
-check("no speech boost exceeds +6 dB after auto-fit", maxGain <= 6.0 + 1e-6)
+check("exactly three segments", #rc.segments == 3)
+check("loud outer segments are speech", rc.segments[1].isSpeech and rc.segments[3].isSpeech)
+check("quiet middle segment is classified room, not speech", not rc.segments[2].isSpeech)
+check("quiet middle is not boosted (inherits a cut)", rc.segments[2].gainDb <= 0)
 
 print("")
 if failures == 0 then

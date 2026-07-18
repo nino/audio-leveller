@@ -25,16 +25,23 @@ local M = {}
 -- Options (defaults match the standalone tool)
 -- ─────────────────────────────────────────────────────────────────────────
 M.defaults = {
-  targetLufs   = -23.0,
+  targetLufs   = -23.0,  -- desired FINAL loudness of the speech
+  -- The envelope levels to (targetLufs - makeupGainDb); this many dB of makeup
+  -- is then applied via the item volume so the envelope only ever CUTS (which
+  -- has unlimited range) and never fights REAPER's limited boost range. With
+  -- the defaults the envelope targets -35 LUFS and +12 dB makeup lands it at -23.
+  makeupGainDb = 12.0,
+  -- A segment counts as speech only if it's within this many dB of the whole
+  -- file's integrated loudness. Stops quiet room / handling noise between
+  -- silences from being treated (and boosted) as speech.
+  maxSpeechDropDb = 18.0,
+  -- Per-segment boost cap, to fit REAPER's take-volume-envelope range
+  -- (Preferences → Envelope Display → "Volume envelope range", often +6 dB).
+  maxBoostDb   = 6.0,
   minSilenceSec = 1.0,
   windowSec    = 0.1,   -- analysis window; also the block unit for gating
   fraction     = 0.25,  -- silence threshold: floor + fraction*(integrated-floor)
-  maxGainDb    = 30.0,
-  -- Cap on boost, to fit REAPER's take-volume-envelope range. If reaching the
-  -- target needs a bigger boost, the whole target is lowered so nothing clamps.
-  -- Raise this AND Preferences → Envelope Display → "Volume envelope range" for
-  -- a louder result; set to 0 for cuts-only (guaranteed no clamping).
-  maxBoostDb   = 6.0,
+  maxGainDb    = 30.0,  -- cut cap
 }
 
 -- ─────────────────────────────────────────────────────────────────────────
@@ -229,7 +236,15 @@ function M.analyze(channels, fs, opts)
   for _, s in ipairs(silences) do bounds[#bounds + 1] = s.mid end
   bounds[#bounds + 1] = n
 
-  -- Pass 1: segment loudness + speech classification.
+  -- The envelope levels to (target - makeup); makeup is added later on the item
+  -- volume. Keeping the envelope target below the speech level means it only
+  -- cuts, so it never hits REAPER's limited boost range.
+  local envTarget = o.targetLufs - o.makeupGainDb
+  local speechFloor = integrated - o.maxSpeechDropDb
+
+  -- Pass 1: segment loudness + speech classification. A segment is speech only
+  -- if it's above the silence threshold AND within maxSpeechDropDb of the whole
+  -- file's integrated loudness (so quiet room between silences isn't "speech").
   local segLufs, isSpeech = {}, {}
   local anySpeech = false
   for i = 1, #bounds - 1 do
@@ -238,36 +253,20 @@ function M.analyze(channels, fs, opts)
     local w1 = math.min(numWin, math.floor((b - 1) / winLen) + 1)
     local l = M.integratedLoudness(windowMS, w0, w1)
     segLufs[i] = l
-    isSpeech[i] = (l > NEG_INF) and (l > threshold)
+    isSpeech[i] = (l > NEG_INF) and (l > threshold) and (l > speechFloor)
     if isSpeech[i] then anySpeech = true end
   end
   if not anySpeech then
     for i = 1, #segLufs do isSpeech[i] = (segLufs[i] > NEG_INF) end
   end
 
-  -- REAPER's take volume envelope has a limited boost range (Preferences →
-  -- Envelope Display → "Volume envelope range", often only +6 dB). If hitting
-  -- the target would need a bigger boost than `maxBoostDb`, lower the whole
-  -- target uniformly so the loudest-needed boost is exactly `maxBoostDb`. This
-  -- keeps every segment equally leveled but stops the envelope from clamping.
-  local maxBoost = NEG_INF
-  for i = 1, #segLufs do
-    if isSpeech[i] then
-      local boost = o.targetLufs - segLufs[i]
-      if boost > maxBoost then maxBoost = boost end
-    end
-  end
-  local effectiveTarget = o.targetLufs
-  if maxBoost > NEG_INF and maxBoost > o.maxBoostDb then
-    effectiveTarget = o.targetLufs - (maxBoost - o.maxBoostDb)
-  end
-
-  -- Pass 2: per-segment gain at the effective target.
+  -- Per-segment gain to the (fixed) envelope target, clamped to the envelope's
+  -- boost/cut range.
   local speechGain = {}
   for i = 1, #segLufs do
     if segLufs[i] > NEG_INF then
-      local g = effectiveTarget - segLufs[i]
-      if g > o.maxGainDb then g = o.maxGainDb elseif g < -o.maxGainDb then g = -o.maxGainDb end
+      local g = envTarget - segLufs[i]
+      if g > o.maxBoostDb then g = o.maxBoostDb elseif g < -o.maxGainDb then g = -o.maxGainDb end
       speechGain[i] = g
     else
       speechGain[i] = 0
@@ -304,7 +303,7 @@ function M.analyze(channels, fs, opts)
   return {
     fs = fs, n = n,
     thresholdLufs = threshold, floorLufs = floor, integratedLufs = integrated,
-    targetLufs = o.targetLufs, effectiveTargetLufs = effectiveTarget,
+    targetLufs = o.targetLufs, envelopeTargetLufs = envTarget, makeupGainDb = o.makeupGainDb,
     silences = silences, segments = segments, breakpoints = bp,
   }
 end
@@ -371,9 +370,9 @@ local function runInReaper()
     return reaper.GetTakeEnvelopeByName(take, "Volume")
   end
 
-  -- Write the breakpoints (in samples) to the take volume envelope. Ramps are
-  -- subdivided so the automation follows our linear-in-dB gain regardless of
-  -- how REAPER interpolates volume envelopes.
+  -- Write the breakpoints (in samples) to the take volume envelope. One point
+  -- per breakpoint — a flat level across each segment and a single straight
+  -- ramp across each silence (REAPER interpolates linearly between the two).
   local function writeEnvelope(take, result, playrate)
     local env = getTakeVolEnvelope(take)
     if not env then msg("  ! could not create take volume envelope"); return false end
@@ -382,25 +381,10 @@ local function runInReaper()
     reaper.DeleteEnvelopePointRange(env, -math.huge, math.huge)
 
     local fs = result.fs
-    local function insertAt(sample, db)
-      local itemTime = (sample / fs) / playrate
-      local lin = 10 ^ (db / 20)
-      local val = reaper.ScaleToEnvelopeMode(scaling, lin)
+    for _, p in ipairs(result.breakpoints) do
+      local itemTime = (p.at / fs) / playrate
+      local val = reaper.ScaleToEnvelopeMode(scaling, 10 ^ (p.db / 20))
       reaper.InsertEnvelopePoint(env, itemTime, val, 0, 0, false, true)
-    end
-
-    local bp = result.breakpoints
-    local rampStep = math.floor(0.05 * fs) -- 50 ms
-    for i = 1, #bp do
-      insertAt(bp[i].at, bp[i].db)
-      -- Subdivide a ramp into the next breakpoint.
-      if i < #bp and math.abs(bp[i + 1].db - bp[i].db) > 1e-6 then
-        local s = bp[i].at + rampStep
-        while s < bp[i + 1].at do
-          insertAt(s, M.gainDbAt(bp, s))
-          s = s + rampStep
-        end
-      end
     end
     reaper.Envelope_SortPoints(env)
     return true
@@ -431,17 +415,20 @@ local function runInReaper()
         local result = M.analyze(channels, fs)
         msg(string.format("%s  (integrated %.1f LUFS, threshold %.1f, %d silence(s), %d segment(s))",
           name, result.integratedLufs, result.thresholdLufs, #result.silences, #result.segments))
-        if math.abs(result.effectiveTargetLufs - result.targetLufs) > 0.05 then
-          msg(string.format("  target lowered %.1f → %.1f LUFS to keep boosts within the envelope range",
-            result.targetLufs, result.effectiveTargetLufs))
-        end
+        msg(string.format("  envelope target %.1f LUFS + %.1f dB item makeup → %.1f LUFS",
+          result.envelopeTargetLufs, result.makeupGainDb, result.targetLufs))
         for i, s in ipairs(result.segments) do
           local l = (s.lufs > -math.huge) and string.format("%.1f LUFS", s.lufs) or "silent"
           msg(string.format("  #%d  %.2f-%.2fs  %s  %s  gain %+.1f dB",
             i, s.start / fs, s.stop / fs, l, s.isSpeech and "speech" or "room", s.gainDb))
         end
         if not DRY_RUN then
-          if writeEnvelope(take, result, playrate) then done = done + 1 end
+          if writeEnvelope(take, result, playrate) then
+            -- Apply the makeup gain on the item volume (stacks with the take
+            -- envelope), so the leveled speech lands at the final target.
+            reaper.SetMediaItemInfo_Value(item, "D_VOL", 10 ^ (result.makeupGainDb / 20))
+            done = done + 1
+          end
         else
           done = done + 1
         end
