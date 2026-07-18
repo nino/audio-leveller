@@ -12,6 +12,7 @@
     "cli": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:reaper": "lua reaper/test_dsp.lua",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dist": "pnpm build && electron-builder"
   },

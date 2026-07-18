@@ -133,4 +133,15 @@ src/renderer/    drag-and-drop UI
 src/worker/      worker thread that runs the DSP off the main thread
 src/cli.ts       command-line entry point
 test/            Vitest suite
+reaper/          native REAPER ReaScript (non-destructive take-volume automation)
 ```
+
+## REAPER script
+
+`reaper/audio_leveller.lua` is a native, non-destructive port for REAPER: it
+writes a **take volume envelope** that levels each segment to −23 LUFS instead
+of rendering a new file, and reads audio through REAPER's decoder so it works
+with any supported format. The leveling maths are a validated port of the DSP
+core — `lua reaper/test_dsp.lua` (or `pnpm test:reaper`) re-levels a synthetic
+signal and checks it lands at −23 LUFS, matching the Node tool to ~0.1 dB. See
+`reaper/README.md` for install/usage and the REAPER-side checklist.
