@@ -18,8 +18,9 @@ export interface ProcessResponse {
 
 const api = {
   getPathForFile: (file: File): string => webUtils.getPathForFile(file),
-  processFile: (inputPath: string): Promise<ProcessResponse> =>
-    ipcRenderer.invoke("process-file", inputPath),
+  /** `bypass` names stages to skip; they still appear in the report. */
+  processFile: (inputPath: string, bypass: string[] = []): Promise<ProcessResponse> =>
+    ipcRenderer.invoke("process-file", inputPath, bypass),
   /** Returns an unsubscribe function. */
   onProgress: (callback: (progress: PipelineProgress) => void): (() => void) => {
     const listener = (_event: unknown, progress: PipelineProgress): void => callback(progress);

@@ -39,11 +39,12 @@ function createWindow(): void {
 
 function processInWorker(
   inputPath: string,
+  bypass: string[],
   onProgress: (progress: PipelineProgress) => void,
 ): Promise<ProcessResult> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(join(__dirname, "../worker/index.js"), {
-      workerData: { inputPath },
+      workerData: { inputPath, options: { bypass } },
     });
     worker.on("message", (msg: WorkerMessage) => {
       switch (msg.type) {
@@ -67,10 +68,10 @@ function processInWorker(
 }
 
 app.whenReady().then(() => {
-  ipcMain.handle("process-file", async (event, inputPath: string) => {
+  ipcMain.handle("process-file", async (event, inputPath: string, bypass: string[] = []) => {
     const sender: WebContents = event.sender;
     try {
-      const result = await processInWorker(inputPath, (progress) => {
+      const result = await processInWorker(inputPath, bypass, (progress) => {
         if (!sender.isDestroyed()) sender.send("process-progress", progress);
       });
       return { ok: true, result };

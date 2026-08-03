@@ -16,4 +16,5 @@ export * from "./denoise";
 export * from "./convolve";
 export * from "./dereverb";
 export * from "./reverbtime";
+export * from "./dyneq";
 export * from "./leveller";

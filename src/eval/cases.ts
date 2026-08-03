@@ -546,4 +546,61 @@ export const CASES: EvalCase[] = [
     ],
   },
 
+  {
+    name: "ringing",
+    description: "Speech with a sustained resonance riding on it, dynamic EQ alone",
+    chain: buildChain({ only: ["dyneq"] }),
+    build: () => {
+      const { signal, segments } = programme([-30, -18, -25], { floorDbfs: -75 });
+      const ringing = cloneSignal(signal);
+      for (const ch of ringing.channels) {
+        for (let i = 0; i < ch.length; i++) {
+          ch[i] += 0.02 * Math.sin((2 * Math.PI * 2500 * i) / SR);
+        }
+      }
+      return { input: ringing, reference: cloneSignal(signal), segments };
+    },
+    expectations: [
+      {
+        metric: "siSdrGainDb",
+        min: 0.5,
+        because:
+          "a sustained resonance is exactly what dynamic EQ is for; suppressing " +
+          "it must move the signal toward the clean reference",
+      },
+      {
+        metric: "spectralFlatteningDb",
+        min: 0.5,
+        because: "the resonance should measurably flatten out of the spectrum",
+      },
+    ],
+  },
+
+  {
+    name: "clean-dyneq",
+    description: "Clean speech through dynamic EQ alone — resonance suppression, not reshaping",
+    chain: buildChain({ only: ["dyneq"] }),
+    build: () => {
+      const { signal, segments } = programme([-30, -18, -25], { floorDbfs: -75 });
+      return { input: signal, reference: cloneSignal(signal), segments };
+    },
+    expectations: [
+      {
+        metric: "outputSiSdrDb",
+        min: 15,
+        because:
+          "unlike the other spectral stages this one cannot decline to act — it " +
+          "is per-frame by nature — so its transparency has to be measured " +
+          "rather than arranged. A voice with no resonances must come back " +
+          "essentially intact",
+      },
+      {
+        metric: "spectralFlatteningDb",
+        min: -0.5,
+        max: 1.5,
+        because: "nothing to suppress means nothing much should change",
+      },
+    ],
+  },
+
 ];

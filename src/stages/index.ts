@@ -14,6 +14,7 @@ import type { Stage, StageSpec } from "../pipeline/types";
 import { declickStage } from "./declick";
 import { denoiseStage } from "./denoise";
 import { dereverbStage } from "./dereverb";
+import { dyneqStage } from "./dyneq";
 import { eqStage } from "./eq";
 import { levelStage } from "./level";
 
@@ -22,6 +23,7 @@ const BUILT_IN: Stage<object, unknown>[] = [
   denoiseStage as Stage<object, unknown>,
   dereverbStage as Stage<object, unknown>,
   eqStage as Stage<object, unknown>,
+  dyneqStage as Stage<object, unknown>,
   levelStage as Stage<object, unknown>,
 ];
 
@@ -61,9 +63,10 @@ export function buildChain(options: ChainOptions = {}): StageSpec[] {
   }));
 }
 
-export { declickStage, denoiseStage, dereverbStage, eqStage, levelStage };
+export { declickStage, denoiseStage, dereverbStage, dyneqStage, eqStage, levelStage };
 export type { DeclickParams } from "./declick";
 export type { DenoiseParams } from "./denoise";
 export type { DereverbParams } from "./dereverb";
+export type { DynEqParams } from "./dyneq";
 export type { EqParams } from "./eq";
 export type { LevelParams } from "./level";

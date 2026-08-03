@@ -152,7 +152,45 @@ ul.chain {
 }
 
 ul.chain li {
-  padding: 2px 0;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+ul.chain li:last-child {
+  border-bottom: none;
+}
+
+ul.chain label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+ul.chain input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.stage-detail {
+  margin: 0 0 2px 24px;
+  font-size: 13px;
+}
+
+button {
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 7px 12px;
+  background: var(--accent-soft);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
 }
 
 .dim {

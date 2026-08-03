@@ -36,6 +36,33 @@ interface StageReport {
   report: unknown;
 }
 
+/** The per-stage reports the inspector knows how to summarise. */
+interface DeclickReport {
+  detected: number;
+  repaired: number;
+  aborted: boolean;
+}
+interface DenoiseReport {
+  backend: string | null;
+  reductionAppliedDb: number;
+  reductionAchievedDb: number;
+  skippedEntirely: boolean;
+}
+interface DereverbReport {
+  decayBeforeMs: number;
+  decayAfterMs: number;
+  skipped: boolean;
+}
+interface EqReport {
+  bands: { freq: number; gainDb: number; q: number }[];
+  rumbleFreq: number | null;
+  skipped: boolean;
+}
+interface DynEqReport {
+  maxReductionDb: number;
+  activeFraction: number;
+}
+
 interface PipelineReport {
   sourceSampleRate: number;
   workingSampleRate: number;
@@ -69,7 +96,7 @@ interface ProcessResponse {
 
 interface LevellerBridge {
   getPathForFile(file: File): string;
-  processFile(inputPath: string): Promise<ProcessResponse>;
+  processFile(inputPath: string, bypass?: string[]): Promise<ProcessResponse>;
   onProgress(callback: (progress: PipelineProgress) => void): () => void;
 }
 
@@ -107,14 +134,69 @@ function levellerReportOf(report: PipelineReport): LevellerReport | null {
   return (stage?.report as LevellerReport | undefined) ?? null;
 }
 
+/**
+ * One line saying what a stage actually did. The point of the inspector is to
+ * make each stage's decision visible, so "declick 42 ms" is not enough — the
+ * question a user has is whether it found anything.
+ */
+function summarise(stage: StageReport): string {
+  if (!stage.enabled) return "bypassed";
+  const r = stage.report;
+
+  switch (stage.name) {
+    case "declick": {
+      const d = r as DeclickReport;
+      if (d.aborted) return "declined — too much of the file looked like clicks";
+      return d.repaired === 0 ? "no clicks found" : `${d.repaired} click(s) repaired`;
+    }
+    case "denoise": {
+      const d = r as DenoiseReport;
+      if (d.skippedEntirely) return "already clean — nothing removed";
+      return `${d.reductionAchievedDb.toFixed(1)} dB of noise removed (${d.backend})`;
+    }
+    case "dereverb": {
+      const d = r as DereverbReport;
+      if (d.skipped) return `dry (${d.decayBeforeMs.toFixed(0)} ms decay) — left alone`;
+      return `decay ${d.decayBeforeMs.toFixed(0)} → ${d.decayAfterMs.toFixed(0)} ms`;
+    }
+    case "eq": {
+      const d = r as EqReport;
+      if (d.skipped) return "not enough speech to measure";
+      const rumble = d.rumbleFreq ? `, rumble filter at ${d.rumbleFreq} Hz` : "";
+      if (d.bands.length === 0) return `no correction needed${rumble}`;
+      return (
+        d.bands.map((b) => `${Math.round(b.freq)} Hz ${signed(b.gainDb)} dB`).join(", ") + rumble
+      );
+    }
+    case "dyneq": {
+      const d = r as DynEqReport;
+      if (d.activeFraction < 0.001) return "no resonances found";
+      return `up to ${d.maxReductionDb.toFixed(1)} dB, ${(d.activeFraction * 100).toFixed(0)}% of the time`;
+    }
+    case "level": {
+      const d = r as LevellerReport;
+      return `${pluralize(d.segments.length, "segment")} levelled`;
+    }
+    default:
+      return "";
+  }
+}
+
 function renderResult(result: NonNullable<ProcessResponse["result"]>): void {
-  const { outputPath, roomTonePath, report } = result;
+  const { inputPath, outputPath, roomTonePath, report } = result;
+  lastInputPath = inputPath;
 
   const chain = report.stages
-    .map((s) =>
-      s.enabled
-        ? `<li>${s.name} <span class="dim">${s.elapsedMs.toFixed(0)} ms</span></li>`
-        : `<li class="dim">${s.name} — bypassed</li>`,
+    .map(
+      (s) => `<li>
+        <label>
+          <input type="checkbox" data-stage="${s.name}" ${s.enabled ? "checked" : ""}>
+          <span class="${s.enabled ? "" : "dim"}">${s.name}</span>
+        </label>
+        <div class="meta stage-detail">${summarise(s)}${
+          s.enabled ? ` <span class="dim">· ${s.elapsedMs.toFixed(0)} ms</span>` : ""
+        }</div>
+      </li>`,
     )
     .join("");
 
@@ -151,10 +233,22 @@ function renderResult(result: NonNullable<ProcessResponse["result"]>): void {
        ${report.output.integratedLufs.toFixed(1)} LUFS ·
        ${report.sourceSampleRate} Hz · ${report.durationSec.toFixed(1)}s</div>
      <ul class="chain">${chain}</ul>
+     <button id="rerender">Re-render with these stages</button>
      ${detail}`,
     "done",
   );
+
+  const button = document.getElementById("rerender");
+  button?.addEventListener("click", () => {
+    const bypass = [...statusEl.querySelectorAll<HTMLInputElement>("input[data-stage]")]
+      .filter((input) => !input.checked)
+      .map((input) => input.dataset.stage ?? "");
+    if (lastInputPath) void run(lastInputPath, basename(lastInputPath), bypass);
+  });
 }
+
+/** The last file processed, so the inspector can re-render it. */
+let lastInputPath: string | null = null;
 
 async function handleFile(file: File): Promise<void> {
   if (busy) return;
@@ -169,13 +263,18 @@ async function handleFile(file: File): Promise<void> {
     setStatus(`Couldn't resolve a file path for <strong>${file.name}</strong>.`, "error");
     return;
   }
+  await run(path, file.name, []);
+}
+
+async function run(path: string, name: string, bypass: string[]): Promise<void> {
+  if (busy) return;
   busy = true;
   drop.classList.add("busy");
-  setStatus(`<span class="spinner"></span> Processing <strong>${file.name}</strong>…`, "working");
+  setStatus(`<span class="spinner"></span> Processing <strong>${name}</strong>…`, "working");
 
   const unsubscribe = leveller.onProgress((p) => {
     setStatus(
-      `<span class="spinner"></span> <strong>${file.name}</strong>
+      `<span class="spinner"></span> <strong>${name}</strong>
        <div class="meta">${p.stage} — step ${p.index + 1} of ${p.total}</div>
        <div class="bar"><span style="width:${Math.round(p.overall * 100)}%"></span></div>`,
       "working",
@@ -183,7 +282,7 @@ async function handleFile(file: File): Promise<void> {
   });
 
   try {
-    const res = await leveller.processFile(path);
+    const res = await leveller.processFile(path, bypass);
     console.log(`processFile result: ok=${res.ok}${res.error ? ` error=${res.error}` : ""}`);
 
     if (!res.ok || !res.result) {
