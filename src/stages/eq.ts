@@ -12,7 +12,7 @@
  * constraint set.
  */
 
-import { applyCascade } from "../dsp/biquad";
+import { applyCascade, peakingEq } from "../dsp/biquad";
 import {
   buildCascade,
   decideRumbleFilter,
@@ -35,13 +35,61 @@ export interface EqParams extends EqFitOptions {
    * "within 12 dB of the fundamentals is too much".
    */
   rumbleMarginDb: number;
+  /**
+   * A fixed tonal tilt applied after the corrective bands, by name.
+   *
+   * Correction and voicing are different jobs and this stage now does both,
+   * deliberately kept apart. Correction is fitted per recording and removes
+   * what that room and microphone added. Voicing is the same on every file: it
+   * is a taste, not a measurement, and it is applied last so it survives
+   * whatever the fitter decided.
+   *
+   * `warm` is measured rather than invented — see {@link VOICINGS}.
+   */
+  voicing: VoicingName;
 }
+
+export type VoicingName = "neutral" | "warm";
+
+/**
+ * Fixed voicing curves.
+ *
+ * `warm` is the static tone curve of a commercial mastering service, recovered
+ * from a 24-minute before/after pair. Getting it required separating tone from
+ * dynamics, and the first attempt got that wrong in an instructive way: on the
+ * loudest frames its 5-6.5 kHz region reads about -3 dB, which looks like a
+ * de-harshing dip. Measured only on frames where *that band* sits 25 dB above
+ * its own noise floor, the same region reads -0.2 dB. The dip was its
+ * per-band noise suppression, not its EQ — even a loud vowel has little
+ * genuine 6 kHz content, so most frames have that band near the floor where
+ * the suppressor is working. Baking it in would have made every recording
+ * duller for no reason anyone could hear.
+ *
+ * What survives that correction is very gentle indeed: about +1 dB under
+ * 130 Hz and about -1 dB across 2.5-5 kHz. Which is the finding — that
+ * service's "sound" is almost entirely its dynamics, not its tone. This curve
+ * is offered because it is what was asked for and it is real, not because it
+ * is where the character comes from.
+ */
+export const VOICINGS: Record<VoicingName, EqBand[]> = {
+  neutral: [],
+  warm: [
+    // The +1.0 dB measured at 80-101 Hz, wide enough to read as weight rather
+    // than as a bump on the fundamental.
+    { freq: 95, gainDb: 1, q: 0.7 },
+    // The -1.1 dB centred near 3.2 kHz and spanning 2.5-5 kHz. This is the
+    // one that reads as "smooth": it is where a close microphone in an
+    // untreated room puts its hardness.
+    { freq: 3400, gainDb: -1.1, q: 0.9 },
+  ],
+};
 
 export const DEFAULT_EQ_PARAMS: EqParams = {
   ...DEFAULT_EQ_FIT_OPTIONS,
   rumbleEnabled: true,
   rumbleFreq: 80,
   rumbleMarginDb: -12,
+  voicing: "neutral",
 };
 
 export interface EqStageReport {
@@ -57,6 +105,9 @@ export interface EqStageReport {
   noiseFrames: number;
   /** True when there was too little speech to measure and nothing was done. */
   skipped: boolean;
+  /** Voicing applied, and its bands, so the report shows tone separately from correction. */
+  voicing: VoicingName;
+  voicingBands: EqBand[];
 }
 
 /** Mono downmix, since one EQ curve is applied to every channel. */
@@ -96,6 +147,7 @@ export const eqStage: Stage<EqParams, EqStageReport> = {
     const speechLtas = computeLtas(mono, signal.sampleRate, speech);
     ctx.progress(0.4);
 
+    const voicingBands = VOICINGS[params.voicing] ?? [];
     const empty: EqStageReport = {
       bands: [],
       rumbleFreq: null,
@@ -105,10 +157,13 @@ export const eqStage: Stage<EqParams, EqStageReport> = {
       speechFrames: 0,
       noiseFrames: 0,
       skipped: true,
+      voicing: params.voicing,
+      voicingBands,
     };
 
     // Too little speech to characterise. Fitting to a couple of frames would
-    // be fitting to an accident, so decline.
+    // be fitting to an accident, so decline — and decline the voicing too,
+    // since a file with no speech in it is not one to impose a voice on.
     if (!speechLtas) return { signal, report: empty };
 
     // The pauses, on the same grid, to gate boosts.
@@ -130,13 +185,21 @@ export const eqStage: Stage<EqParams, EqStageReport> = {
       speechFrames: speechLtas.frames,
       noiseFrames: noiseLtas?.frames ?? 0,
       skipped: false,
+      voicing: params.voicing,
+      voicingBands,
     };
 
-    // Nothing worth correcting: return the signal itself, so a clean file
-    // comes out of this stage bit-identical rather than merely similar.
-    if (cascade.length === 0) return { signal, report };
+    // Voicing rides after correction, so the fitter's decisions are not
+    // reshaped by it and the two stay separable in the report.
+    const voicingCascade = voicingBands.map((b) => peakingEq(signal.sampleRate, b.freq, b.gainDb, b.q));
+    const full = [...cascade, ...voicingCascade];
 
-    const channels = signal.channels.map((ch) => applyCascade(ch, cascade));
+    // Nothing worth correcting and no voice to impose: return the signal
+    // itself, so a clean file comes out of this stage bit-identical rather
+    // than merely similar.
+    if (full.length === 0) return { signal, report };
+
+    const channels = signal.channels.map((ch) => applyCascade(ch, full));
     ctx.progress(1);
 
     return {

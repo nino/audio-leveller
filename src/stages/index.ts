@@ -5,14 +5,19 @@
  * one. As the pipeline grows this list encodes the ordering decisions that
  * matter: de-click before the denoiser (impulses are out-of-distribution for
  * the model and get smeared rather than removed), EQ after it (denoising
- * changes the spectrum you'd otherwise be fitting a curve to), and levelling
- * last so the loudness target is exact.
+ * changes the spectrum you'd otherwise be fitting a curve to), the expander
+ * before the compressor (the compressor applies upward gain in the middle of
+ * its range, so compressing first would lift the very floor the expander is
+ * then asked to push down), and levelling last so the loudness target is
+ * exact and the true-peak limiter sees what the compressor actually produced.
  */
 
 import { registerStage } from "../pipeline/registry";
 import type { Stage, StageSpec } from "../pipeline/types";
+import { compressStage } from "./compress";
 import { declickStage } from "./declick";
 import { denoiseStage } from "./denoise";
+import { expandStage } from "./expand";
 import { dereverbStage } from "./dereverb";
 import { dyneqStage } from "./dyneq";
 import { eqStage } from "./eq";
@@ -24,6 +29,8 @@ const BUILT_IN: Stage<object, unknown>[] = [
   dereverbStage as Stage<object, unknown>,
   eqStage as Stage<object, unknown>,
   dyneqStage as Stage<object, unknown>,
+  expandStage as Stage<object, unknown>,
+  compressStage as Stage<object, unknown>,
   levelStage as Stage<object, unknown>,
 ];
 
@@ -63,10 +70,21 @@ export function buildChain(options: ChainOptions = {}): StageSpec[] {
   }));
 }
 
-export { declickStage, denoiseStage, dereverbStage, dyneqStage, eqStage, levelStage };
+export {
+  compressStage,
+  declickStage,
+  denoiseStage,
+  dereverbStage,
+  dyneqStage,
+  eqStage,
+  expandStage,
+  levelStage,
+};
+export type { CompressParams } from "./compress";
 export type { DeclickParams } from "./declick";
 export type { DenoiseParams } from "./denoise";
 export type { DereverbParams } from "./dereverb";
 export type { DynEqParams } from "./dyneq";
-export type { EqParams } from "./eq";
+export type { EqParams, VoicingName } from "./eq";
+export type { ExpandParams } from "./expand";
 export type { LevelParams } from "./level";

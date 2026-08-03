@@ -16,9 +16,9 @@ It writes two files next to the input:
 
 ## The chain
 
-Six stages, in order. Each decides for itself whether it has anything to do and
-says so in the report — a stage that acts on material needing no treatment is a
-cost with no benefit, so most of them can decline.
+Eight stages, in order. Each decides for itself whether it has anything to do
+and says so in the report — a stage that acts on material needing no treatment
+is a cost with no benefit, so most of them can decline.
 
 | stage | what it does | when it declines |
 | ----- | ------------ | ---------------- |
@@ -27,13 +27,19 @@ cost with no benefit, so most of them can decline.
 | `dereverb` | Suppresses late reverberation by weighted prediction error. | Passes dry material through untouched, judged by a blind decay measurement. |
 | `eq` | Corrects room and microphone colouration from the long-term average spectrum. | Places no bands when the spectrum is already even. |
 | `dyneq` | Suppresses resonances and sibilance while they occur — this is also the de-esser. | Cannot decline (it is per-frame by nature), so its transparency is measured instead. |
+| `expand` | Pushes the floor down between words, where nothing is masking it. | Passes through untouched when the floor already sits more than 50 dB below the programme. |
+| `compress` | Evens out level *within* a phrase, where segment levelling cannot reach. | Declines on material whose loudness range is already under 3 LU. |
 | `level` | Normalises each speech segment to a target loudness, with a true-peak limiter. | — |
 
 The order is load-bearing. De-click comes first because impulses are
 out-of-distribution for any denoiser and get smeared rather than removed. EQ
 comes after the denoiser and dereverberator because both change the spectrum you
-would otherwise be fitting a curve to. Levelling is last so the loudness target
-is measured on the audio that actually gets written.
+would otherwise be fitting a curve to. The expander comes before the compressor
+because the compressor applies upward gain in the middle of its range, so
+compressing first would lift the very floor the expander is then asked to push
+back down. Levelling is last so the loudness target is measured on the audio
+that actually gets written, and so the true-peak limiter sees what the
+compressor actually produced.
 
 ## De-click
 
@@ -179,6 +185,61 @@ backend declines with a reason and the classical one takes over, rather than
 resampling into and out of 48 kHz inside the stage — two conversions to reach a
 denoiser is not obviously better than the classical one that needs neither, and
 that is not a trade this corpus can settle.
+
+## Levelling, compression and expansion
+
+Segment levelling fixes the difference between a passage recorded close and one
+recorded far away. It does nothing about the difference between the start and
+the end of a single sentence, and that is where most of the unevenness in speech
+actually lives — which is the gap between a recording that has been *levelled*
+and one that sounds *mastered*.
+
+The `compress` and `expand` stages close it, and their numbers were measured
+rather than chosen. A 24-minute before/after pair from a commercial service was
+aligned to the sample (correlation 0.991) and differenced:
+
+| what it does | measured | ours |
+| ------------ | -------- | ---- |
+| loudness target | −18.00 LUFS | configurable, −23 default |
+| ceiling | −1 dBFS **sample** peak, overshooting to −0.72 dBTP | −1 dBTP true peak — stricter |
+| compression | ~1.7:1 above ≈2 dB under programme loudness | same |
+| compressor timing | 33 ms fall, 168 ms rise | same |
+| gain moved *within* one utterance | 4.51 dB | — |
+| gain moved *between* utterances | 3.27 dB | the leveller's job |
+| expansion | ~2.8:1 from ≈27 dB under programme | same, capped at 12 dB |
+| loudness range | 5.00 → 3.38 LU | 4.98 → 3.80 LU through the whole chain |
+
+Two deliberate departures. **The expander is capped** where the reference is
+not: at 43 dB below its programme that service attenuates by about 40 dB, which
+is a gate, and a recording gated to digital silence between words sounds broken
+in a way the noise never did — the room vanishes and reappears with every
+syllable, which is what the room-tone bed elsewhere here exists to avoid. And
+**the compressor has no make-up gain**, because the level stage runs afterwards
+and normalises to an exact target; make-up gain would be a number the leveller
+immediately takes back out, and leaving it off keeps the compressor's report
+honest about how much it took.
+
+### Voicing, and what "their sound" turned out to be
+
+`eq` can apply a fixed tonal tilt on top of its corrective fit, via
+`voicing: "warm"`. Correction and voicing are different jobs kept apart:
+correction is fitted per recording and removes what that room and microphone
+added, voicing is the same on every file and is a taste.
+
+Recovering that service's tone curve took two passes, and the first was wrong in
+a way worth recording. Measured on the loudest frames, its 5–6.5 kHz region
+reads about −3 dB, which looks exactly like a de-harshing dip. Measured only on
+frames where *that band* sits 25 dB above its own noise floor, the same region
+reads −0.2 dB. The dip was its per-band noise suppression, not its EQ — even a
+loud vowel has little genuine 6 kHz content, so most frames have that band near
+the floor where the suppressor is working. Baking it in would have made every
+recording duller for no reason anyone could hear.
+
+What survives that correction is very gentle: about **+1 dB under 130 Hz** and
+about **−1 dB across 2.5–5 kHz**, and nothing else outside ±0.6 dB. Which is the
+finding — that service's "sound" is almost entirely its dynamics and its
+per-band suppression, not its tone. The voicing is offered because it is real
+and because it was asked for, not because it is where the character comes from.
 
 ## Architecture
 
@@ -475,6 +536,7 @@ replacement rather than a loudness tool are still to come.
 | **5** | ✅ done | Dereverb by weighted prediction error (WPE). The model options in the original plan were unreachable, so the classical one got built — and it earns its place on merit: it cannot invent speech, only subtract a linear prediction. Modest, honestly: ~12% off the decay, +1.3 dB SI-SDR. Engages only on genuinely reverberant material. |
 | **6** | ✅ done | Dynamic EQ: per-bin suppression of whatever protrudes above the spectrum's own local envelope, with attack/release smoothing. Doubles as the de-esser via extra sensitivity in the sibilance band. +5.1 dB SI-SDR on a ringing resonance, ~5% of cells touched on clean speech. |
 | **7** | ✅ done | Chain inspector in the app: every stage says what it actually did, and can be toggled off and re-rendered for A/B. |
+| **8** | ✅ done | Compressor and downward expander, both fitted to a measured before/after pair from a commercial service rather than to taste, plus an optional voicing curve on the EQ. Loudness range 4.98 → 3.80 LU through the chain, against that service's 3.38. |
 
 A note on the generative enhancers (phases 4–5): they hallucinate plausible
 speech detail, which is fine for intelligibility and bad when the speaker's

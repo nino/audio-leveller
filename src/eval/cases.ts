@@ -109,37 +109,55 @@ function programme(
 }
 
 /**
- * Within a segment, levelling is a single gain change, so speech and its own
- * noise floor must stay the same distance apart.
+ * What the whole chain does to segment-local SNR on clean material.
+ *
+ * This bound used to read -1 to 1, on the reasoning that levelling applies one
+ * gain per segment and therefore moves speech and noise together. That premise
+ * expired when the expander joined the chain: an expander deliberately
+ * attenuates the quiet parts, and the quiet parts inside a segment are the gaps
+ * between words, so it moves this number by design. Widening it is a
+ * consequence of the chain changing, not of the bound being inconvenient — and
+ * the two jobs the old bound was doing have been separated rather than dropped.
  *
  * Note this is the *segment-local* SNR, not the whole-file `snrGainDb`. The
  * whole-file figure legitimately drops when segments are pulled together —
  * boosting a quiet passage boosts its noise with it — so bounding that one
  * would be asserting something false about what levelling does.
  */
-const SNR_PRESERVED: Expectation = {
+const SNR_EXPANDED: Expectation = {
   metric: "segmentSnrGainDb",
-  min: -1,
-  max: 1,
+  min: 6,
+  max: 14,
   because:
-    "levelling applies one gain per segment, which moves that segment's speech " +
-    "and noise together, so on material clean enough that the denoiser backs " +
-    "off to nothing this must not move at all. It doubles as the check that the " +
-    "backoff works: if the denoiser started processing clean sources, this is " +
-    "where it would show",
+    "on clean material the expander is the only stage that moves this, so the " +
+    "bound is a statement about the expander: it must engage on a floor this " +
+    "close to the programme, and it must stay inside its own range cap. The " +
+    "upper bound is that cap plus the little the leveller contributes — past " +
+    "14 dB means rangeDb has stopped holding, which is the difference between " +
+    "an expander and a gate. The other job this bound used to do, checking " +
+    "that the denoiser backs off on clean sources, now lives on `clean-denoise` " +
+    "and `clean-denoise-onnx`, where it is asserted as bit-identity through the " +
+    "denoise stage alone — a stronger check than an SNR window ever was",
 };
 
-/** Cases noisy enough that the denoiser is supposed to engage. */
+/**
+ * Cases noisy enough that the denoiser is supposed to engage.
+ *
+ * On the full chain this number is now the denoiser and the expander together,
+ * which is why the windows sit higher than the denoiser alone would justify.
+ * The two are separable in the report — `floorReductionDb` is the expander's
+ * alone — and the denoiser is bounded unconfounded on the fixture cases.
+ */
 function snrImproved(minDb: number, maxDb: number, note: string): Expectation {
   return {
     metric: "segmentSnrGainDb",
     min: minDb,
     max: maxDb,
     because:
-      `the denoiser should engage here and deliver ${minDb} dB or better. ` +
-      `${note} The upper bound matters as much as the lower: over-delivering ` +
-      "means it is reaching past what the source supports, which is where " +
-      "artefacts come from",
+      `the denoiser and the expander together should deliver ${minDb} dB or ` +
+      `better here. ${note} The upper bound matters as much as the lower: ` +
+      "over-delivering means something is reaching past what the source " +
+      "supports, which is where artefacts come from",
   };
 }
 
@@ -274,7 +292,7 @@ export const CASES: EvalCase[] = [
       ON_TARGET,
       UNDER_CEILING,
       UNDER_TRUE_PEAK_CEILING,
-      SNR_PRESERVED,
+      SNR_EXPANDED,
       {
         metric: "lufsError",
         max: 1.5,
@@ -316,14 +334,15 @@ export const CASES: EvalCase[] = [
       { ...ON_TARGET, max: 1.5, because: "large corrections may cost a little accuracy" },
       UNDER_CEILING,
       {
-        ...SNR_PRESERVED,
-        max: 2.5,
+        ...SNR_EXPANDED,
+        max: 15,
         because:
-          "same check as elsewhere, with headroom for a measurement artifact this " +
-          "case makes unavoidable: adjacent segments here differ by ~18 dB of gain, " +
-          "and the noise sample sits in the ramp between them, so it is measured a " +
-          "fraction of that difference away from the speech it is compared against. " +
-          "The negative bound is unchanged — nothing may reduce SNR",
+          "the same expander check as elsewhere, with headroom for a measurement " +
+          "artifact this case makes unavoidable: adjacent segments here differ by " +
+          "~18 dB of gain, and the noise sample sits in the ramp between them, so " +
+          "it is measured a fraction of that difference away from the speech it is " +
+          "compared against. Nothing may reduce SNR, and nothing may exceed the " +
+          "expander's range by more than that artifact explains",
       },
     ],
   },
@@ -340,10 +359,11 @@ export const CASES: EvalCase[] = [
       ON_TARGET,
       UNDER_CEILING,
       snrImproved(
-        1.5,
-        6,
-        "Its floor sits ~31 dB down, so the taper gives it only a few dB " +
-          "rather than the full amount — that is the intended behaviour, not a shortfall.",
+        8,
+        16,
+        "The denoiser's own contribution is small — the floor sits ~31 dB down, " +
+          "so its clean-source taper gives it only a few dB, which is intended " +
+          "rather than a shortfall — and the expander supplies the rest.",
       ),
     ],
   },
@@ -364,7 +384,12 @@ export const CASES: EvalCase[] = [
     expectations: [
       { ...ON_TARGET, max: 1.5, because: "noise costs the measurement a little accuracy" },
       UNDER_CEILING,
-      snrImproved(6, 14, "A 20 dB floor is squarely in range for the full 12 dB."),
+      snrImproved(
+        16,
+        26,
+        "A 20 dB floor is squarely in range for the denoiser's full 12 dB, and " +
+          "the expander then finds the gaps it leaves.",
+      ),
       {
         metric: "siSdrGainDb",
         min: -8,
@@ -499,7 +524,7 @@ export const CASES: EvalCase[] = [
       const { signal, segments } = programme([-30, -18, -25], { channels: 2 });
       return { input: signal, segments, targetLufs: TARGET };
     },
-    expectations: [ON_TARGET, UNDER_CEILING, SNR_PRESERVED],
+    expectations: [ON_TARGET, UNDER_CEILING, SNR_EXPANDED],
   },
 
   {
@@ -566,6 +591,164 @@ export const CASES: EvalCase[] = [
   },
 
   ...denoiseModelCases(),
+
+  {
+    name: "uneven",
+    description: "Speech whose level drifts within each phrase — compressor alone",
+    chain: buildChain({ only: ["compress"] }),
+    build: () => {
+      const { signal, segments } = programme([-30, -18, -25]);
+      // A slow swell inside each spurt: the unevenness a segment leveller
+      // cannot see, because it is one gain per segment and this moves under it.
+      const uneven = cloneSignal(signal);
+      for (const ch of uneven.channels) {
+        for (const seg of segments) {
+          const span = seg.end - seg.start;
+          for (let i = seg.start; i < seg.end; i++) {
+            const t = (i - seg.start) / span;
+            ch[i] *= 10 ** ((-6 + 12 * t) / 20); // -6 dB to +6 dB across the phrase
+          }
+        }
+      }
+      return { input: uneven, reference: cloneSignal(signal), segments };
+    },
+    expectations: [
+      {
+        metric: "loudnessRangeReductionLu",
+        min: 1,
+        because:
+          "loudness range is what a compressor is for, so it is what the " +
+          "compressor is measured on. A phrase swelling 12 dB is exactly the " +
+          "unevenness the leveller cannot reach — one gain per segment moves " +
+          "with it rather than against it. Under 1 LU of reduction means the " +
+          "threshold has drifted above the programme and the stage is idling",
+      },
+      {
+        metric: "compressorMaxReductionDb",
+        max: 12,
+        because:
+          "the cap exists so a mis-set threshold cannot turn the stage into a " +
+          "fader. If this ever sits at the cap the curve is wrong, not the cap",
+      },
+    ],
+  },
+
+  {
+    name: "even-compress",
+    description: "Already-even speech through the compressor — it should decline",
+    chain: buildChain({ only: ["compress"] }),
+    build: () => {
+      // Three spurts at the same level with no drift: nothing to even out.
+      const { signal, segments } = programme([-23, -23, -23]);
+      return { input: signal, reference: cloneSignal(signal), segments };
+    },
+    expectations: [
+      {
+        metric: "changeDb",
+        max: -300,
+        because:
+          "compressing material that is already even costs whatever life it " +
+          "has left and buys nothing, so the stage measures the loudness range " +
+          "first and declines below minLoudnessRangeLu. Bit-identical output " +
+          "is the check that it does — a compressor with no off switch is a " +
+          "sound, not a tool",
+      },
+    ],
+  },
+
+  {
+    name: "floor-expand",
+    description: "Audible room tone between words — expander alone",
+    chain: buildChain({ only: ["expand"] }),
+    build: () => {
+      // A floor 30 dB down: close enough to the voice to be heard in the gaps.
+      const { signal, segments } = programme([-30, -18, -25], { floorDbfs: -52 });
+      // The same programme with the floor driven out of hearing. Same seed, so
+      // the speech is sample-identical and the only difference is the noise —
+      // which makes this a genuine clean reference rather than a copy of the
+      // input, and lets SI-SDR say whether the speech survived.
+      const { signal: quiet } = programme([-30, -18, -25], { floorDbfs: -100 });
+      return { input: signal, reference: quiet, segments };
+    },
+    expectations: [
+      {
+        metric: "floorReductionDb",
+        min: 3,
+        because:
+          "the whole job: push the floor down in the gaps, where no speech is " +
+          "masking it. The reference this was measured from manages 3.6 dB of " +
+          "programme-to-floor on real material, so 3 dB is the floor of useful",
+      },
+      {
+        metric: "segmentSnrGainDb",
+        min: 3,
+        max: 14,
+        because:
+          "unlike every other stage measured this way, an expander is *supposed* " +
+          "to move segment-local SNR — that is its mechanism, not a side effect. " +
+          "It attenuates the quiet parts, and the quiet parts inside a segment " +
+          "are the gaps between words. The upper bound is what keeps it a bound: " +
+          "rangeDb caps attenuation at 12 dB, so anything past 14 means the " +
+          "cap has stopped holding",
+      },
+      {
+        metric: "siSdrGainDb",
+        min: 0,
+        because:
+          "the check that it removes noise rather than speech. Scored against " +
+          "the same programme with an inaudible floor, so a stage that chewed " +
+          "word onsets to get its floor reduction would move away from the " +
+          "reference even while `floorReductionDb` looked healthy",
+      },
+    ],
+  },
+
+  {
+    name: "clean-expand",
+    description: "A recording whose floor is already deep — the expander should decline",
+    chain: buildChain({ only: ["expand"] }),
+    build: () => {
+      const { signal, segments } = programme([-30, -18, -25], { floorDbfs: -85 });
+      return { input: signal, reference: cloneSignal(signal), segments };
+    },
+    expectations: [
+      {
+        metric: "changeDb",
+        max: -300,
+        because:
+          "a floor already more than cleanFloorDb below the programme has " +
+          "nothing left worth pushing, and expanding anyway risks chewing the " +
+          "quiet ends of words for no audible gain. Bit-identical or the " +
+          "decline is not working",
+      },
+    ],
+  },
+
+  {
+    name: "warm-voicing",
+    description: "The measured tonal curve, applied to clean speech — it must stay a whisper",
+    chain: chainWith({}, { only: ["eq"] }).map((s) =>
+      s.name === "eq" ? { ...s, params: { ...s.params, voicing: "warm" } } : s,
+    ),
+    build: () => {
+      const { signal, segments } = programme([-30, -18, -25]);
+      return { input: signal, reference: cloneSignal(signal), segments };
+    },
+    expectations: [
+      {
+        metric: "outputSiSdrDb",
+        min: 12,
+        because:
+          "voicing is a taste rather than a correction, so the only honest " +
+          "bound on it is that it stays small. The curve it applies is +1 dB " +
+          "at 95 Hz and -1.1 dB at 3.4 kHz — recovered by measurement, and " +
+          "much gentler than a first pass suggested, because most of what " +
+          "looked like a de-harshing dip turned out to be that service's " +
+          "per-band noise suppression rather than its EQ. A voicing that " +
+          "scores below this has stopped being a tilt and become a filter",
+      },
+    ],
+  },
 
   {
     name: "clean-eq",
@@ -636,10 +819,12 @@ export const CASES: EvalCase[] = [
       UNDER_CEILING,
       UNDER_TRUE_PEAK_CEILING,
       {
-        metric: "segmentSnrGainDb",
-        min: -1,
-        max: 1,
-        because: "limiting hard must still not change speech-to-noise within a segment",
+        ...SNR_EXPANDED,
+        because:
+          "limiting hard must not change speech-to-noise within a segment beyond " +
+          "what the expander is already doing — the limiter works on peaks, and " +
+          "peaks are not where a noise floor lives, so it must contribute nothing " +
+          "to this number in either direction",
       },
     ],
   },

@@ -115,3 +115,38 @@ export function integratedLoudness(
   const mean = relSurvivors.reduce((a, b) => a + b, 0) / relSurvivors.length;
   return loudnessFromMeanSquare(mean);
 }
+
+/**
+ * Loudness range (EBU Tech 3342), in LU.
+ *
+ * The spread between a recording's quiet and loud passages, measured on 3-second
+ * short-term blocks: the 10th to 95th percentile of the blocks that survive a
+ * relative gate 20 LU below the 95th percentile. It answers the question
+ * integrated loudness cannot — whether a programme sitting on target does so
+ * evenly or by averaging a shout and a mumble.
+ *
+ * It is what a compressor is for, and therefore what tells a compressor whether
+ * it has anything to do.
+ */
+export function loudnessRange(filtered: Float32Array[], sampleRate: number): number {
+  const window = Math.round(3 * sampleRate);
+  const hop = Math.round(sampleRate);
+  const length = filtered[0]?.length ?? 0;
+  if (length < window) return 0;
+
+  const blocks: number[] = [];
+  for (let start = 0; start + window <= length; start += hop) {
+    const value = loudnessOfRange(filtered, start, start + window);
+    // -70 LUFS absolute gate, as for integrated loudness.
+    if (value >= -70) blocks.push(value);
+  }
+  if (blocks.length < 2) return 0;
+
+  blocks.sort((a, b) => a - b);
+  const at = (p: number): number => blocks[Math.min(blocks.length - 1, Math.floor(blocks.length * p))];
+  const gated = blocks.filter((v) => v > at(0.95) - 20);
+  if (gated.length < 2) return 0;
+
+  const pick = (p: number): number => gated[Math.min(gated.length - 1, Math.floor(gated.length * p))];
+  return pick(0.95) - pick(0.1);
+}

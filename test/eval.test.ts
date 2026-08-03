@@ -261,7 +261,21 @@ describe("case corpus", () => {
         }),
       ),
     );
-    available.add("resampled"); // added by the runner from the pipeline report
+    // Metrics the runner lifts out of stage reports rather than measuring from
+    // the audio. A stage's own account of what it did belongs in the corpus
+    // alongside the measurements — the denoiser reporting that it cost 10 dB of
+    // programme is the same finding as the audio being 10 dB quieter, caught a
+    // layer earlier.
+    for (const key of [
+      "resampled",
+      "programmeLossDb",
+      "loudnessRangeReductionLu",
+      "loudnessRangeAfterLu",
+      "compressorMaxReductionDb",
+      "floorReductionDb",
+    ]) {
+      available.add(key);
+    }
 
     for (const c of CASES) {
       for (const expectation of c.expectations) {

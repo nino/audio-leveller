@@ -163,11 +163,25 @@ function runCase(
   // the denoiser measuring that it cost 10 dB of programme is the same finding
   // as the audio being 10 dB quieter, caught one layer earlier.
   metrics.resampled = report.resampled ? 1 : 0;
-  const denoise = report.stages.find((s) => s.name === "denoise")?.report as
-    | { programmeLossDb?: number }
-    | null
-    | undefined;
+  const stageReport = <T,>(name: string): T | undefined =>
+    (report.stages.find((s) => s.name === name)?.report as T | null | undefined) ?? undefined;
+
+  const denoise = stageReport<{ programmeLossDb?: number }>("denoise");
   if (denoise?.programmeLossDb !== undefined) metrics.programmeLossDb = denoise.programmeLossDb;
+
+  const compress = stageReport<{
+    loudnessRangeBeforeLu?: number;
+    loudnessRangeAfterLu?: number;
+    maxReductionDb?: number;
+  }>("compress");
+  if (compress?.loudnessRangeBeforeLu !== undefined && compress.loudnessRangeAfterLu !== undefined) {
+    metrics.loudnessRangeReductionLu = compress.loudnessRangeBeforeLu - compress.loudnessRangeAfterLu;
+    metrics.loudnessRangeAfterLu = compress.loudnessRangeAfterLu;
+  }
+  if (compress?.maxReductionDb !== undefined) metrics.compressorMaxReductionDb = compress.maxReductionDb;
+
+  const expand = stageReport<{ floorReductionDb?: number }>("expand");
+  if (expand?.floorReductionDb !== undefined) metrics.floorReductionDb = expand.floorReductionDb;
 
   return { metrics, output, report };
 }
