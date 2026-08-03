@@ -13,4 +13,15 @@ export const DEFAULT_BACKEND_PREFERENCE = ["onnx", "spectral"];
 
 export * from "./backend";
 export { spectralBackend } from "./spectral";
-export { onnxBackend, MODELS, modelDirectory, modelPath, verifyChecksum } from "./onnx";
+export {
+  onnxBackend,
+  MODELS,
+  modelDirectory,
+  modelPath,
+  modelFilePath,
+  modelSize,
+  runtimeAvailable,
+  verifyChecksum,
+  verifyModel,
+} from "./onnx";
+export type { ModelFile, ModelSpec, OnnxInfo } from "./onnx";

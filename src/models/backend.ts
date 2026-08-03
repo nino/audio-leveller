@@ -37,6 +37,19 @@ export interface DenoiseBackend {
   readonly name: string;
   readonly description: string;
   /**
+   * Programme-to-floor distance, in dB, above which *this* backend has nothing
+   * left to offer and should be tapered to nothing. Falls back to the stage's
+   * own parameter when a backend does not state one.
+   *
+   * It belongs to the backend rather than the stage because it is a statement
+   * about that backend's transparency, and the two here are not equally
+   * transparent. The threshold is the point past which the cure costs more
+   * than the disease, and that point is different for a suppressor with no
+   * idea what speech is than for a model that decides frame by frame whether
+   * a frame is worth touching.
+   */
+  readonly cleanSnrDb?: number;
+  /**
    * Whether this backend can run right now. A backend that needs weights is
    * unavailable until they are on disk; `unavailableReason` says why so the
    * report can be honest instead of silently falling back.

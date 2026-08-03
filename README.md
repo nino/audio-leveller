@@ -23,7 +23,7 @@ cost with no benefit, so most of them can decline.
 | stage | what it does | when it declines |
 | ----- | ------------ | ---------------- |
 | `declick` | Finds impulsive damage on the linear-prediction residual and rebuilds it by AR interpolation. | Refuses entirely if detection covers more than 2% of the file — the threshold is wrong for that material. |
-| `denoise` | Attenuates steady noise by Wiener suppression with a decision-directed SNR estimate. | Scales itself back as the source gets cleaner, to nothing at a 35 dB noise floor. |
+| `denoise` | Attenuates background noise — DeepFilterNet3 when its weights are installed, Wiener suppression otherwise. | Scales itself back as the source gets cleaner, to nothing at a 35 dB noise floor; and throws away any backend's output that costs more than 3 dB of programme loudness. |
 | `dereverb` | Suppresses late reverberation by weighted prediction error. | Passes dry material through untouched, judged by a blind decay measurement. |
 | `eq` | Corrects room and microphone colouration from the long-term average spectrum. | Places no bands when the spectrum is already even. |
 | `dyneq` | Suppresses resonances and sibilance while they occur — this is also the de-esser. | Cannot decline (it is per-frame by nature), so its transparency is measured instead. |
@@ -65,6 +65,120 @@ The eval bound reflects what repair can honestly achieve: at a pause site the
 residual of even a perfect repair is the unknowable noise realisation that was
 under the click (~0 dB against the local peaks); repairs measure −1.2 dB, a
 surviving click +40.
+
+## Noise reduction, and the two backends
+
+Two kinds of denoiser are worth having and they are not interchangeable, so
+both sit behind one interface and the report says which ran.
+
+- **`spectral`** — Wiener suppression with a decision-directed SNR estimate.
+  No weights, no native dependency, always available, and it cannot invent
+  detail because it only ever attenuates. This is the default and what every
+  baseline number is measured against.
+- **`onnx`** — DeepFilterNet3 through ONNX Runtime. Better on real speech, and
+  only present if you ask for it.
+
+```bash
+pnpm fetch-model
+```
+
+That downloads the ONNX export from
+[the upstream repository](https://github.com/Rikorose/DeepFilterNet) — the
+project's own author, deliberately not one of the community mirrors that carry
+the same bytes without the same provenance — checks the archive against a
+pinned SHA-256, and checks every file it extracts against its own. Weights are
+never bundled: they are large, they carry their own licences, and a local-first
+tool should let you decide what to download. `onnxruntime-node` is an *optional*
+dependency for the same reason, so the classical backend keeps working for
+anyone who does not want a 100 MB runtime. When either is missing the stage says
+exactly what is missing and runs the classical backend.
+
+### What the model is, and what had to be written around it
+
+The export is not a denoiser. It is three graphs — an encoder and two decoders —
+that consume normalised spectral features and emit an ERB gain mask plus complex
+deep-filter taps. The 960-point transform (not a power of two, so
+`createFftPlan` exists), the ERB filterbank, the running feature normalisation,
+the mask application, the deep filter and the resynthesis are all outside the
+model, and each has to match what it was trained on. See `src/models/deepfilternet.ts`,
+which is deliberately free of any ONNX dependency so it can be tested without
+weights present. Three things there are worth knowing because each contradicts
+the obvious guess:
+
+- **There is no recurrent state on the graph boundary.** The GRUs are inside the
+  graph and unroll over whatever time axis they are handed, so this is not a
+  frame-at-a-time runner threading hidden state. It feeds long spans. The graph
+  is also exactly causal — verified by growing the future context and watching
+  the output not move — so splitting a file only restarts hidden state, which a
+  discarded warm-up prefix covers.
+
+- **The lookahead is the caller's job.** The PyTorch model shifts its own input
+  by `conv_lookahead`; the ONNX export does not include that shift, so the
+  output of model frame *t* applies to spectrum frame *t − 2*. Get it wrong and
+  the mask still "works", it is simply 40 ms early. Measured across candidate
+  alignments, the deep filter scores 19.9 dB SI-SDR at a lookahead of 2 and
+  about −2 dB at 0, 1 or 3.
+
+- **The ERB mask is only valid above `nb_df`.** This one is a departure from
+  upstream's own runtime, and it is the difference between a working denoiser
+  and a speech destroyer. The training graph keeps the masked spectrum only for
+  bins the deep filter does not cover (`spec_e[..., nb_df:, :] = spec_m[..., nb_df:, :]`),
+  so the network was never given a reason to emit sensible gains below that
+  boundary — and it does not: on clean speech the bands below bin 96 come back
+  at about 0.25, a flat −12 dB, while the bands above sit near unity. libDF gets
+  away with masking the whole spectrum because the deep filter then overwrites
+  the low bins, but its `apply_stages` has a branch where the mask runs and the
+  deep filter does not, and there the junk gains reach the output. Measured:
+  masking the full spectrum scores 3.8 dB SI-SDR where confining the mask to the
+  bins it was trained for scores 25.4, and on *clean* input 6.6 dB against 51.6.
+
+`reductionDb` is honoured as upstream's `atten_lim_db`: a fixed fraction of the
+noisy spectrum is mixed back, which bounds the attenuation of any bin to that
+many dB while leaving bins the model already passes through untouched. A plain
+wet/dry blend would dilute the speech by the same fraction it dilutes the noise.
+Running a neural denoiser at full strength sounds obviously processed, so the
+default is 12 dB, tapered to zero as the source gets clean.
+
+### Results, including the bad one
+
+On **real speech** at 20 dB SNR (a fixture plus broadband noise), denoise stage
+alone, scored against the clean recording:
+
+| backend | noise removed | SI-SDR | programme loudness |
+| ------- | ------------- | ------ | ------------------ |
+| none (input) | — | 21.20 dB | — |
+| `spectral` | 10.7 dB | 21.03 dB (**−0.2**) | −0.20 dB |
+| `onnx` | 8.2 dB | 26.22 dB (**+5.0**) | −0.05 dB |
+
+The classical backend removes *more* noise and still ends up further from clean:
+it is trading signal for quiet. That gap is the whole case for the download.
+Forced onto already-clean real speech with the taper disabled, the model scores
+42.8 dB SI-SDR and costs 0.00 dB of programme loudness.
+
+And the bad one: **on this project's synthetic corpus the model destroys the
+programme.** Given `noisy-20db` it attenuates the voice by 10 dB — it reads a
+harmonic stack with formants as noise, because that is what it is. This is not
+evidence the port is wrong; it is evidence that a corpus built to evaluate a
+spectral suppressor cannot evaluate a trained model. A suppressor asks only what
+is stationary. A model asks whether it is hearing a voice, and about synthetic
+speech it is entitled to say no.
+
+Two things follow, and both are in the code rather than in this paragraph:
+
+- The stage measures the gated programme loudness a backend cost and **discards
+  its output** when it exceeds `maxProgrammeLossDb` (3 dB), returning the input
+  untouched and saying so in the report. A trained backend fails by confidently
+  rewriting the signal, not by doing too little, so this guard matters more for
+  the model than for the classical one. `ood-denoise-onnx` asserts it fires.
+- The model's *quality* bounds live on fixture cases, which need a real
+  recording. There is no synthetic quality bound, because there could not be an
+  honest one.
+
+Known limitation: the model runs at **48 kHz only**. At any other rate the
+backend declines with a reason and the classical one takes over, rather than
+resampling into and out of 48 kHz inside the stage — two conversions to reach a
+denoiser is not obviously better than the classical one that needs neither, and
+that is not a trade this corpus can settle.
 
 ## Architecture
 
@@ -197,6 +311,7 @@ pnpm test           # run the Vitest suite
 pnpm test:watch     # watch mode
 pnpm typecheck      # tsc --noEmit
 pnpm eval           # run the evaluation corpus (see below)
+pnpm fetch-model    # download and verify the DeepFilterNet3 weights
 pnpm dist           # package a distributable (electron-builder)
 ```
 
@@ -280,6 +395,20 @@ a number that changes always means the code changed. Real recordings dropped
 into `eval/fixtures/` are picked up automatically as extra cases; see the README
 there.
 
+Cases needing something this machine lacks — the model weights — are reported as
+**skipped** rather than dropped, because a check nobody ran must not look like
+one that passed. The denoiser is pinned to a named backend in every case, so the
+numbers do not depend on what happens to be sitting in `~/.audio-leveller`.
+
+A limit worth stating plainly: **a synthetic corpus cannot evaluate a trained
+model.** Speech-shaped material is enough for a spectral suppressor, which asks
+only what is stationary, and not enough for a model that asks whether it is
+hearing a voice — DeepFilterNet3's answer about this corpus is no, and it
+removes the programme. So the model's quality bounds live on the fixture cases,
+which need a real recording, and the synthetic cases assert only what must hold
+whatever the material: that the stage catches a backend doing this and throws
+the result away.
+
 Each case states **bounds with reasons**, not snapshots of current behaviour, and
 `pnpm eval` fails when one breaks. The metrics that matter:
 
@@ -342,7 +471,7 @@ replacement rather than a loudness tool are still to come.
 | **1** | ✅ done | Evaluation harness — seeded synthetic corpus, bounds with stated reasons, baseline comparison. Real fixtures picked up from `eval/fixtures/`. |
 | **2** | ✅ done | De-click: two-sided AR residual detection, MAD threshold, Janssen interpolation with a refit pass. `segmentLufsError` on `clicky` went 7.93 → 0.32 LU, SI-SDR −20.7 → +29.3 dB, worst repair −1.2 dB against local peaks. |
 | **3** | ✅ done | Corrective EQ fitted to the long-term average spectrum (gain-limited bells, cut-biased, boosts gated on noise), rumble high-pass, and a true-peak limiter replacing the sample-peak one. `spectralFlatteningDb` on `boxy` +4.35 dB, +1.22 dB on clean material. |
-| **4** | ✅ partly | Noise reduction with a pluggable backend. The classical spectral suppressor is built, tested and default: +11.8 dB of segment SNR on a 20 dB-noise source, scaled back automatically on clean ones. The ONNX backend is wired (discovery, checksum, refusal-to-load-unverified) but **its inference path has never been run** — this environment cannot reach the hosts that serve the weights. |
+| **4** | ✅ done | Noise reduction with a pluggable backend. The classical spectral suppressor is built, tested and default: +11.8 dB of segment SNR on a 20 dB-noise source, scaled back automatically on clean ones. DeepFilterNet3 now runs through ONNX Runtime when its weights are installed — +5.0 dB SI-SDR on real noisy speech where the classical backend manages −0.2 — with a programme-loss guard that discards any backend's output when it starts removing the voice instead of the noise. |
 | **5** | ✅ done | Dereverb by weighted prediction error (WPE). The model options in the original plan were unreachable, so the classical one got built — and it earns its place on merit: it cannot invent speech, only subtract a linear prediction. Modest, honestly: ~12% off the decay, +1.3 dB SI-SDR. Engages only on genuinely reverberant material. |
 | **6** | ✅ done | Dynamic EQ: per-bin suppression of whatever protrudes above the spectrum's own local envelope, with attack/release smoothing. Doubles as the de-esser via extra sensitivity in the sibilance band. +5.1 dB SI-SDR on a ringing resonance, ~5% of cells touched on clean speech. |
 | **7** | ✅ done | Chain inspector in the app: every stage says what it actually did, and can be toggled off and re-rendered for A/B. |

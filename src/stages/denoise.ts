@@ -12,7 +12,7 @@
  * any other way.
  */
 
-import { loudnessOfRange, preFilter } from "../dsp/loudness";
+import { integratedLoudness, loudnessOfRange, preFilter } from "../dsp/loudness";
 import {
   DEFAULT_BACKEND_PREFERENCE,
   resolveBackend,
@@ -32,7 +32,9 @@ export interface DenoiseParams {
   reductionDb: number;
   /**
    * Programme-to-floor distance, in dB, at which a recording counts as already
-   * clean and the stage backs off to nothing.
+   * clean and the stage backs off to nothing. A backend may state its own
+   * threshold ({@link DenoiseBackend.cleanSnrDb}), and does when it is more
+   * transparent than this default assumes.
    *
    * Denoising is not free: it modifies the signal, and on material that was
    * already quiet the modification is all you get. Measured on the eval corpus,
@@ -43,6 +45,26 @@ export interface DenoiseParams {
    * and in between it tapers.
    */
   cleanSnrDb: number;
+  /**
+   * How much gated programme loudness a backend may cost before its output is
+   * thrown away and the input returned instead, in dB.
+   *
+   * A denoiser is supposed to remove what is *around* the speech. Losing a
+   * little programme loudness is legitimate — on a genuinely noisy source the
+   * noise was contributing to the measurement — but losing a lot means the
+   * backend has decided the speech is the noise.
+   *
+   * This is not hypothetical. DeepFilterNet3 does exactly that to this
+   * project's synthetic corpus, which is speech-*shaped* rather than speech:
+   * it reads a harmonic stack with formants as noise and pulls the programme
+   * down by 10 dB, right up against the limit the requested reduction sets.
+   * On real recordings the same model moves programme loudness by under
+   * 0.7 dB. So the guard costs nothing on material a model understands and
+   * turns a wrecked render into a declined stage on material it does not —
+   * which matters more for a trained backend than a classical one, because a
+   * trained one fails by confidently rewriting rather than by doing too little.
+   */
+  maxProgrammeLossDb: number;
   /** Backend order to try. First one that can actually run wins. */
   backends: string[];
 }
@@ -50,6 +72,10 @@ export interface DenoiseParams {
 export const DEFAULT_DENOISE_PARAMS: DenoiseParams = {
   reductionDb: 12,
   cleanSnrDb: 35,
+  // Above what noise removal alone can explain: at 6 dB SNR the noise is a
+  // fifth of the total power, so removing all of it costs about 1 dB of
+  // measured loudness, and 3 dB leaves room for worse sources than that.
+  maxProgrammeLossDb: 3,
   backends: DEFAULT_BACKEND_PREFERENCE,
 };
 
@@ -69,6 +95,13 @@ export interface DenoiseStageReport {
   reductionAchievedDb: number;
   noiseFloorBeforeLufs: number;
   noiseFloorAfterLufs: number;
+  /** Gated programme loudness the backend cost, in dB (positive = quieter). */
+  programmeLossDb: number;
+  /**
+   * Set when a backend ran and its output was rejected, saying why. The audio
+   * returned is then the input, unchanged.
+   */
+  rejected: string | null;
   /** True when no backend could run and the audio was passed through. */
   skippedEntirely: boolean;
 }
@@ -114,7 +147,10 @@ export const denoiseStage: Stage<DenoiseParams, DenoiseStageReport> = {
     const before = pauseLoudness(signal, pauses);
     const programme = ctx.analysis.integratedLufs();
     const inputSnrDb = Number.isFinite(programme) && Number.isFinite(before) ? programme - before : NaN;
-    const applied = adaptReduction(params.reductionDb, inputSnrDb, params.cleanSnrDb);
+    // A backend that states its own threshold knows better than the stage does
+    // how transparent it is on material that barely needs treating.
+    const cleanSnrDb = backend?.cleanSnrDb ?? params.cleanSnrDb;
+    const applied = adaptReduction(params.reductionDb, inputSnrDb, cleanSnrDb);
 
     const base: DenoiseStageReport = {
       backend: null,
@@ -126,6 +162,8 @@ export const denoiseStage: Stage<DenoiseParams, DenoiseStageReport> = {
       reductionAchievedDb: 0,
       noiseFloorBeforeLufs: before,
       noiseFloorAfterLufs: before,
+      programmeLossDb: 0,
+      rejected: null,
       skippedEntirely: true,
     };
 
@@ -149,16 +187,46 @@ export const denoiseStage: Stage<DenoiseParams, DenoiseStageReport> = {
     };
     const after = pauseLoudness(output, pauses);
 
+    // What the backend cost the programme itself, measured the same way the
+    // leveller measures loudness: gated, so pauses do not drag it down.
+    const outputProgramme = integratedLoudness(
+      preFilter(output.channels, output.sampleRate),
+      output.sampleRate,
+    );
+    const programmeLossDb =
+      Number.isFinite(programme) && Number.isFinite(outputProgramme)
+        ? programme - outputProgramme
+        : 0;
+
+    const common = {
+      ...base,
+      backend: backend.name,
+      info: response.info,
+      programmeLossDb,
+      skippedEntirely: false,
+    };
+
+    if (programmeLossDb > params.maxProgrammeLossDb) {
+      ctx.progress(1);
+      return {
+        signal,
+        report: {
+          ...common,
+          rejected:
+            `the ${backend.name} backend cost ${programmeLossDb.toFixed(1)} dB of programme ` +
+            `loudness (limit ${params.maxProgrammeLossDb} dB) — it is removing the speech, ` +
+            `not the noise, so its output was discarded`,
+        },
+      };
+    }
+
     ctx.progress(1);
     return {
       signal: output,
       report: {
-        ...base,
-        backend: backend.name,
-        info: response.info,
+        ...common,
         reductionAchievedDb: Number.isFinite(before) && Number.isFinite(after) ? before - after : 0,
         noiseFloorAfterLufs: after,
-        skippedEntirely: false,
       },
     };
   },

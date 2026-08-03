@@ -16,12 +16,14 @@
     "test:reaper": "lua reaper/test_dsp.lua",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dist": "pnpm build && electron-builder",
-    "eval": "pnpm build && node dist/eval/run.js"
+    "eval": "pnpm build && node dist/eval/run.js",
+    "fetch-model": "pnpm build && node scripts/fetch-model.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "electron",
-      "esbuild"
+      "esbuild",
+      "onnxruntime-node"
     ]
   },
   "devDependencies": {
@@ -42,5 +44,8 @@
       "category": "public.app-category.music",
       "target": "dmg"
     }
+  },
+  "optionalDependencies": {
+    "onnxruntime-node": "^1.27.0"
   }
 }

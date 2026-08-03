@@ -3,8 +3,22 @@
 Drop real `.wav` recordings in this directory and `pnpm eval` will pick them up
 automatically, one case per file, named `fixture:<filename>`.
 
-Real material has no clean reference, so the reference-based metrics (SI-SDR,
-click residual) are skipped. What still applies:
+Each file also produces two **denoiser** cases, `fixture:<name>:spectral` and
+`fixture:<name>:onnx`. Those add broadband noise at 20 dB SNR to the first 60
+seconds and score the result against the recording itself — which supplies the
+clean reference real material otherwise lacks. They are the only place a
+*trained* denoiser can be judged, because the synthetic corpus is speech-shaped
+rather than speech and DeepFilterNet3 does not accept it as a voice. The `onnx`
+pair is skipped when the weights are absent (`pnpm fetch-model`).
+
+The chain's own outputs — `<name>_processed.wav` and `<name>_roomtone.wav`,
+which it writes next to its input — are ignored here. Otherwise processing a
+fixture in place would enrol the results as fixtures on the next run, and the
+harness would end up grading the chain on its own output.
+
+Real material has no clean reference, so on the plain `fixture:<name>` case the
+reference-based metrics (SI-SDR, click residual) are skipped. What still
+applies:
 
 - `lufsError` — did the programme land on target
 - `outputPeakDbfs` — did the limiter ceiling hold

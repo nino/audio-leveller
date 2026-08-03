@@ -18,9 +18,21 @@ import { basename, extname, join, resolve } from "node:path";
 import { decodeWav, encodeWav } from "../dsp/wav";
 import { runPipeline } from "../pipeline/pipeline";
 import type { PipelineReport, Signal } from "../pipeline/types";
+import { onnxBackend } from "../models";
 import { buildChain } from "../stages";
 import { CASES, type CaseInput, type EvalCase, type Expectation } from "./cases";
 import { computeMetrics, type Metrics } from "./metrics";
+import { addNoise } from "./signals";
+
+/** The first `seconds` of a signal, or all of it when it is shorter. */
+function clip(signal: Signal, seconds: number): Signal {
+  const length = Math.min(signal.length, Math.round(seconds * signal.sampleRate));
+  return {
+    sampleRate: signal.sampleRate,
+    channels: signal.channels.map((ch) => ch.slice(0, length)),
+    length,
+  };
+}
 
 interface Args {
   filter?: string;
@@ -98,6 +110,8 @@ interface CaseResult {
   checks: CheckResult[];
   passed: boolean;
   elapsedMs: number;
+  /** Set when the case could not run at all; it is then neither passed nor failed. */
+  skipped?: string;
 }
 
 function check(metrics: Metrics, expectations: Expectation[]): CheckResult[] {
@@ -144,17 +158,38 @@ function runCase(
     targetLufs: input.targetLufs,
   });
 
-  // Report-derived facts worth asserting on.
+  // Report-derived facts worth asserting on. A stage's own account of what it
+  // did belongs in the corpus alongside the measurements taken from the audio:
+  // the denoiser measuring that it cost 10 dB of programme is the same finding
+  // as the audio being 10 dB quieter, caught one layer earlier.
   metrics.resampled = report.resampled ? 1 : 0;
+  const denoise = report.stages.find((s) => s.name === "denoise")?.report as
+    | { programmeLossDb?: number }
+    | null
+    | undefined;
+  if (denoise?.programmeLossDb !== undefined) metrics.programmeLossDb = denoise.programmeLossDb;
 
   return { metrics, output, report };
 }
+
+/**
+ * The pipeline writes its results next to its input, so processing a fixture
+ * in place leaves `<name>_processed.wav` and `<name>_roomtone.wav` in the
+ * fixtures directory — where the next run would pick them up as fixtures in
+ * their own right. That is not a corpus, it is a feedback loop: the harness
+ * would end up grading the chain on its own output, and on a room-tone bed
+ * that no amount of levelling can bring to -23 LUFS.
+ */
+const DERIVED = /_(processed|roomtone)$/;
 
 /** Real recordings dropped into the fixtures directory, if any. */
 async function fixtureCases(dir: string): Promise<EvalCase[]> {
   if (!existsSync(dir)) return [];
   const entries = await readdir(dir);
-  const wavs = entries.filter((f) => extname(f).toLowerCase() === ".wav").sort();
+  const wavs = entries
+    .filter((f) => extname(f).toLowerCase() === ".wav")
+    .filter((f) => !DERIVED.test(basename(f, extname(f))))
+    .sort();
 
   const cases: EvalCase[] = [];
   for (const file of wavs) {
@@ -166,6 +201,14 @@ async function fixtureCases(dir: string): Promise<EvalCase[]> {
     cases.push({
       name: `fixture:${basename(file, extname(file))}`,
       description: `Real recording from ${dir}`,
+      // Pinned to the classical backend for the same reason the synthetic
+      // cases are: a fixture's numbers should not depend on whether the
+      // machine running it happens to have model weights installed.
+      chain: buildChain().map((stage) =>
+        stage.name === "denoise"
+          ? { ...stage, params: { ...stage.params, backends: ["spectral"] } }
+          : stage,
+      ),
       build: (): CaseInput => ({
         input: { sampleRate: audio.sampleRate, channels: audio.channels, length: audio.length },
         targetLufs: -23,
@@ -185,6 +228,60 @@ async function fixtureCases(dir: string): Promise<EvalCase[]> {
         },
       ],
     });
+
+    // A trained denoiser can only be judged on real speech (see
+    // `denoiseModelCases`), and a fixture is the only real speech this harness
+    // has. Degrading it with known noise supplies the clean reference the
+    // fixture cases otherwise lack: the recording itself.
+    const excerpt = clip(
+      { sampleRate: audio.sampleRate, channels: audio.channels, length: audio.length },
+      60,
+    );
+    for (const backend of ["spectral", "onnx"]) {
+      cases.push({
+        name: `fixture:${basename(file, extname(file))}:${backend}`,
+        description: `That recording plus noise at 20 dB SNR, ${backend} denoiser alone`,
+        chain: buildChain({ only: ["denoise"] }).map((stage) =>
+          stage.name === "denoise"
+            ? { ...stage, params: { ...stage.params, backends: [backend] } }
+            : stage,
+        ),
+        unavailableReason: () =>
+          backend === "onnx" ? onnxBackend.unavailableReason(excerpt.sampleRate) : null,
+        build: (): CaseInput => ({
+          input: addNoise(excerpt, 20, 991),
+          reference: excerpt,
+        }),
+        expectations: [
+          {
+            metric: "programmeLossDb",
+            max: 3,
+            because:
+              "whatever a backend removes, it must not be the voice. This is the " +
+              "same limit the stage itself enforces, asserted here on real " +
+              "material so that a backend which starts eating speech fails the " +
+              "run rather than being quietly reverted every time",
+          },
+          ...(backend === "onnx"
+            ? [
+                {
+                  metric: "siSdrGainDb",
+                  min: 2,
+                  because:
+                    "the whole case for a 9 MB download and a native runtime. On " +
+                    "real speech at 20 dB SNR the classical suppressor removes " +
+                    "11.8 dB of noise and still ends up 0.2 dB *further* from the " +
+                    "clean reference — it trades signal for quiet. The model gains " +
+                    "4.97 dB on the same material. The bound sits well below that " +
+                    "so it tracks a different recording, but above zero, because a " +
+                    "model that cannot beat the classical backend here has no " +
+                    "reason to be preferred over it",
+                },
+              ]
+            : []),
+        ],
+      });
+    }
   }
 
   return cases;
@@ -199,8 +296,15 @@ const fmt = (n: number): string => {
 const useColour = process.stdout.isTTY;
 const green = (s: string): string => (useColour ? `[32m${s}[0m` : s);
 const red = (s: string): string => (useColour ? `[31m${s}[0m` : s);
+const dim = (s: string): string => (useColour ? `\x1b[2m${s}\x1b[0m` : s);
 
 function printCase(result: CaseResult, verbose: boolean): void {
+  if (result.skipped) {
+    console.log(`${dim("–")} ${result.name.padEnd(18)} ${result.description}`);
+    console.log(`    ${dim(`skipped: ${result.skipped}`)}`);
+    return;
+  }
+
   const mark = result.passed ? green("✓") : red("✗");
   console.log(`${mark} ${result.name.padEnd(18)} ${result.description}`);
 
@@ -280,6 +384,23 @@ async function main(): Promise<void> {
 
   const results: CaseResult[] = [];
   for (const evalCase of cases) {
+    // A case whose prerequisites are missing is reported as skipped rather
+    // than quietly dropped: a check nobody runs must not look like one that
+    // passed.
+    const unavailable = evalCase.unavailableReason?.() ?? null;
+    if (unavailable) {
+      results.push({
+        name: evalCase.name,
+        description: evalCase.description,
+        metrics: {},
+        checks: [],
+        passed: true,
+        elapsedMs: 0,
+        skipped: unavailable,
+      });
+      continue;
+    }
+
     const input = evalCase.build();
     const started = performance.now();
     const { metrics, output } = runCase(evalCase, input);
@@ -325,11 +446,12 @@ async function main(): Promise<void> {
   if (args.wavDir) console.log(`Wrote rendered audio to ${args.wavDir}`);
 
   const failed = results.filter((r) => !r.passed);
+  const skipped = results.filter((r) => r.skipped);
   if (!args.json) {
     const total = (results.reduce((s, r) => s + r.elapsedMs, 0) / 1000).toFixed(1);
-    console.log(
-      `\n${results.length - failed.length}/${results.length} cases passed in ${total}s`,
-    );
+    const ran = results.length - skipped.length;
+    const note = skipped.length > 0 ? `, ${skipped.length} skipped` : "";
+    console.log(`\n${ran - failed.length}/${ran} cases passed in ${total}s${note}`);
   }
   if (failed.length > 0) process.exitCode = 1;
 }

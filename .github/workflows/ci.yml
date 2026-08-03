@@ -39,6 +39,14 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      # Without weights the model backend's eval cases skip, and the one that
+      # matters most would skip silently for ever: `ood-denoise-onnx` is the
+      # check that a model which misreads its material cannot get that into the
+      # output. The archive is 8 MB and the script verifies it against the
+      # checksums pinned in the registry, so this also keeps those honest.
+      - name: Fetch model weights
+        run: pnpm fetch-model
+
       # The evaluation corpus is the regression gate: every case states bounds
       # with a reason, and the run exits non-zero when one breaks. The baseline
       # comparison does not fail the build on its own — it prints what moved, so

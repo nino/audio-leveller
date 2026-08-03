@@ -12,6 +12,7 @@
  */
 
 import type { Signal, StageSpec } from "../pipeline/types";
+import { onnxBackend } from "../models";
 import { buildChain, DEFAULT_CHAIN } from "../stages";
 import { addClicks, addNoise, addReverb, cloneSignal, syntheticSpeech, type SpeechSegment } from "./signals";
 import { applyCascade, peakingEq } from "../dsp/biquad";
@@ -61,10 +62,35 @@ export interface EvalCase {
   /** Chain to run. Defaults to the standard chain. */
   chain?: StageSpec[];
   expectations: Expectation[];
+  /**
+   * Why this case cannot run here, or null when it can. A case that needs
+   * model weights reports them missing and is skipped rather than failing —
+   * but it says so in the output, because a silently absent check is worse
+   * than a missing one.
+   */
+  unavailableReason?(): string | null;
 }
 
 const SR = 48000;
 const TARGET = -23;
+
+/**
+ * Pin the denoiser to the classical backend.
+ *
+ * Every case that runs the default chain says this explicitly, so the corpus
+ * measures the same thing on a machine with model weights installed as on one
+ * without. Leaving it to `resolveBackend` would make the baseline depend on
+ * what happens to be in `~/.audio-leveller`, and "the numbers moved because
+ * your home directory changed" is exactly the sort of thing this harness
+ * exists to rule out. The model backend gets its own cases below.
+ */
+const SPECTRAL: Record<string, unknown> = { backends: ["spectral"] };
+
+function chainWith(params: Record<string, unknown>, options?: { only?: string[] }): StageSpec[] {
+  return buildChain(options).map((stage) =>
+    stage.name === "denoise" ? { ...stage, params: { ...stage.params, ...params } } : stage,
+  );
+}
 
 /** The standard three-spurt programme, at whatever levels a case needs. */
 function programme(
@@ -145,10 +171,101 @@ const ON_TARGET: Expectation = {
   because: "every speech segment should land within 1 LU of the target",
 };
 
+/**
+ * Cases that exercise the model backend rather than the classical one.
+ *
+ * They are skipped, loudly, when the weights are absent — which is the normal
+ * state of a fresh checkout and of CI, since nothing here bundles a 9 MB
+ * model. `pnpm fetch-model` makes them run.
+ *
+ * ## Why there is no synthetic quality case here
+ *
+ * The corpus is speech-*shaped*, not speech: a harmonic stack with formants
+ * and a syllable-rate envelope. That is enough to evaluate a spectral
+ * suppressor, which knows nothing about speech and only asks what is
+ * stationary. It is not enough to evaluate a trained model, which asks whether
+ * what it is hearing is a voice — and DeepFilterNet3's answer on this material
+ * is no. Given `noisy-20db` it removes the programme rather than the noise,
+ * pulling gated loudness down by 10 dB. On real speech at the same SNR the
+ * same code moves loudness by 0.07 dB and gains 4.97 dB of SI-SDR.
+ *
+ * So a synthetic bound on the model's *quality* would be measuring the
+ * corpus's synthetic-ness. What is asserted here instead is the behaviour that
+ * has to hold whatever the material: the stage must not ship a render in which
+ * a backend has deleted the programme. The quality bounds live on the fixture
+ * cases in `run.ts`, which need a real recording.
+ */
+function denoiseModelCases(): EvalCase[] {
+  const onnx = { backends: ["onnx"] };
+  const unavailableReason = (): string | null => onnxBackend.unavailableReason(SR);
+
+  return [
+    {
+      name: "ood-denoise-onnx",
+      description: "Material the model misreads — the stage must reject its output",
+      chain: chainWith(onnx, { only: ["denoise"] }),
+      unavailableReason,
+      build: () => {
+        const { signal, segments } = programme([-30, -18, -25]);
+        return {
+          input: addNoise(signal, 20, 991),
+          reference: cloneSignal(signal),
+          segments,
+          targetLufs: TARGET,
+        };
+      },
+      expectations: [
+        {
+          metric: "changeDb",
+          max: -300,
+          because:
+            "this is the guard case, and it is asserted on synthetic speech " +
+            "precisely because the model does not recognise it. Handed material " +
+            "it misreads, DeepFilterNet3 attenuates the voice by 10 dB — bounded " +
+            "only by the requested reduction, which is the difference between a " +
+            "quiet render and an empty one. The stage measures the programme " +
+            "loudness it cost and discards a backend's output when it exceeds " +
+            "`maxProgrammeLossDb`, so the signal here must come back " +
+            "bit-identical. A real number means a model is free to decide the " +
+            "speech is the noise and have that reach the file",
+        },
+      ],
+    },
+
+    {
+      name: "clean-denoise-onnx",
+      description: "Clean speech through DeepFilterNet3 alone — the transparency check",
+      chain: chainWith(onnx, { only: ["denoise"] }),
+      unavailableReason,
+      build: () => {
+        const { signal, segments } = programme([-30, -18, -25]);
+        return { input: signal, reference: cloneSignal(signal), segments };
+      },
+      expectations: [
+        {
+          metric: "changeDb",
+          max: -300,
+          because:
+            "the same bound as `clean-denoise`, reached by a different route. " +
+            "This backend declares a 45 dB clean-source threshold rather than " +
+            "the stage's 35, so unlike the classical one it *does* run here — " +
+            "and then costs 6.2 dB of programme loudness, because it does not " +
+            "recognise synthetic speech as speech, so the guard discards it. " +
+            "Bit-identical output is therefore the check that the two " +
+            "safeguards compose: a backend permitted to run on clean material " +
+            "still cannot get speech damage into the file. If this ever " +
+            "returns a real number, one of them has stopped working",
+        },
+      ],
+    },
+  ];
+}
+
 export const CASES: EvalCase[] = [
   {
     name: "clean",
     description: "Three segments at moderately different levels, quiet floor",
+    chain: chainWith(SPECTRAL),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25]);
       return { input: signal, segments, targetLufs: TARGET };
@@ -190,6 +307,7 @@ export const CASES: EvalCase[] = [
   {
     name: "level-drift",
     description: "Segments 25 LU apart — the case the leveller exists for",
+    chain: chainWith(SPECTRAL),
     build: () => {
       const { signal, segments } = programme([-40, -15, -33]);
       return { input: signal, segments, targetLufs: TARGET };
@@ -213,6 +331,7 @@ export const CASES: EvalCase[] = [
   {
     name: "quiet",
     description: "A whole recording 22 dB too quiet",
+    chain: chainWith(SPECTRAL),
     build: () => {
       const { signal, segments } = programme([-45, -44, -46], { floorDbfs: -78 });
       return { input: signal, segments, targetLufs: TARGET };
@@ -232,6 +351,7 @@ export const CASES: EvalCase[] = [
   {
     name: "noisy-20db",
     description: "Broadband noise 20 dB below programme",
+    chain: chainWith(SPECTRAL),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25]);
       return {
@@ -262,6 +382,7 @@ export const CASES: EvalCase[] = [
   {
     name: "noisy-6db",
     description: "Broadband noise only 6 dB below programme — the hard case",
+    chain: chainWith(SPECTRAL),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25]);
       return {
@@ -289,6 +410,7 @@ export const CASES: EvalCase[] = [
   {
     name: "clicky",
     description: "Clean programme with 40 sharp clicks scattered through it",
+    chain: chainWith(SPECTRAL),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25]);
       const { signal: clicked, positions } = addClicks(signal, {
@@ -372,6 +494,7 @@ export const CASES: EvalCase[] = [
   {
     name: "stereo",
     description: "Two-channel programme, to keep the multi-channel paths honest",
+    chain: chainWith(SPECTRAL),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25], { channels: 2 });
       return { input: signal, segments, targetLufs: TARGET };
@@ -382,6 +505,7 @@ export const CASES: EvalCase[] = [
   {
     name: "rate-44k1",
     description: "44.1 kHz source — must not be resampled by a rate-agnostic chain",
+    chain: chainWith(SPECTRAL),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25], { sampleRate: 44100 });
       return { input: signal, segments, targetLufs: TARGET };
@@ -418,6 +542,30 @@ export const CASES: EvalCase[] = [
       },
     ],
   },
+
+  {
+    name: "clean-denoise",
+    description: "Clean speech through the classical denoiser alone — it should decline",
+    chain: chainWith(SPECTRAL, { only: ["denoise"] }),
+    build: () => {
+      const { signal, segments } = programme([-30, -18, -25]);
+      return { input: signal, reference: cloneSignal(signal), segments };
+    },
+    expectations: [
+      {
+        metric: "changeDb",
+        max: -300,
+        because:
+          "this programme's floor sits ~32 dB below the speech, past the point " +
+          "where the clean-source taper has scaled the reduction to zero, so the " +
+          "stage must return the signal itself rather than a slightly processed " +
+          "copy. Bit-identical gives -Infinity; any real number means the taper " +
+          "stopped working",
+      },
+    ],
+  },
+
+  ...denoiseModelCases(),
 
   {
     name: "clean-eq",
@@ -476,6 +624,7 @@ export const CASES: EvalCase[] = [
   {
     name: "hot",
     description: "Quiet crest-heavy speech boosted hard into the ceiling",
+    chain: chainWith(SPECTRAL),
     build: () => {
       // Quiet enough to need ~20 dB of boost, so the limiter has real work to
       // do and inter-sample overshoot is where the ceiling gets decided.

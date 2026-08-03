@@ -4,8 +4,10 @@ import { stft } from "../src/dsp/stft";
 import { syntheticSpeech, addNoise, cloneSignal, rng } from "../src/eval/signals";
 import { siSdrDb } from "../src/eval/metrics";
 import { loudnessOfRange, preFilter } from "../src/dsp/loudness";
-import { resolveBackend, registeredBackends } from "../src/models";
-import { verifyChecksum, MODELS, modelPath } from "../src/models/onnx";
+import { resolveBackend, registeredBackends, registerBackend, type DenoiseBackend } from "../src/models";
+import { denoiseStage, DEFAULT_DENOISE_PARAMS } from "../src/stages/denoise";
+import { Analyzer } from "../src/pipeline/analysis";
+import { verifyChecksum, verifyModel, MODELS, modelFilePath } from "../src/models/onnx";
 import type { Signal } from "../src/pipeline/types";
 
 const sr = 48000;
@@ -241,16 +243,90 @@ describe("backends", () => {
   it("refuses weights with no pinned checksum", () => {
     // A registry entry nobody has pinned must not act as a wildcard that
     // accepts whatever happens to sit at that path.
-    const unpinned = { ...MODELS[0], sha256: "" };
-    const result = verifyChecksum(unpinned, modelPath(unpinned));
+    const unpinned = { name: "enc.onnx", sha256: "" };
+    const result = verifyChecksum(unpinned, modelFilePath(MODELS[0], "encoder"));
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toMatch(/no checksum pinned/);
   });
 
   it("reports a missing model file", () => {
-    const pinned = { ...MODELS[0], sha256: "a".repeat(64) };
+    const pinned = { name: "enc.onnx", sha256: "a".repeat(64) };
     const result = verifyChecksum(pinned, "/nonexistent/model.onnx");
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toMatch(/not found/);
+  });
+
+  it("verifies every file of a model, not just the first", () => {
+    // A model is the whole set or nothing: an encoder that matches paired
+    // with a decoder that does not is an unknown model, not a usable one.
+    const spec = MODELS[0];
+    expect(Object.keys(spec.files).length).toBeGreaterThan(1);
+    const broken = {
+      ...spec,
+      files: { ...spec.files, dfDecoder: { ...spec.files.dfDecoder, sha256: "b".repeat(64) } },
+    };
+    const result = verifyModel(broken);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/df_dec\.onnx/);
+  });
+
+  it("pins a checksum for every file it lists", () => {
+    for (const spec of MODELS) {
+      for (const [role, file] of Object.entries(spec.files)) {
+        expect(file.sha256, `${spec.id}/${role}`).toMatch(/^[0-9a-f]{64}$/);
+      }
+      expect(spec.archive.sha256).toMatch(/^[0-9a-f]{64}$/);
+    }
+  });
+});
+
+describe("the programme-loss guard", () => {
+  /**
+   * A backend that behaves the way DeepFilterNet3 does on material it does not
+   * recognise as speech: it attenuates the voice rather than the noise. The
+   * stage has to notice and throw the result away, because a trained backend
+   * fails by confidently rewriting the signal, not by doing too little.
+   */
+  function destroyer(lossDb: number): DenoiseBackend {
+    const gain = 10 ** (-lossDb / 20);
+    return {
+      name: "destroyer",
+      description: "test backend that eats the programme",
+      available: () => true,
+      unavailableReason: () => null,
+      process: (request) => ({
+        channels: request.channels.map((ch) => ch.map((v) => v * gain)),
+        info: {},
+      }),
+    };
+  }
+
+  function run(backend: DenoiseBackend) {
+    registerBackend(backend);
+    const { signal } = speech(-40); // noisy enough that the stage engages
+    const source: Signal = { sampleRate: sr, channels: signal.channels, length: signal.length };
+    const analysis = new Analyzer(source);
+    return denoiseStage.render(
+      source,
+      { ...DEFAULT_DENOISE_PARAMS, backends: [backend.name] },
+      { analysis, source, sourceAnalysis: analysis, progress: () => {} },
+    );
+  }
+
+  it("discards a backend that removes the speech instead of the noise", () => {
+    const { signal, report } = run(destroyer(10));
+
+    expect(report.backend).toBe("destroyer");
+    expect(report.programmeLossDb).toBeGreaterThan(9);
+    expect(report.rejected).toMatch(/programme loudness/);
+    // Rejected means the input itself comes back, not a partly-processed copy.
+    expect(signal.channels[0]).toBe(speech(-40).signal.channels[0]);
+  });
+
+  it("leaves a backend alone when the loss is small enough to be noise removal", () => {
+    const { report } = run(destroyer(0.5));
+
+    expect(report.rejected).toBeNull();
+    expect(report.programmeLossDb).toBeLessThan(DEFAULT_DENOISE_PARAMS.maxProgrammeLossDb);
   });
 });

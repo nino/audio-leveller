@@ -6,6 +6,10 @@
  * powers of two; frames are real-valued and processed as complex with zero
  * imaginary parts, which wastes a factor of two we happily pay for
  * simplicity's sake at analysis (not per-sample) rates.
+ *
+ * {@link createFftPlan} lifts the power-of-two restriction, because a trained
+ * model does not get to choose its frame size: DeepFilterNet3 was trained on a
+ * 960-point transform (20 ms at 48 kHz), and 960 = 2⁶·3·5.
  */
 
 /** In-place complex FFT of interleaved [re, im, re, im, ...]. */
@@ -90,6 +94,141 @@ export function powerSpectrum(
     out[k] = (re * re + im * im) * scale;
   }
   return out;
+}
+
+/**
+ * Factorise into radices this transform can handle. Returns null when `n` has
+ * a prime factor above 5 — the caller gets a clear error rather than a plan
+ * that silently computes the wrong thing.
+ */
+function factorise(n: number): number[] | null {
+  const factors: number[] = [];
+  let rest = n;
+  for (const radix of [4, 2, 3, 5]) {
+    while (rest % radix === 0) {
+      factors.push(radix);
+      rest /= radix;
+    }
+  }
+  return rest === 1 ? factors : null;
+}
+
+export interface FftPlan {
+  readonly size: number;
+  /** In-place forward transform of interleaved [re, im, ...] of `size` points. */
+  forward(data: Float64Array): void;
+  /** In-place inverse, normalised by 1/size. */
+  inverse(data: Float64Array): void;
+}
+
+/**
+ * Mixed-radix complex FFT for any size whose prime factors are 2, 3 and 5.
+ *
+ * Plain recursive Cooley–Tukey: split the input into `r` interleaved
+ * subsequences, transform each, then combine. The twiddle table and the
+ * scratch buffers are built once per plan, so a plan reused across every frame
+ * of a file allocates nothing per frame.
+ *
+ * Radix 4 is preferred over two radix-2 passes only because it halves the
+ * recursion depth; correctness does not depend on the factor order, which is
+ * what `test/fft.test.ts` checks by comparing several sizes against a direct
+ * DFT.
+ */
+export function createFftPlan(size: number): FftPlan {
+  if (!Number.isInteger(size) || size < 1) throw new Error("FFT size must be a positive integer");
+  const planned = factorise(size);
+  if (!planned) throw new Error(`FFT size ${size} has a prime factor above 5`);
+  const factors: number[] = planned;
+
+  // W_size^k for k = 0..size-1, shared by every level: a sub-transform of
+  // length n uses stride size/n into this same table.
+  const twiddle = new Float64Array(2 * size);
+  for (let k = 0; k < size; k++) {
+    const angle = (-2 * Math.PI * k) / size;
+    twiddle[2 * k] = Math.cos(angle);
+    twiddle[2 * k + 1] = Math.sin(angle);
+  }
+
+  const scratch = new Float64Array(2 * size);
+  // One temporary per level, sized to that level's radix. A level's combine
+  // step runs only after its children have returned, so levels never share.
+  const temp = new Float64Array(2 * Math.max(1, ...factors));
+
+  /**
+   * Transform `n` points read from `inp` at `inpOff` with stride `stride`,
+   * writing `n` contiguous points to `out` at `outOff`.
+   */
+  function rec(
+    out: Float64Array,
+    outOff: number,
+    inp: Float64Array,
+    inpOff: number,
+    stride: number,
+    n: number,
+    level: number,
+  ): void {
+    if (n === 1) {
+      out[2 * outOff] = inp[2 * inpOff];
+      out[2 * outOff + 1] = inp[2 * inpOff + 1];
+      return;
+    }
+
+    const radix = factors[level];
+    const m = n / radix;
+    for (let j = 0; j < radix; j++) {
+      rec(out, outOff + j * m, inp, inpOff + j * stride, stride * radix, m, level + 1);
+    }
+
+    // X[k + q·m] = Σ_j W_n^{jk} · W_radix^{jq} · Y_j[k]
+    const step = size / n; // W_n^i == twiddle[i · step]
+    for (let k = 0; k < m; k++) {
+      for (let j = 0; j < radix; j++) {
+        const at = 2 * (outOff + j * m + k);
+        const yRe = out[at];
+        const yIm = out[at + 1];
+        const w = 2 * ((j * k * step) % size);
+        const wRe = twiddle[w];
+        const wIm = twiddle[w + 1];
+        temp[2 * j] = yRe * wRe - yIm * wIm;
+        temp[2 * j + 1] = yRe * wIm + yIm * wRe;
+      }
+      const radixStep = size / radix; // W_radix^i == twiddle[i · radixStep]
+      for (let q = 0; q < radix; q++) {
+        let sumRe = 0;
+        let sumIm = 0;
+        for (let j = 0; j < radix; j++) {
+          const w = 2 * ((j * q * radixStep) % size);
+          const wRe = twiddle[w];
+          const wIm = twiddle[w + 1];
+          sumRe += temp[2 * j] * wRe - temp[2 * j + 1] * wIm;
+          sumIm += temp[2 * j] * wIm + temp[2 * j + 1] * wRe;
+        }
+        const at = 2 * (outOff + q * m + k);
+        out[at] = sumRe;
+        out[at + 1] = sumIm;
+      }
+    }
+  }
+
+  function forward(data: Float64Array): void {
+    if (data.length !== 2 * size) throw new Error(`plan is for ${size} points`);
+    rec(scratch, 0, data, 0, 1, size, 0);
+    data.set(scratch);
+  }
+
+  return {
+    size,
+    forward,
+    inverse(data: Float64Array): void {
+      for (let i = 0; i < size; i++) data[2 * i + 1] = -data[2 * i + 1];
+      forward(data);
+      const scale = 1 / size;
+      for (let i = 0; i < size; i++) {
+        data[2 * i] *= scale;
+        data[2 * i + 1] = -data[2 * i + 1] * scale;
+      }
+    },
+  };
 }
 
 /** In-place inverse complex FFT, normalised by 1/n. */
