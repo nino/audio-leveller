@@ -14,6 +14,8 @@
 import { Analyzer } from "../pipeline/analysis";
 import type { Signal } from "../pipeline/types";
 import { integratedLoudness, loudnessOfRange, preFilter } from "../dsp/loudness";
+import { computeLtas, broadTarget } from "../dsp/ltas";
+import { truePeakDbfs } from "../dsp/truepeak";
 import type { SpeechSegment } from "./signals";
 
 /** Metric keys are free-form so stages can add their own; values are always dB-ish. */
@@ -247,6 +249,30 @@ export function segmentSnrDb(signal: Signal, segments: SpeechSegment[]): number 
   return median(values);
 }
 
+/**
+ * Worst deviation of the speech spectrum from its own broadly-smoothed shape,
+ * in dB — how coloured the material is. The corrective EQ exists to bring this
+ * down; nothing else in the chain should move it much.
+ */
+export function spectralDeviationDb(
+  signal: Signal,
+  segments: SpeechSegment[],
+  minFreq = 80,
+  maxFreq = 12000,
+): number {
+  const ranges = segments.map((s) => ({ start: s.start, end: s.end }));
+  const ltas = computeLtas(signal.channels[0], signal.sampleRate, ranges);
+  if (!ltas) return NaN;
+
+  const target = broadTarget(ltas);
+  let worst = 0;
+  for (let i = 0; i < ltas.freqs.length; i++) {
+    if (ltas.freqs[i] < minFreq || ltas.freqs[i] > maxFreq) continue;
+    worst = Math.max(worst, Math.abs(ltas.db[i] - target[i]));
+  }
+  return worst;
+}
+
 /** How much a chain changed a signal at all: RMS difference, dB relative to input. */
 export function changeDb(before: Signal, after: Signal): number {
   const a = flatten(before);
@@ -324,9 +350,21 @@ export function computeMetrics(inputs: MetricInputs): Metrics {
     outputSnrDb: outSnr,
     snrGainDb: outSnr - inSnr,
     changeDb: changeDb(input, output),
+    // What a converter or a lossy encoder will actually see, as opposed to the
+    // highest sample value. The limiter's ceiling is meaningless without it.
+    inputTruePeakDbfs: truePeakDbfs(input.channels),
+    outputTruePeakDbfs: truePeakDbfs(output.channels),
   };
 
   if (segments) {
+    const inDeviation = spectralDeviationDb(input, segments);
+    const outDeviation = spectralDeviationDb(output, segments);
+    metrics.inputSpectralDeviationDb = inDeviation;
+    metrics.outputSpectralDeviationDb = outDeviation;
+    // Positive means the chain flattened the colouration; negative means it
+    // added some.
+    metrics.spectralFlatteningDb = inDeviation - outDeviation;
+
     // The local version, which levelling leaves alone — see `segmentSnrDb`.
     const inSegSnr = segmentSnrDb(input, segments);
     const outSegSnr = segmentSnrDb(output, segments);

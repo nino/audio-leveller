@@ -12,6 +12,7 @@
  */
 
 import { preFilter, integratedLoudness } from "../dsp/loudness";
+import { applyCascade, peakingEq } from "../dsp/biquad";
 import type { Signal } from "../pipeline/types";
 
 /** Small, fast, seedable PRNG (mulberry32). Uniform in [0, 1). */
@@ -49,22 +50,50 @@ function normaliseTo(samples: Float32Array, sampleRate: number, targetLufs: numb
   return out;
 }
 
-/** Crude formant colouring: three resonances over a falling harmonic tilt. */
-function formantGain(freq: number): number {
-  const peaks = [
-    { f: 500, bw: 90, gain: 1.0 },
-    { f: 1500, bw: 130, gain: 0.55 },
-    { f: 2600, bw: 180, gain: 0.3 },
-  ];
-  let g = 0.04; // a little energy everywhere, so it isn't three pure tones
-  for (const p of peaks) {
-    const d = (freq - p.f) / p.bw;
-    g += p.gain / (1 + d * d);
-  }
-  return g;
+/**
+ * Vowel inventory: F1/F2/F3 for five vowels, typical adult male values.
+ *
+ * The spurt moves between these, which matters more than it looks. A single
+ * fixed vowel leaves a ~13 dB valley between F1 and F2 in the long-term
+ * average — deep enough that an injected resonance sitting in it reads as
+ * filling a hole rather than as a peak, and any spectral stage evaluated
+ * against it learns the wrong lesson. Real speech averages over vowels whose
+ * F1 spans 270-730 Hz and F2 840-2290 Hz, which is exactly why measured
+ * speech LTAS is smooth.
+ *
+ * Modelled as peaking filters, not two-pole resonators: cascaded resonators
+ * each roll off -12 dB/octave above their centre, so four in series fall off a
+ * cliff past the top formant and everything above 4 kHz becomes fiction.
+ * Peaking filters return to 0 dB away from centre, adding formant contrast
+ * without touching the overall tilt.
+ */
+const VOWELS = [
+  [270, 2290, 3010], // beet
+  [530, 1840, 2480], // bet
+  [730, 1090, 2440], // father
+  [570, 840, 2410], // boat
+  [300, 870, 2240], // boot
+];
+
+/** Peaking filters for one vowel, plus a fixed upper formant. */
+function vowelCascade(vowel: number[], sampleRate: number) {
+  const gains = [8, 6, 4];
+  const qs = [1.2, 1.2, 1.5];
+  const bands = vowel.map((freq, i) => peakingEq(sampleRate, freq, gains[i], qs[i]));
+  bands.push(peakingEq(sampleRate, 3700, 3, 1.5));
+  return bands;
 }
 
-/** One talk spurt at unit scale: harmonic stack under a syllable envelope. */
+/**
+ * One talk spurt at unit scale, by source-filter synthesis.
+ *
+ * An additive harmonic stack was the obvious approach and the wrong one: any
+ * finite number of harmonics puts a cliff in the spectrum (16 harmonics of a
+ * 110 Hz voice ends at 1.8 kHz), and everything above it is silence dressed up
+ * as signal — useless for judging anything spectral. A glottal pulse train
+ * through formant resonators produces energy all the way to Nyquist, from the
+ * same mechanism real speech uses, at a fraction of the cost.
+ */
 function talkSpurt(seconds: number, sampleRate: number, f0: number, seed: number): Float32Array {
   const n = Math.round(seconds * sampleRate);
   const out = new Float32Array(n);
@@ -73,29 +102,107 @@ function talkSpurt(seconds: number, sampleRate: number, f0: number, seed: number
   const syllablePhase = next() * Math.PI * 2;
   const fricative = noiseArray(n, seed + 1);
 
-  let phase = 0;
+  // Prosody. Without this the harmonics sit at exactly the same frequencies for
+  // the whole file, and the long-term average spectrum resolves a deep comb
+  // instead of a spectral envelope — an artefact no real voice produces, and
+  // one that would send any spectral stage chasing the pitch rather than the
+  // room. Real speech moves: pitch declines across an utterance, rises and
+  // falls with intonation, and jitters cycle to cycle.
+  const declinationDepth = 0.12; // ~+12% at the start to -12% at the end
+  let jitter = 0;
+
+  // Glottal source: a train of Rosenberg pulses. The pulse shape is smooth, so
+  // its spectrum falls at roughly -12 dB/octave the way a real glottal flow
+  // does, without the aliasing a naive sawtooth would bring.
+  const openQuotient = 0.4;
+  const closeQuotient = 0.16;
+  let cycle = 0; // position within the current pitch period, in [0, 1)
+
   for (let i = 0; i < n; i++) {
     const t = i / sampleRate;
-    // Slow pitch glide, as in real intonation.
-    const pitch = f0 * (1 + 0.06 * Math.sin(2 * Math.PI * 0.7 * t + syllablePhase));
-    phase += (2 * Math.PI * pitch) / sampleRate;
+    const declination = 1 + declinationDepth * (1 - (2 * i) / Math.max(1, n - 1));
+    const intonation = 1 + 0.06 * Math.sin(2 * Math.PI * 0.7 * t + syllablePhase);
+    // Slow random walk, bounded, for cycle-to-cycle variation.
+    jitter = Math.max(-0.03, Math.min(0.03, jitter + (next() - 0.5) * 0.0008));
 
-    let s = 0;
-    for (let k = 1; k <= 16; k++) {
-      const harmonic = k * pitch;
-      if (harmonic > sampleRate / 2) break;
-      s += (formantGain(harmonic) / Math.pow(k, 0.9)) * Math.sin(k * phase);
+    const pitch = f0 * declination * intonation * (1 + jitter);
+    cycle += pitch / sampleRate;
+    if (cycle >= 1) cycle -= 1;
+
+    let pulse: number;
+    if (cycle < openQuotient) {
+      pulse = 0.5 * (1 - Math.cos((Math.PI * cycle) / openQuotient));
+    } else if (cycle < openQuotient + closeQuotient) {
+      pulse = Math.cos((Math.PI * (cycle - openQuotient)) / (2 * closeQuotient));
+    } else {
+      pulse = 0;
     }
 
-    // Syllable-rate amplitude modulation, never quite reaching zero.
-    const syllable = 0.25 + 0.75 * Math.pow(
-      0.5 - 0.5 * Math.cos(2 * Math.PI * syllableRate * t + syllablePhase),
-      0.6,
-    );
+    // Aspiration rides with the voicing, as it does in real speech. Kept low:
+    // the radiation difference below applies +6 dB/octave to it as well, and
+    // too much turns the top of the spectrum into rising noise rather than the
+    // falling tilt real speech has.
+    out[i] = pulse - 0.5 + fricative[i] * 0.004;
+  }
+
+  // Lip radiation is a first difference (+6 dB/octave), which turns the
+  // source's -12 into the ~-6 dB/octave tilt measured speech actually shows.
+  let previous = 0;
+  for (let i = 0; i < n; i++) {
+    const current = out[i];
+    out[i] = current - 0.97 * previous;
+    previous = current;
+  }
+
+  // Vocal-tract colouring, moving between vowels. Each vowel filters the whole
+  // source once, then the spurt is assembled from chunks of the results with
+  // short crossfades — cheaper than a time-varying filter and free of the
+  // transients that switching coefficients mid-stream would introduce.
+  const vowelTracks = VOWELS.map((vowel) => applyCascade(out, vowelCascade(vowel, sampleRate)));
+  const chunk = Math.max(1, Math.round(0.18 * sampleRate));
+  const fade = Math.max(1, Math.round(0.02 * sampleRate));
+
+  let previousTrack = vowelTracks[Math.floor(next() * VOWELS.length) % VOWELS.length];
+  for (let start = 0; start < n; start += chunk) {
+    const end = Math.min(n, start + chunk);
+    const track = vowelTracks[Math.floor(next() * VOWELS.length) % VOWELS.length];
+    for (let i = start; i < end; i++) {
+      // Equal-power crossfade from the previous vowel over the chunk's head.
+      const into = i - start;
+      if (into < fade && start > 0) {
+        const t = into / fade;
+        out[i] = previousTrack[i] * Math.cos((t * Math.PI) / 2) + track[i] * Math.sin((t * Math.PI) / 2);
+      } else {
+        out[i] = track[i];
+      }
+    }
+    previousTrack = track;
+  }
+
+  // Syllable-rate amplitude envelope and edge fades, applied last so the
+  // filters see a continuously voiced excitation.
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate;
+    const syllable =
+      0.25 +
+      0.75 *
+        Math.pow(0.5 - 0.5 * Math.cos(2 * Math.PI * syllableRate * t + syllablePhase), 0.6);
     // Gentle fade at the spurt edges so onsets aren't clicks themselves.
     const edge = Math.min(1, Math.min(i, n - 1 - i) / (0.02 * sampleRate));
+    out[i] *= syllable * edge;
+  }
 
-    out[i] = (s * 0.25 + fricative[i] * 0.012 * syllable) * syllable * edge;
+  // Bring the spurt to a sane working level before anything measures it. The
+  // cascade's absolute output depends on formant bandwidths and the radiation
+  // difference, and lands far below the -70 LUFS absolute gate — which would
+  // make the loudness measurement return -Infinity and the caller's
+  // normalisation silently do nothing.
+  let energy = 0;
+  for (let i = 0; i < n; i++) energy += out[i] * out[i];
+  const rms = Math.sqrt(energy / Math.max(1, n));
+  if (rms > 0) {
+    const scale = 0.1 / rms;
+    for (let i = 0; i < n; i++) out[i] *= scale;
   }
 
   return out;

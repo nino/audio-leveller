@@ -14,6 +14,28 @@
 import type { Signal, StageSpec } from "../pipeline/types";
 import { buildChain, DEFAULT_CHAIN } from "../stages";
 import { addClicks, addNoise, cloneSignal, syntheticSpeech, type SpeechSegment } from "./signals";
+import { applyCascade, peakingEq } from "../dsp/biquad";
+
+/** Colour a signal with fixed resonances, as a room and a cheap mic would. */
+function colour(signal: Signal, bands: { freq: number; gainDb: number; q: number }[]): Signal {
+  const cascade = bands.map((b) => peakingEq(signal.sampleRate, b.freq, b.gainDb, b.q));
+  return {
+    sampleRate: signal.sampleRate,
+    length: signal.length,
+    channels: signal.channels.map((ch) => applyCascade(ch, cascade)),
+  };
+}
+
+/** Add a low-frequency tone, standing in for traffic or handling noise. */
+function addRumble(signal: Signal, freq: number, amplitude: number): Signal {
+  const out = cloneSignal(signal);
+  for (const ch of out.channels) {
+    for (let i = 0; i < ch.length; i++) {
+      ch[i] += amplitude * Math.sin((2 * Math.PI * freq * i) / signal.sampleRate);
+    }
+  }
+  return out;
+}
 
 export interface Expectation {
   /** Key from `computeMetrics`. Unknown keys fail the run rather than pass it. */
@@ -85,6 +107,21 @@ const UNDER_CEILING: Expectation = {
   because: "the -1 dBFS limiter ceiling must hold even when segments are boosted",
 };
 
+/**
+ * The ceiling that actually matters. Between two samples the waveform a
+ * converter reconstructs can overshoot both of them, so a sample-peak ceiling
+ * of -1 dBFS routinely passes material that hits -0.3 dBTP on the way out —
+ * and lossy encoders, which reconstruct the same inter-sample content, clip on
+ * it. The limiter detects on the 4x-oversampled envelope so this holds too.
+ */
+const UNDER_TRUE_PEAK_CEILING: Expectation = {
+  metric: "outputTruePeakDbfs",
+  max: -0.95,
+  because:
+    "the ceiling is only meaningful as a true-peak ceiling; a sample-peak " +
+    "limiter leaves inter-sample overshoot for the converter to clip",
+};
+
 const ON_TARGET: Expectation = {
   metric: "segmentLufsError",
   max: 1,
@@ -102,6 +139,7 @@ export const CASES: EvalCase[] = [
     expectations: [
       ON_TARGET,
       UNDER_CEILING,
+      UNDER_TRUE_PEAK_CEILING,
       SNR_PRESERVED,
       {
         metric: "lufsError",
@@ -289,11 +327,14 @@ export const CASES: EvalCase[] = [
       },
       {
         metric: "changeDb",
-        max: -25,
+        max: -15,
         because:
-          "repairing ~40 bursts of a few samples each must leave the other " +
-          "99.9% of the file untouched; more change than this means the " +
-          "detector is firing on clean audio",
+          "repairing ~40 bursts of a few samples each must leave the rest of " +
+          "the file untouched. The bound is loose because the metric is energy " +
+          "ratio, not sample count: 400 repaired samples out of 600k is 6e-4 of " +
+          "the file, but each carries click-sized energy against a crest-heavy " +
+          "programme, so a *correct* repair lands near -20 dB. Transparency is " +
+          "asserted properly on `clean-declick`, where nothing should change",
       },
     ],
   },
@@ -325,4 +366,103 @@ export const CASES: EvalCase[] = [
       },
     ],
   },
+  {
+    name: "clean-declick",
+    description: "Clean speech through de-click alone — the transparency check",
+    chain: buildChain({ only: ["declick"] }),
+    build: () => {
+      const { signal, segments } = programme([-30, -18, -25]);
+      return { input: signal, segments };
+    },
+    expectations: [
+      {
+        metric: "changeDb",
+        max: -60,
+        because:
+          "most material has no clicks at all, so the cost of a de-clicker is " +
+          "measured on clean audio, where it must do essentially nothing. Voiced " +
+          "speech is driven by a glottal pulse every pitch period — impulsive " +
+          "excitation that an outlier detector will happily mistake for clicks — " +
+          "so this is the bound that keeps the analysis block short enough for " +
+          "those pulses to set their own threshold",
+      },
+    ],
+  },
+
+  {
+    name: "clean-eq",
+    description: "Clean speech through EQ alone — an auto-EQ that always acts is not corrective",
+    chain: buildChain({ only: ["eq"] }),
+    build: () => {
+      const { signal, segments } = programme([-30, -18, -25]);
+      return { input: signal, segments };
+    },
+    expectations: [
+      {
+        metric: "spectralFlatteningDb",
+        min: -0.5,
+        max: 1.5,
+        because:
+          "uncoloured speech has nothing to correct; the EQ may shave a little " +
+          "but must not reshape a voice that arrived fine, and must never make " +
+          "the spectrum less even than it found it",
+      },
+    ],
+  },
+
+  {
+    name: "boxy",
+    description: "Speech through room resonances and sub-bass rumble",
+    chain: buildChain({ only: ["eq"] }),
+    build: () => {
+      const { signal, segments } = programme([-30, -18, -25]);
+      // A boxy low-mid mode and a harsh upper-mid peak, plus traffic underneath.
+      const coloured = colour(signal, [
+        { freq: 240, gainDb: 9, q: 3 },
+        { freq: 3200, gainDb: 7, q: 3.5 },
+      ]);
+      return {
+        input: addRumble(coloured, 38, 0.02),
+        reference: cloneSignal(signal),
+        segments,
+      };
+    },
+    expectations: [
+      {
+        metric: "spectralFlatteningDb",
+        min: 1.5,
+        because:
+          "two injected resonances and a rumble tone are exactly what corrective " +
+          "EQ is for; if this does not measurably flatten, the stage is not working",
+      },
+      {
+        metric: "segmentSnrGainDb",
+        min: -1,
+        because: "removing colouration must not cost signal-to-noise",
+      },
+    ],
+  },
+
+  {
+    name: "hot",
+    description: "Quiet crest-heavy speech boosted hard into the ceiling",
+    build: () => {
+      // Quiet enough to need ~20 dB of boost, so the limiter has real work to
+      // do and inter-sample overshoot is where the ceiling gets decided.
+      const { signal, segments } = programme([-43, -41, -44], { floorDbfs: -80 });
+      return { input: signal, segments, targetLufs: TARGET };
+    },
+    expectations: [
+      ON_TARGET,
+      UNDER_CEILING,
+      UNDER_TRUE_PEAK_CEILING,
+      {
+        metric: "segmentSnrGainDb",
+        min: -1,
+        max: 1,
+        because: "limiting hard must still not change speech-to-noise within a segment",
+      },
+    ],
+  },
+
 ];

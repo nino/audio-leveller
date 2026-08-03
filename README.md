@@ -319,8 +319,8 @@ replacement rather than a loudness tool are still to come.
 | **0** | ✅ done | Pipeline skeleton: stage contract, memoised analysis, lazy resampling, progress, JSON report. Leveller ported to a stage, no behaviour change. |
 | **1** | ✅ done | Evaluation harness — seeded synthetic corpus, bounds with stated reasons, baseline comparison. Real fixtures picked up from `eval/fixtures/`. |
 | **2** | ✅ done | De-click: two-sided AR residual detection, MAD threshold, Janssen interpolation with a refit pass. `segmentLufsError` on `clicky` went 7.93 → 0.32 LU, SI-SDR −20.7 → +29.3 dB, worst repair −1.2 dB against local peaks. |
-| **3** | next | Corrective EQ from the long-term average spectrum (a handful of gain-limited shelves and bells, not a 31-band match), rumble high-pass, and a true-peak limiter to replace the current sample-peak one. |
-| **4** | | AI denoise via ONNX (`onnxruntime-node`) with DeepFilterNet3 — models fetched on first run rather than bundled. |
+| **3** | ✅ done | Corrective EQ fitted to the long-term average spectrum (gain-limited bells, cut-biased, boosts gated on noise), rumble high-pass, and a true-peak limiter replacing the sample-peak one. `spectralFlatteningDb` on `boxy` +4.35 dB, +1.22 dB on clean material. |
+| **4** | next | AI denoise via ONNX (`onnxruntime-node`) with DeepFilterNet3 — models fetched on first run rather than bundled. |
 | **5** | | Dereverb — an evaluation between ClearerVoice, Resemble-Enhance and classical WPE before committing to one. |
 | **6** | | Dynamic EQ / resonance suppression, doubling as the de-esser. |
 | **7** | | UI: chain inspector with per-stage bypass and A/B. |

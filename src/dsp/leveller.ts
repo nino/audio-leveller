@@ -17,6 +17,7 @@ import {
   type RoomToneOptions,
   type RoomToneClip,
 } from "./roomtone";
+import { truePeakEnvelope } from "./truepeak";
 
 export interface LevellerOptions extends Partial<SilenceOptions> {
   /** Target loudness for every segment, in LUFS. */
@@ -149,24 +150,26 @@ function gainAt(points: { at: number; db: number }[], sample: number): number {
 }
 
 /**
- * Simple feed-forward peak limiter. Computes a single gain-reduction curve
- * from the loudest channel (preserving the stereo image) with instant attack
- * and a one-pole release, then applies it to every channel in place.
- * Returns the maximum gain reduction applied, in dB.
+ * Feed-forward limiter with a single gain-reduction curve applied to every
+ * channel (preserving the stereo image), instant attack and a one-pole
+ * release. Returns the maximum gain reduction applied, in dB.
+ *
+ * The detector runs on the **true peak**, not the sample peak. Between two
+ * samples the waveform a converter reconstructs can overshoot both of them, so
+ * a sample-peak limiter set to -1 dBFS routinely lets through -0.3 dBTP, and
+ * lossy encoders then clip on the way out. Detecting on the 4x-oversampled
+ * envelope costs one pass and makes the ceiling mean what it says.
  */
 function limit(channels: Float32Array[], ceilingDb: number, sampleRate: number): number {
   const ceiling = dbToLin(ceilingDb);
   const length = channels[0]?.length ?? 0;
   const releaseCoeff = Math.exp(-1 / (0.05 * sampleRate)); // ~50 ms release
+  const peaks = truePeakEnvelope(channels);
   let env = 1; // current gain-reduction factor (1 = no reduction)
   let maxReduction = 1;
 
   for (let i = 0; i < length; i++) {
-    let peak = 0;
-    for (let c = 0; c < channels.length; c++) {
-      const a = Math.abs(channels[c][i]);
-      if (a > peak) peak = a;
-    }
+    const peak = peaks[i];
     const required = peak > ceiling ? ceiling / peak : 1;
     // Instant attack: clamp down immediately; release recovers slowly.
     env = required < env ? required : env + (1 - env) * (1 - releaseCoeff);
