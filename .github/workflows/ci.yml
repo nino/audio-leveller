@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push supersedes an in-flight run on the same branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: Typecheck, tests, evaluation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version comes from the `packageManager` field in package.json, so CI
+      # and a developer's machine cannot drift apart.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Electron is a devDependency but nothing here launches the app, and its
+      # binary is a ~100 MB download per run.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      # The evaluation corpus is the regression gate: every case states bounds
+      # with a reason, and the run exits non-zero when one breaks. The baseline
+      # comparison does not fail the build on its own — it prints what moved, so
+      # a review can see whether a metric shifted and by how much.
+      - name: Evaluation corpus
+        run: pnpm eval -- --baseline eval/baseline.json
+
+  reaper:
+    name: REAPER script
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The ReaScript port is a separate implementation of the levelling maths,
+      # and its test re-levels a synthetic signal and checks it lands on target.
+      # It needs only a Lua interpreter, and this is the one place it gets run —
+      # nothing in the Node toolchain touches it.
+      - name: Install Lua
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: REAPER DSP test
+        run: lua5.4 reaper/test_dsp.lua

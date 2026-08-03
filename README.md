@@ -170,6 +170,9 @@ on and off, compare the reports, and listen to the two outputs.
 
 ## Development
 
+CI runs the same three checks on every pull request, plus the REAPER script's
+own test — `.github/workflows/ci.yml`.
+
 ```bash
 pnpm test           # run the Vitest suite
 pnpm test:watch     # watch mode

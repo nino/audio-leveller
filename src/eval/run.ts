@@ -61,6 +61,10 @@ function parseArgs(argv: string[]): Args {
       return next;
     };
     switch (arg) {
+      // A bare `--` is the conventional argument separator, and `pnpm run x --
+      // --flag` inserts one. Skip it rather than rejecting it as an option.
+      case "--":
+        break;
       case "--case": args.filter = value(); break;
       case "--fixtures": args.fixturesDir = resolve(value()); break;
       case "--baseline": args.baselinePath = value(); break;
