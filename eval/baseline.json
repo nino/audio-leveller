@@ -23,7 +23,8 @@
     "segmentSnrGainDb": 0.17360663198047632,
     "lufsError": 0.0006583940197479876,
     "segmentLufsError": 0.47888276679777775,
-    "resampled": 0
+    "resampled": 0,
+    "programmeLossDb": 0
   },
   "bypass-null": {
     "inputLufs": -21.980397035184353,
@@ -73,7 +74,8 @@
     "segmentSnrGainDb": 1.1386042350996455,
     "lufsError": 0.000020511580867577095,
     "segmentLufsError": 0.47838236655684696,
-    "resampled": 0
+    "resampled": 0,
+    "programmeLossDb": 0
   },
   "quiet": {
     "inputLufs": -45.27059307376705,
@@ -99,7 +101,8 @@
     "segmentSnrGainDb": 3.6066325321516217,
     "lufsError": 0.0006795336206799618,
     "segmentLufsError": 0.5036612807958001,
-    "resampled": 0
+    "resampled": 0,
+    "programmeLossDb": 0.03167277558732451
   },
   "noisy-20db": {
     "inputLufs": -21.938509282457957,
@@ -128,7 +131,8 @@
     "inputSiSdrDb": 22.478595826424712,
     "outputSiSdrDb": 18.474350671584133,
     "siSdrGainDb": -4.004245154840579,
-    "resampled": 0
+    "resampled": 0,
+    "programmeLossDb": 0.1980359531355944
   },
   "noisy-6db": {
     "inputLufs": -22.211499402290247,
@@ -157,7 +161,8 @@
     "inputSiSdrDb": 8.476934091491108,
     "outputSiSdrDb": 9.78116885370506,
     "siSdrGainDb": 1.3042347622139516,
-    "resampled": 0
+    "resampled": 0,
+    "programmeLossDb": 0.4788914733791714
   },
   "clicky": {
     "inputLufs": -21.940957799864666,
@@ -188,7 +193,8 @@
     "siSdrGainDb": 23.598426199882468,
     "inputClickResidualDb": 54.794721210989515,
     "outputClickResidualDb": 1.640576142905489,
-    "resampled": 0
+    "resampled": 0,
+    "programmeLossDb": 0
   },
   "clicky-stage": {
     "inputLufs": -21.940957799864666,
@@ -237,7 +243,8 @@
     "segmentSnrGainDb": 0.17109995985016013,
     "lufsError": 0.00065775003515256,
     "segmentLufsError": 0.478623622266678,
-    "resampled": 0
+    "resampled": 0,
+    "programmeLossDb": 0
   },
   "rate-44k1": {
     "inputLufs": -21.931848641777027,
@@ -256,14 +263,15 @@
     "outputDecayMs": 45,
     "decayShorteningMs": 5,
     "inputSpectralDeviationDb": 4.5333279309747025,
-    "outputSpectralDeviationDb": 3.4390297113717345,
-    "spectralFlatteningDb": 1.094298219602968,
+    "outputSpectralDeviationDb": 3.439029711371738,
+    "spectralFlatteningDb": 1.0942982196029645,
     "inputSegmentSnrDb": 35.535024639899675,
     "outputSegmentSnrDb": 35.64559514478562,
     "segmentSnrGainDb": 0.110570504885942,
     "lufsError": 0.0008352569726035597,
     "segmentLufsError": 0.37857087777796394,
-    "resampled": 0
+    "resampled": 0,
+    "programmeLossDb": 0
   },
   "clean-declick": {
     "inputLufs": -21.980397035184353,
@@ -288,6 +296,92 @@
     "outputSegmentSnrDb": 35.588638336210195,
     "segmentSnrGainDb": 0,
     "resampled": 0
+  },
+  "clean-denoise": {
+    "inputLufs": -21.980397035184353,
+    "outputLufs": -21.980397035184353,
+    "inputPeakDbfs": -0.9091534698616675,
+    "outputPeakDbfs": -0.9091534698616675,
+    "inputFloorLufs": -60.65277846884752,
+    "outputFloorLufs": -60.65277846884752,
+    "inputSnrDb": 38.67238143366317,
+    "outputSnrDb": 38.67238143366317,
+    "snrGainDb": 0,
+    "changeDb": null,
+    "inputTruePeakDbfs": -0.5572139001217673,
+    "outputTruePeakDbfs": -0.5572139001217673,
+    "inputDecayMs": 60,
+    "outputDecayMs": 60,
+    "decayShorteningMs": 0,
+    "inputSpectralDeviationDb": 4.061438800491047,
+    "outputSpectralDeviationDb": 4.061438800491047,
+    "spectralFlatteningDb": 0,
+    "inputSegmentSnrDb": 35.588638336210195,
+    "outputSegmentSnrDb": 35.588638336210195,
+    "segmentSnrGainDb": 0,
+    "inputSiSdrDb": null,
+    "outputSiSdrDb": null,
+    "siSdrGainDb": null,
+    "resampled": 0,
+    "programmeLossDb": 0
+  },
+  "ood-denoise-onnx": {
+    "inputLufs": -21.938509282457957,
+    "outputLufs": -21.938509282457957,
+    "inputPeakDbfs": -1.0000548939204261,
+    "outputPeakDbfs": -1.0000548939204261,
+    "inputFloorLufs": -41.951605440626096,
+    "outputFloorLufs": -41.951605440626096,
+    "inputSnrDb": 20.01309615816814,
+    "outputSnrDb": 20.01309615816814,
+    "snrGainDb": 0,
+    "changeDb": null,
+    "inputTruePeakDbfs": -0.6401852460501234,
+    "outputTruePeakDbfs": -0.6401852460501234,
+    "inputDecayMs": 65,
+    "outputDecayMs": 65,
+    "decayShorteningMs": 0,
+    "inputSpectralDeviationDb": 4.059391922316303,
+    "outputSpectralDeviationDb": 4.059391922316303,
+    "spectralFlatteningDb": 0,
+    "inputSegmentSnrDb": 17.01588349670167,
+    "outputSegmentSnrDb": 17.01588349670167,
+    "segmentSnrGainDb": 0,
+    "lufsError": 1.0614907175420427,
+    "segmentLufsError": 6.6082612347656635,
+    "inputSiSdrDb": 22.478595826424712,
+    "outputSiSdrDb": 22.478595826424712,
+    "siSdrGainDb": 0,
+    "resampled": 0,
+    "programmeLossDb": 10.075017963206761
+  },
+  "clean-denoise-onnx": {
+    "inputLufs": -21.980397035184353,
+    "outputLufs": -21.980397035184353,
+    "inputPeakDbfs": -0.9091534698616675,
+    "outputPeakDbfs": -0.9091534698616675,
+    "inputFloorLufs": -60.65277846884752,
+    "outputFloorLufs": -60.65277846884752,
+    "inputSnrDb": 38.67238143366317,
+    "outputSnrDb": 38.67238143366317,
+    "snrGainDb": 0,
+    "changeDb": null,
+    "inputTruePeakDbfs": -0.5572139001217673,
+    "outputTruePeakDbfs": -0.5572139001217673,
+    "inputDecayMs": 60,
+    "outputDecayMs": 60,
+    "decayShorteningMs": 0,
+    "inputSpectralDeviationDb": 4.061438800491047,
+    "outputSpectralDeviationDb": 4.061438800491047,
+    "spectralFlatteningDb": 0,
+    "inputSegmentSnrDb": 35.588638336210195,
+    "outputSegmentSnrDb": 35.588638336210195,
+    "segmentSnrGainDb": 0,
+    "inputSiSdrDb": null,
+    "outputSiSdrDb": null,
+    "siSdrGainDb": null,
+    "resampled": 0,
+    "programmeLossDb": 6.220606770995449
   },
   "clean-eq": {
     "inputLufs": -21.980397035184353,
@@ -314,15 +408,15 @@
     "resampled": 0
   },
   "boxy": {
-    "inputLufs": -17.52568789015146,
+    "inputLufs": -17.525687890149896,
     "outputLufs": -17.84916781983334,
     "inputPeakDbfs": 2.2126399175901366,
     "outputPeakDbfs": 2.630995729168129,
     "inputFloorLufs": -43.684999253937264,
     "outputFloorLufs": -43.66997450960918,
-    "inputSnrDb": 26.159311363785804,
+    "inputSnrDb": 26.159311363787367,
     "outputSnrDb": 25.820806689775843,
-    "snrGainDb": -0.3385046740099611,
+    "snrGainDb": -0.3385046740115243,
     "changeDb": -11.51282822732519,
     "inputTruePeakDbfs": 2.444553591374057,
     "outputTruePeakDbfs": 2.861926780035742,
@@ -342,14 +436,14 @@
   },
   "hot": {
     "inputLufs": -42.829238186781524,
-    "outputLufs": -22.99934603681732,
+    "outputLufs": -22.99934603681892,
     "inputPeakDbfs": -23.902845021415153,
     "outputPeakDbfs": -5.499512404983617,
     "inputFloorLufs": -78.65243603703865,
     "outputFloorLufs": -58.79872716383916,
     "inputSnrDb": 35.82319785025713,
-    "outputSnrDb": 35.79938112702184,
-    "snrGainDb": -0.02381672323529216,
+    "outputSnrDb": 35.79938112702024,
+    "snrGainDb": -0.02381672323689088,
     "changeDb": 18.86767097665849,
     "inputTruePeakDbfs": -23.554285123842167,
     "outputTruePeakDbfs": -5.1522608547205015,
@@ -357,14 +451,15 @@
     "outputDecayMs": 65,
     "decayShorteningMs": -5,
     "inputSpectralDeviationDb": 3.7807215102812854,
-    "outputSpectralDeviationDb": 2.293195956726038,
-    "spectralFlatteningDb": 1.4875255535552476,
+    "outputSpectralDeviationDb": 2.293195956725981,
+    "spectralFlatteningDb": 1.4875255535553045,
     "inputSegmentSnrDb": 35.690146875581746,
     "outputSegmentSnrDb": 35.70121385297905,
     "segmentSnrGainDb": 0.011066977397305777,
-    "lufsError": 0.0006539631826782966,
+    "lufsError": 0.0006539631810795754,
     "segmentLufsError": 0.5027389627029599,
-    "resampled": 0
+    "resampled": 0,
+    "programmeLossDb": 0
   },
   "reverberant": {
     "inputLufs": -21.870549052271887,
@@ -389,8 +484,8 @@
     "outputSegmentSnrDb": 48.95875303688095,
     "segmentSnrGainDb": 0.14848426819708038,
     "inputSiSdrDb": 3.342991377343875,
-    "outputSiSdrDb": 4.654565322743032,
-    "siSdrGainDb": 1.3115739453991573,
+    "outputSiSdrDb": 4.654565322743031,
+    "siSdrGainDb": 1.3115739453991564,
     "resampled": 0
   },
   "dry-dereverb": {
