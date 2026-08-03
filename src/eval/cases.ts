@@ -13,7 +13,7 @@
 
 import type { Signal, StageSpec } from "../pipeline/types";
 import { buildChain, DEFAULT_CHAIN } from "../stages";
-import { addClicks, addNoise, cloneSignal, syntheticSpeech, type SpeechSegment } from "./signals";
+import { addClicks, addNoise, addReverb, cloneSignal, syntheticSpeech, type SpeechSegment } from "./signals";
 import { applyCascade, peakingEq } from "../dsp/biquad";
 
 /** Colour a signal with fixed resonances, as a room and a cheap mic would. */
@@ -491,6 +491,57 @@ export const CASES: EvalCase[] = [
         min: -1,
         max: 1,
         because: "limiting hard must still not change speech-to-noise within a segment",
+      },
+    ],
+  },
+
+  {
+    name: "reverberant",
+    description: "Speech in a live room, dereverb stage alone",
+    chain: buildChain({ only: ["dereverb"] }),
+    build: () => {
+      const { signal, segments } = programme([-30, -18, -25], { floorDbfs: -75 });
+      return {
+        input: addReverb(signal, { rt60Sec: 0.7, directToReverbDb: 4 }),
+        reference: cloneSignal(signal),
+        segments,
+      };
+    },
+    expectations: [
+      {
+        metric: "decayShorteningMs",
+        min: 10,
+        because:
+          "the room's tail must measurably shorten. Single-channel WPE is a " +
+          "modest tool — roughly 12% off the decay here — and the bound is set " +
+          "to catch it stopping working, not to claim it transforms the recording",
+      },
+      {
+        metric: "siSdrGainDb",
+        min: 0,
+        because: "whatever it removes must move the signal toward the dry reference, not away",
+      },
+    ],
+  },
+
+  {
+    name: "dry-dereverb",
+    description: "A dry recording through the dereverb stage — it should decline to act",
+    chain: buildChain({ only: ["dereverb"] }),
+    build: () => {
+      const { signal, segments } = programme([-30, -18, -25], { floorDbfs: -75 });
+      return { input: signal, reference: cloneSignal(signal), segments };
+    },
+    expectations: [
+      {
+        metric: "changeDb",
+        max: -300,
+        because:
+          "dry speech decays in ~35 ms, far below the engagement threshold, so " +
+          "the stage must pass the signal through untouched rather than " +
+          "processing it slightly. WPE is not transparent enough to run " +
+          "unconditionally: at the pipeline's usual frame size it reduces a dry " +
+          "recording to 1 dB SI-SDR",
       },
     ],
   },

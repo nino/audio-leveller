@@ -321,8 +321,8 @@ replacement rather than a loudness tool are still to come.
 | **2** | ✅ done | De-click: two-sided AR residual detection, MAD threshold, Janssen interpolation with a refit pass. `segmentLufsError` on `clicky` went 7.93 → 0.32 LU, SI-SDR −20.7 → +29.3 dB, worst repair −1.2 dB against local peaks. |
 | **3** | ✅ done | Corrective EQ fitted to the long-term average spectrum (gain-limited bells, cut-biased, boosts gated on noise), rumble high-pass, and a true-peak limiter replacing the sample-peak one. `spectralFlatteningDb` on `boxy` +4.35 dB, +1.22 dB on clean material. |
 | **4** | ✅ partly | Noise reduction with a pluggable backend. The classical spectral suppressor is built, tested and default: +11.8 dB of segment SNR on a 20 dB-noise source, scaled back automatically on clean ones. The ONNX backend is wired (discovery, checksum, refusal-to-load-unverified) but **its inference path has never been run** — this environment cannot reach the hosts that serve the weights. |
-| **5** | next | Dereverb — an evaluation between ClearerVoice, Resemble-Enhance and classical WPE before committing to one. |
-| **6** | | Dynamic EQ / resonance suppression, doubling as the de-esser. |
+| **5** | ✅ done | Dereverb by weighted prediction error (WPE). The model options in the original plan were unreachable, so the classical one got built — and it earns its place on merit: it cannot invent speech, only subtract a linear prediction. Modest, honestly: ~12% off the decay, +1.3 dB SI-SDR. Engages only on genuinely reverberant material. |
+| **6** | next | Dynamic EQ / resonance suppression, doubling as the de-esser. |
 | **7** | | UI: chain inspector with per-stage bypass and A/B. |
 
 A note on the generative enhancers (phases 4–5): they hallucinate plausible

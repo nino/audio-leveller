@@ -13,6 +13,7 @@
 
 import { preFilter, integratedLoudness } from "../dsp/loudness";
 import { applyCascade, peakingEq } from "../dsp/biquad";
+import { convolve } from "../dsp/convolve";
 import type { Signal } from "../pipeline/types";
 
 /** Small, fast, seedable PRNG (mulberry32). Uniform in [0, 1). */
@@ -355,4 +356,87 @@ export function addClicks(signal: Signal, options: ClickOptions): ClickedSignal 
 
   positions.sort((a, b) => a - b);
   return { signal: out, positions };
+}
+
+export interface RirOptions {
+  /** Time for the tail to fall 60 dB, in seconds. */
+  rt60Sec: number;
+  /** How far the reverberant energy sits below the direct sound, in dB. */
+  directToReverbDb: number;
+  /** Gap between the direct sound and the first reflection. */
+  preDelaySec: number;
+  seed: number;
+}
+
+export const DEFAULT_RIR_OPTIONS: RirOptions = {
+  rt60Sec: 0.6,
+  directToReverbDb: 6,
+  preDelaySec: 0.012,
+  seed: 31337,
+};
+
+/**
+ * A synthetic room impulse response: direct sound, then an exponentially
+ * decaying noise tail after a pre-delay.
+ *
+ * Real rooms have discrete early reflections before the tail goes diffuse, and
+ * a frequency-dependent decay (high frequencies die first). This models the
+ * decay envelope and the direct-to-reverberant ratio, which are what a
+ * dereverberator has to work against, and is honest about being a model rather
+ * than a measurement — a measured RIR would be better material once real
+ * fixtures exist.
+ */
+export function syntheticRir(
+  sampleRate: number,
+  options: Partial<RirOptions> = {},
+): Float32Array {
+  const opts = { ...DEFAULT_RIR_OPTIONS, ...options };
+  const length = Math.max(2, Math.round(opts.rt60Sec * 1.5 * sampleRate));
+  const rir = new Float32Array(length);
+  const preDelay = Math.round(opts.preDelaySec * sampleRate);
+  const next = rng(opts.seed);
+
+  // Direct sound.
+  rir[0] = 1;
+
+  // Diffuse tail: noise under an exponential envelope reaching -60 dB at rt60.
+  const decay = Math.log(1000) / (opts.rt60Sec * sampleRate); // ln(10^3) over rt60
+  let tailEnergy = 0;
+  for (let i = preDelay; i < length; i++) {
+    const envelope = Math.exp(-decay * (i - preDelay));
+    const sample = (next() * 2 - 1) * envelope;
+    rir[i] = sample;
+    tailEnergy += sample * sample;
+  }
+
+  // Scale the tail so the direct-to-reverberant ratio comes out as requested.
+  if (tailEnergy > 0) {
+    const wanted = Math.pow(10, -opts.directToReverbDb / 10); // energy ratio vs direct (=1)
+    const scale = Math.sqrt(wanted / tailEnergy);
+    for (let i = preDelay; i < length; i++) rir[i] *= scale;
+  }
+
+  return rir;
+}
+
+/** Put a signal in a room. Level is preserved so loudness comparisons stay meaningful. */
+export function addReverb(
+  signal: Signal,
+  options: Partial<RirOptions> = {},
+): Signal {
+  const rir = syntheticRir(signal.sampleRate, options);
+  const channels = signal.channels.map((ch) => convolve(ch, rir));
+
+  // Convolution adds energy; renormalise to the dry loudness so that what the
+  // metrics see afterwards is reverberation, not a level change.
+  const dry = integratedLoudness(preFilter(signal.channels, signal.sampleRate), signal.sampleRate);
+  const wet = integratedLoudness(preFilter(channels, signal.sampleRate), signal.sampleRate);
+  if (Number.isFinite(dry) && Number.isFinite(wet)) {
+    const gain = Math.pow(10, (dry - wet) / 20);
+    for (const ch of channels) {
+      for (let i = 0; i < ch.length; i++) ch[i] *= gain;
+    }
+  }
+
+  return { sampleRate: signal.sampleRate, length: signal.length, channels };
 }

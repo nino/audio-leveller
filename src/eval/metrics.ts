@@ -16,6 +16,10 @@ import type { Signal } from "../pipeline/types";
 import { integratedLoudness, loudnessOfRange, preFilter } from "../dsp/loudness";
 import { computeLtas, broadTarget } from "../dsp/ltas";
 import { truePeakDbfs } from "../dsp/truepeak";
+import { reverbDecayMs } from "../dsp/reverbtime";
+
+// Re-exported so eval code has one place to import metrics from.
+export { reverbDecayMs };
 import type { SpeechSegment } from "./signals";
 
 /** Metric keys are free-form so stages can add their own; values are always dB-ish. */
@@ -355,6 +359,15 @@ export function computeMetrics(inputs: MetricInputs): Metrics {
     inputTruePeakDbfs: truePeakDbfs(input.channels),
     outputTruePeakDbfs: truePeakDbfs(output.channels),
   };
+
+  {
+    // Reverberation decay, so a dereverb stage can be judged on what it did.
+    const before = reverbDecayMs(input);
+    const after = reverbDecayMs(output);
+    metrics.inputDecayMs = before;
+    metrics.outputDecayMs = after;
+    metrics.decayShorteningMs = Number.isFinite(before) && Number.isFinite(after) ? before - after : 0;
+  }
 
   if (segments) {
     const inDeviation = spectralDeviationDb(input, segments);

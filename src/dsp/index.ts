@@ -13,4 +13,7 @@ export * from "./eq";
 export * from "./truepeak";
 export * from "./stft";
 export * from "./denoise";
+export * from "./convolve";
+export * from "./dereverb";
+export * from "./reverbtime";
 export * from "./leveller";
