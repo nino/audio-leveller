@@ -12,11 +12,13 @@
 import { registerStage } from "../pipeline/registry";
 import type { Stage, StageSpec } from "../pipeline/types";
 import { declickStage } from "./declick";
+import { denoiseStage } from "./denoise";
 import { eqStage } from "./eq";
 import { levelStage } from "./level";
 
 const BUILT_IN: Stage<object, unknown>[] = [
   declickStage as Stage<object, unknown>,
+  denoiseStage as Stage<object, unknown>,
   eqStage as Stage<object, unknown>,
   levelStage as Stage<object, unknown>,
 ];
@@ -57,7 +59,8 @@ export function buildChain(options: ChainOptions = {}): StageSpec[] {
   }));
 }
 
-export { declickStage, eqStage, levelStage };
+export { declickStage, denoiseStage, eqStage, levelStage };
 export type { DeclickParams } from "./declick";
+export type { DenoiseParams } from "./denoise";
 export type { EqParams } from "./eq";
 export type { LevelParams } from "./level";

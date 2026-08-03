@@ -91,3 +91,18 @@ export function powerSpectrum(
   }
   return out;
 }
+
+/** In-place inverse complex FFT, normalised by 1/n. */
+export function ifftComplex(data: Float64Array): void {
+  const n = data.length / 2;
+  if (n < 1) return;
+
+  // conj -> forward -> conj -> scale is the standard inverse-by-forward trick.
+  for (let i = 0; i < n; i++) data[2 * i + 1] = -data[2 * i + 1];
+  fftComplex(data);
+  const scale = 1 / n;
+  for (let i = 0; i < n; i++) {
+    data[2 * i] *= scale;
+    data[2 * i + 1] = -data[2 * i + 1] * scale;
+  }
+}

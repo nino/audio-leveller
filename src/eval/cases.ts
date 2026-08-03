@@ -97,8 +97,25 @@ const SNR_PRESERVED: Expectation = {
   max: 1,
   because:
     "levelling applies one gain per segment, which moves that segment's speech " +
-    "and noise together; a denoiser should push this positive, nothing else may move it",
+    "and noise together, so on material clean enough that the denoiser backs " +
+    "off to nothing this must not move at all. It doubles as the check that the " +
+    "backoff works: if the denoiser started processing clean sources, this is " +
+    "where it would show",
 };
+
+/** Cases noisy enough that the denoiser is supposed to engage. */
+function snrImproved(minDb: number, maxDb: number, note: string): Expectation {
+  return {
+    metric: "segmentSnrGainDb",
+    min: minDb,
+    max: maxDb,
+    because:
+      `the denoiser should engage here and deliver ${minDb} dB or better. ` +
+      `${note} The upper bound matters as much as the lower: over-delivering ` +
+      "means it is reaching past what the source supports, which is where " +
+      "artefacts come from",
+  };
+}
 
 /** Below the limiter ceiling, with a hair of slack for float rounding. */
 const UNDER_CEILING: Expectation = {
@@ -200,7 +217,16 @@ export const CASES: EvalCase[] = [
       const { signal, segments } = programme([-45, -44, -46], { floorDbfs: -78 });
       return { input: signal, segments, targetLufs: TARGET };
     },
-    expectations: [ON_TARGET, UNDER_CEILING, SNR_PRESERVED],
+    expectations: [
+      ON_TARGET,
+      UNDER_CEILING,
+      snrImproved(
+        1.5,
+        6,
+        "Its floor sits ~31 dB down, so the taper gives it only a few dB " +
+          "rather than the full amount — that is the intended behaviour, not a shortfall.",
+      ),
+    ],
   },
 
   {
@@ -218,15 +244,17 @@ export const CASES: EvalCase[] = [
     expectations: [
       { ...ON_TARGET, max: 1.5, because: "noise costs the measurement a little accuracy" },
       UNDER_CEILING,
-      SNR_PRESERVED,
+      snrImproved(6, 14, "A 20 dB floor is squarely in range for the full 12 dB."),
       {
         metric: "siSdrGainDb",
         min: -8,
         because:
-          "noise makes the leveller's own decisions less accurate — it measures " +
-          "segment loudness through the noise — so the score drifts even though " +
-          "nothing here claims to remove noise; this bound catches a collapse, " +
-          "and the denoiser should turn it positive",
+          "kept as a collapse detector, not as a measure of the denoiser. It is " +
+          "confounded here: the reference goes through the same chain, but the " +
+          "chain is input-dependent — the clean reference is quiet enough that " +
+          "the denoiser backs off, while the noisy input gets the full 12 dB — so " +
+          "the two take different paths and the score reflects that as much as " +
+          "any damage. `segmentSnrGainDb` is the honest number for this stage",
       },
     ],
   },
@@ -245,13 +273,15 @@ export const CASES: EvalCase[] = [
     },
     expectations: [
       UNDER_CEILING,
-      SNR_PRESERVED,
+      snrImproved(6, 14, "At 6 dB SNR there is plenty to remove."),
       {
         metric: "siSdrGainDb",
-        min: -8,
+        min: 0,
         because:
-          "same drift as noisy-20db, and at 6 dB SNR the leveller is measuring " +
-          "almost as much noise as speech; a collapse past this means segmentation broke",
+          "the one case where SI-SDR is not confounded: at 6 dB SNR there is so " +
+          "much noise that the denoiser engages on the reference too, and the " +
+          "score must actually improve. If removing noise this thick does not " +
+          "move the signal closer to clean, the stage is not working",
       },
     ],
   },

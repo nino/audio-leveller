@@ -11,4 +11,6 @@ export * from "./biquad";
 export * from "./ltas";
 export * from "./eq";
 export * from "./truepeak";
+export * from "./stft";
+export * from "./denoise";
 export * from "./leveller";

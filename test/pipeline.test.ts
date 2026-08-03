@@ -246,7 +246,9 @@ describe("buildChain", () => {
 
   it("rejects unknown stage names instead of ignoring them", () => {
     expect(() => buildChain({ bypass: ["levl"] })).toThrow(/Unknown stage "levl"/);
-    expect(() => buildChain({ only: ["denoise"] })).toThrow(/Unknown stage "denoise"/);
+    // Deliberately a name no future stage will claim: this test previously
+    // used "denoise", which stopped being unknown the moment that stage landed.
+    expect(() => buildChain({ only: ["not-a-stage"] })).toThrow(/Unknown stage "not-a-stage"/);
     expect(() => buildChain({ params: { nope: {} } })).toThrow(/Unknown stage "nope"/);
   });
 });
