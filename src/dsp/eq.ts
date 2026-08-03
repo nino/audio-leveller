@@ -18,7 +18,7 @@
  *     safe; boosting a notch dredges up whatever lives down there;
  *   - no boosts where the noise floor is close — boosting a band whose SNR is
  *     poor is buying timbre with noise;
- *   - deviations under a threshold (1.5 dB) are left alone entirely. Small
+ *   - deviations under a threshold (2 dB) are left alone entirely. Small
  *     wiggles are what voices sound like.
  */
 

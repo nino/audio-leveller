@@ -4,17 +4,36 @@ A local, [Auphonic](https://auphonic.com)-style audio processing pipeline for
 spoken word — everything runs on your machine, nothing is uploaded. Drag a
 `.wav` file onto the window and it writes the processed result next to it.
 
-The chain currently runs two stages — **de-click**, then the **leveller** the
-project grew out of:
+It writes two files next to the input:
 
-- **`<name>_processed.wav`** — impulsive clicks repaired, then every speech
-  segment normalised to **−23 LUFS** with smooth gain ramps across the
+- **`<name>_processed.wav`** — the recording through the whole chain: clicks
+  repaired, steady noise attenuated, late reverberation suppressed, room and
+  microphone colouration corrected, resonances and sibilance tamed, and every
+  speech segment normalised to **−23 LUFS** with smooth gain ramps across the
   silences in between.
 - **`<name>_roomtone.wav`** — a seamless **room-tone bed** built from the
   cleanest bits of the silences (see below).
 
-Corrective EQ, dynamic EQ and AI noise/reverb removal are the stages being
-built next — see [Roadmap](#roadmap).
+## The chain
+
+Six stages, in order. Each decides for itself whether it has anything to do and
+says so in the report — a stage that acts on material needing no treatment is a
+cost with no benefit, so most of them can decline.
+
+| stage | what it does | when it declines |
+| ----- | ------------ | ---------------- |
+| `declick` | Finds impulsive damage on the linear-prediction residual and rebuilds it by AR interpolation. | Refuses entirely if detection covers more than 2% of the file — the threshold is wrong for that material. |
+| `denoise` | Attenuates steady noise by Wiener suppression with a decision-directed SNR estimate. | Scales itself back as the source gets cleaner, to nothing at a 35 dB noise floor. |
+| `dereverb` | Suppresses late reverberation by weighted prediction error. | Passes dry material through untouched, judged by a blind decay measurement. |
+| `eq` | Corrects room and microphone colouration from the long-term average spectrum. | Places no bands when the spectrum is already even. |
+| `dyneq` | Suppresses resonances and sibilance while they occur — this is also the de-esser. | Cannot decline (it is per-frame by nature), so its transparency is measured instead. |
+| `level` | Normalises each speech segment to a target loudness, with a true-peak limiter. | — |
+
+The order is load-bearing. De-click comes first because impulses are
+out-of-distribution for any denoiser and get smeared rather than removed. EQ
+comes after the denoiser and dereverberator because both change the spectrum you
+would otherwise be fitting a curve to. Levelling is last so the loudness target
+is measured on the audio that actually gets written.
 
 ## De-click
 
@@ -47,7 +66,7 @@ residual of even a perfect repair is the unknowable noise realisation that was
 under the click (~0 dB against the local peaks); repairs measure −1.2 dB, a
 surviving click +40.
 
-## The pipeline
+## Architecture
 
 Processing is a list of **stages**, each a pure function from a signal plus
 parameters to a new signal plus a report. Uniform stages are what make per-stage
