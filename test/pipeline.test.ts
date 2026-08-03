@@ -194,7 +194,9 @@ describe("pipeline", () => {
   it("produces a JSON-serialisable report", () => {
     const { report } = runPipeline(testSignal(), { stages: buildChain() });
     expect(() => JSON.stringify(report)).not.toThrow();
-    expect(JSON.parse(JSON.stringify(report)).stages[0].name).toBe("level");
+    expect(JSON.parse(JSON.stringify(report)).stages.map((s: { name: string }) => s.name)).toEqual(
+      DEFAULT_CHAIN,
+    );
   });
 });
 
@@ -205,9 +207,11 @@ describe("level stage", () => {
       sr,
     );
     const direct = levelAudio(input, {});
+    // Level stage alone: the full default chain now de-clicks first, which is
+    // allowed to touch the audio and would make this comparison meaningless.
     const piped = runPipeline(
       { sampleRate: input.sampleRate, channels: input.channels, length: input.length },
-      { stages: buildChain() },
+      { stages: buildChain({ only: ["level"] }) },
     );
 
     expect(Array.from(piped.signal.channels[0])).toEqual(Array.from(direct.audio.channels[0]));

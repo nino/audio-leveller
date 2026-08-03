@@ -12,7 +12,7 @@
  */
 
 import type { Signal, StageSpec } from "../pipeline/types";
-import { buildChain } from "../stages";
+import { buildChain, DEFAULT_CHAIN } from "../stages";
 import { addClicks, addNoise, cloneSignal, syntheticSpeech, type SpeechSegment } from "./signals";
 
 export interface Expectation {
@@ -114,7 +114,9 @@ export const CASES: EvalCase[] = [
   {
     name: "bypass-null",
     description: "The same programme with every stage bypassed",
-    chain: buildChain({ bypass: ["level"] }),
+    // Every stage, by name from the chain itself — a new stage added to
+    // DEFAULT_CHAIN is covered by this null test automatically.
+    chain: buildChain({ bypass: [...DEFAULT_CHAIN] }),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25]);
       return { input: signal, segments };
@@ -236,18 +238,63 @@ export const CASES: EvalCase[] = [
     },
     expectations: [
       UNDER_CEILING,
-      // Deliberately no bound on segmentLufsError or click residual yet.
-      //
-      // The harness found something worth knowing here: with clicks present,
-      // segment levelling is off by ~8 LU, far more than the clicks' own energy
-      // could explain. The cause is upstream of levelling — a click landing in a
-      // pause pushes that window above the silence threshold, the pause stops
-      // being detected as silence, and two segments at different levels get
-      // merged and gained as one.
-      //
-      // So de-clicking is not only about audible pops: it repairs segmentation.
-      // Phase 2 should bring segmentLufsError under 1.5 and the click residual
-      // below about -40 dB, and those bounds belong here once it can.
+      {
+        ...ON_TARGET,
+        max: 1.5,
+        because:
+          "phase 1 found clicks were breaking segmentation itself — a click in a " +
+          "pause lifted it over the silence threshold and merged two segments at " +
+          "different levels (~8 LU of error). With de-click ahead of the leveller " +
+          "the pauses are clean again, so levelling must be back on target",
+      },
+      {
+        metric: "siSdrGainDb",
+        min: 10,
+        because:
+          "repairing the clicks should recover most of the 20 dB they cost; " +
+          "well short of this means bursts are being missed or repairs are poor",
+      },
+      // Click audibility is bounded on the `clicky-stage` case instead: at
+      // full chain, the output-vs-processed-reference comparison at click
+      // sites is dominated by micro-differences in the leveller's silence
+      // boundaries between the two renders, which segmentLufsError already
+      // bounds — not by surviving clicks.
+    ],
+  },
+
+  {
+    name: "clicky-stage",
+    description: "The same clicks, de-click stage alone — the repair itself, unconfounded",
+    chain: buildChain({ only: ["declick"] }),
+    build: () => {
+      const { signal } = programme([-30, -18, -25]);
+      const { signal: clicked, positions } = addClicks(signal, {
+        count: 40,
+        relativeAmplitude: 0.9,
+        seed: 5150,
+      });
+      return { input: clicked, reference: cloneSignal(signal), clickPositions: positions };
+    },
+    expectations: [
+      {
+        metric: "outputClickResidualDb",
+        max: 2,
+        because:
+          "no repair may poke meaningfully above the peaks already present " +
+          "around it (±10 ms) — that is what makes a click audible. The bound " +
+          "sits just above the theoretical floor: at a pause site the residual " +
+          "of even a perfect repair is the unknowable noise realisation that " +
+          "was under the click, which lands at ~0 dB on this peak-vs-local-peak " +
+          "measure. Repairs currently reach -1.2 dB; a missed click reads +40",
+      },
+      {
+        metric: "changeDb",
+        max: -25,
+        because:
+          "repairing ~40 bursts of a few samples each must leave the other " +
+          "99.9% of the file untouched; more change than this means the " +
+          "detector is firing on clean audio",
+      },
     ],
   },
 

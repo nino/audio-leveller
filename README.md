@@ -4,15 +4,48 @@ A local, [Auphonic](https://auphonic.com)-style audio processing pipeline for
 spoken word — everything runs on your machine, nothing is uploaded. Drag a
 `.wav` file onto the window and it writes the processed result next to it.
 
-Today the chain contains one stage, the leveller it grew out of:
+The chain currently runs two stages — **de-click**, then the **leveller** the
+project grew out of:
 
-- **`<name>_processed.wav`** — every speech segment normalised to **−23 LUFS**
-  with smooth gain ramps across the silences in between.
+- **`<name>_processed.wav`** — impulsive clicks repaired, then every speech
+  segment normalised to **−23 LUFS** with smooth gain ramps across the
+  silences in between.
 - **`<name>_roomtone.wav`** — a seamless **room-tone bed** built from the
   cleanest bits of the silences (see below).
 
-De-click, corrective EQ, dynamic EQ and AI noise/reverb removal are the stages
-being built next — see [Roadmap](#roadmap).
+Corrective EQ, dynamic EQ and AI noise/reverb removal are the stages being
+built next — see [Roadmap](#roadmap).
+
+## De-click
+
+Detection runs on the linear-prediction residual: over a few tens of
+milliseconds speech is well described by an all-pole (AR) model, and a click —
+which owes nothing to the samples around it — leaves a spike in the prediction
+error far larger than anything speech produces. Three details carry the
+quality (see `src/dsp/declick.ts`):
+
+- **Two-sided detection.** One corrupt sample pollutes the *forward* residual
+  for a whole model order after it, so thresholding it alone flags (and
+  "repairs") ~32 samples of good audio per click. Requiring the *backward*
+  residual to agree isolates exactly the damaged samples.
+- **Robust statistics.** The threshold is set from the median absolute
+  deviation of the residual, not its standard deviation — the clicks
+  themselves would inflate a standard deviation and hide behind it. Blocks
+  where detections are *dense* are skipped entirely (clicks are rare by
+  definition; a dense block is a transient the model doesn't fit), and the
+  stage refuses to touch the file at all if detection covers more than 2% of
+  it.
+- **Repair, then refit, then repair again.** Gaps are rebuilt by least-squares
+  AR interpolation (Janssen), which reconstructs the resonance rather than
+  bridging the hole. The first repair uses the model that did the detecting —
+  fitted on a block *containing the click*, which in quiet audio describes the
+  click more than the audio. So the model is refitted on the repaired
+  neighbourhood and the gap interpolated once more.
+
+The eval bound reflects what repair can honestly achieve: at a pause site the
+residual of even a perfect repair is the unknowable noise realisation that was
+under the click (~0 dB against the local peaks); repairs measure −1.2 dB, a
+surviving click +40.
 
 ## The pipeline
 
@@ -235,7 +268,7 @@ Each case states **bounds with reasons**, not snapshots of current behaviour, an
 | `segmentSnrGainDb` | **the transparency check** — did a stage move speech and noise apart |
 | `snrGainDb` | the whole-file version: what levelling *costs* in noise |
 | `siSdrGainDb` | did the chain damage the signal relative to a clean reference |
-| `outputClickResidualDb` | how loud the worst surviving click is |
+| `outputClickResidualDb` | how *audible* the worst surviving click is: residual peak vs the local peaks around it (±10 ms) |
 | `changeDb` | did a stage touch the audio at all (`-inf` = bit-identical) |
 
 Two of these deserve a note, because getting them wrong makes a harness that
@@ -254,18 +287,27 @@ lies to you:
 
 ### What the current baseline says
 
-Two findings worth carrying into later phases:
+Findings worth carrying forward:
 
-- **Clicks break segmentation, not just ears.** On the `clicky` case, segment
-  levelling is off by ~8 LU — far more than the clicks' own energy explains. A
-  click landing in a pause lifts that window above the silence threshold, the
-  pause stops being detected as silence, and two segments at different levels
-  get merged and gained as one. De-clicking repairs segmentation.
+- **Clicks were breaking segmentation, not just ears** — phase 1 measured ~8 LU
+  of segment-levelling error on the `clicky` case, because a click landing in a
+  pause lifted it over the silence threshold and merged two segments at
+  different levels. With de-click ahead of the leveller (phase 2), that error
+  is 0.32 LU and SI-SDR on the case swung from −20.7 to +29.3 dB. The eval
+  bounds now hold segmentation to ≤1.5 LU with clicks present.
 
 - **Noise degrades the leveller's decisions.** SI-SDR drifts about 4–5 dB on the
   noisy cases even though nothing in the chain touches noise: the leveller is
   measuring segment loudness *through* the noise and choosing different gains
   than it would on clean audio. This is the baseline the denoiser has to beat.
+
+- **Click-repair quality has a physical floor, and the metric had to learn it.**
+  The click-audibility metric was rewritten twice: whole-file-RMS normalisation
+  punished good repairs in loud speech and forgave bad ones in silence, and
+  local-RMS still sat crest-factor above a perfect repair. It now compares the
+  residual peak against the local peaks (±10 ms) — like for like. At a pause
+  site even a perfect repair scores ~0 dB on this measure, because the residual
+  is the noise realisation that was under the click, which nothing can know.
 
 ## Roadmap
 
@@ -276,8 +318,8 @@ replacement rather than a loudness tool are still to come.
 | ----- | ------ | ----------- |
 | **0** | ✅ done | Pipeline skeleton: stage contract, memoised analysis, lazy resampling, progress, JSON report. Leveller ported to a stage, no behaviour change. |
 | **1** | ✅ done | Evaluation harness — seeded synthetic corpus, bounds with stated reasons, baseline comparison. Real fixtures picked up from `eval/fixtures/`. |
-| **2** | next | De-click: LPC/autoregressive detection and interpolation. Pure DSP, deterministic, no external dependencies. Target: `segmentLufsError` under 1.5 and click residual below −40 dB on the `clicky` case. |
-| **3** | | Corrective EQ from the long-term average spectrum (a handful of gain-limited shelves and bells, not a 31-band match), rumble high-pass, and a true-peak limiter to replace the current sample-peak one. |
+| **2** | ✅ done | De-click: two-sided AR residual detection, MAD threshold, Janssen interpolation with a refit pass. `segmentLufsError` on `clicky` went 7.93 → 0.32 LU, SI-SDR −20.7 → +29.3 dB, worst repair −1.2 dB against local peaks. |
+| **3** | next | Corrective EQ from the long-term average spectrum (a handful of gain-limited shelves and bells, not a 31-band match), rumble high-pass, and a true-peak limiter to replace the current sample-peak one. |
 | **4** | | AI denoise via ONNX (`onnxruntime-node`) with DeepFilterNet3 — models fetched on first run rather than bundled. |
 | **5** | | Dereverb — an evaluation between ClearerVoice, Resemble-Enhance and classical WPE before committing to one. |
 | **6** | | Dynamic EQ / resonance suppression, doubling as the de-esser. |

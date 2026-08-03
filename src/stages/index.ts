@@ -11,9 +11,13 @@
 
 import { registerStage } from "../pipeline/registry";
 import type { Stage, StageSpec } from "../pipeline/types";
+import { declickStage } from "./declick";
 import { levelStage } from "./level";
 
-const BUILT_IN: Stage<object, unknown>[] = [levelStage as Stage<object, unknown>];
+const BUILT_IN: Stage<object, unknown>[] = [
+  declickStage as Stage<object, unknown>,
+  levelStage as Stage<object, unknown>,
+];
 
 for (const stage of BUILT_IN) registerStage(stage);
 
@@ -51,5 +55,6 @@ export function buildChain(options: ChainOptions = {}): StageSpec[] {
   }));
 }
 
-export { levelStage };
+export { declickStage, levelStage };
+export type { DeclickParams } from "./declick";
 export type { LevelParams } from "./level";

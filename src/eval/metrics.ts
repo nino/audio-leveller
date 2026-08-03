@@ -86,9 +86,28 @@ function residual(reference: Signal, estimate: Signal): Float32Array {
 }
 
 /**
- * How loud the worst surviving click is, relative to programme level (dB).
- * Lower is better; around -60 dB is inaudible. Measured on the gain-aligned
- * residual, so it survives the leveller changing the overall level.
+ * How audible the worst surviving click is (dB). Lower is better; anything
+ * below about -6 dB sits under the signal around it and cannot be heard as a
+ * click.
+ *
+ * The residual peak at each click site is compared against the *local peak*
+ * of the reference (±10 ms), because that is how click audibility works: a
+ * spike is a click when it pokes above what is already there. Two earlier
+ * versions of this metric were wrong in instructive ways:
+ *
+ *   - Normalising by whole-file RMS punished good repairs in loud speech
+ *     (global RMS is dragged down by the pauses) and forgave bad ones in
+ *     silence.
+ *   - Normalising by local RMS still had a false floor: AR interpolation
+ *     necessarily replaces the *unpredictable* part of the signal (fricative
+ *     noise, floor noise) with a different realisation, so in a pause the
+ *     residual is the floor noise itself — and a peak measured against an RMS
+ *     sits crest-factor above it even when the repair is perfect.
+ *
+ * Peak against peak is like for like: a residual spike that stays below the
+ * peaks already present within ±10 ms cannot be heard as a click. In dead
+ * silence the mask is floored at a fraction of the global RMS so the score
+ * cannot explode dividing by nothing.
  */
 export function impulsiveResidualDb(
   reference: Signal,
@@ -98,21 +117,42 @@ export function impulsiveResidualDb(
 ): number {
   if (positions.length === 0) return -Infinity;
 
+  const s = flatten(reference);
+  const x = flatten(estimate);
+  const energy = dot(s, s);
+  const alpha = energy === 0 ? 1 : dot(x, s) / energy;
+  const alphaScale = Math.abs(alpha) > 1e-12 ? Math.abs(alpha) : 1;
   const diff = residual(reference, estimate);
-  const level = rms(flatten(estimate));
-  if (level === 0) return -Infinity;
+  const globalLevel = rms(s);
+  if (globalLevel === 0) return -Infinity;
 
+  const maskHalf = Math.round(0.01 * reference.sampleRate); // ±10 ms
   const guard = 8;
-  let worst = 0;
+  let worst = -Infinity;
+
   for (const channelOffset of reference.channels.map((_, c) => c * reference.length)) {
     for (const pos of positions) {
       const from = Math.max(0, channelOffset + pos - guard);
       const to = Math.min(diff.length, channelOffset + pos + widthSamples + guard);
-      for (let i = from; i < to; i++) worst = Math.max(worst, Math.abs(diff[i]));
+      let peak = 0;
+      for (let i = from; i < to; i++) peak = Math.max(peak, Math.abs(diff[i]));
+      // The residual lives at the estimate's scale, the mask at the
+      // reference's; divide the gain back out so the score is scale-invariant.
+      peak /= alphaScale;
+      if (peak === 0) continue;
+
+      // Local peak of the reference around the site, floored against silence.
+      const maskFrom = Math.max(0, channelOffset + pos - maskHalf);
+      const maskTo = Math.min(s.length, channelOffset + pos + maskHalf);
+      let local = 0;
+      for (let i = maskFrom; i < maskTo; i++) local = Math.max(local, Math.abs(s[i]));
+      const mask = Math.max(local, 0.02 * globalLevel);
+
+      worst = Math.max(worst, 20 * Math.log10(peak / mask));
     }
   }
 
-  return worst > 0 ? 20 * Math.log10(worst / level) : -Infinity;
+  return worst;
 }
 
 /**
