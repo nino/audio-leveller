@@ -5,3 +5,7 @@ release/
 .DS_Store
 scratch/
 *.processed.wav
+
+# Evaluation fixtures are local-only (large, and often not ours to share).
+eval/fixtures/*
+!eval/fixtures/README.md

@@ -141,6 +141,7 @@ on and off, compare the reports, and listen to the two outputs.
 pnpm test           # run the Vitest suite
 pnpm test:watch     # watch mode
 pnpm typecheck      # tsc --noEmit
+pnpm eval           # run the evaluation corpus (see below)
 pnpm dist           # package a distributable (electron-builder)
 ```
 
@@ -209,6 +210,63 @@ out-of-distribution for the model and get smeared rather than removed), EQ after
 it (denoising changes the spectrum you'd otherwise fit a curve to), and levelling
 last so the loudness target is exact.
 
+## Evaluation harness
+
+```bash
+pnpm eval                                   # run the corpus, exit non-zero on a broken bound
+pnpm eval --verbose --case noisy            # every metric for one case
+pnpm eval --baseline eval/baseline.json     # what moved since the baseline
+pnpm eval --wav /tmp/out                    # dump each case's input and output to listen to
+```
+
+The corpus is synthetic and seeded — speech-*shaped* material (harmonic stack,
+formant resonances, syllable-rate envelope, pauses) degraded in known ways, so
+a number that changes always means the code changed. Real recordings dropped
+into `eval/fixtures/` are picked up automatically as extra cases; see the README
+there.
+
+Each case states **bounds with reasons**, not snapshots of current behaviour, and
+`pnpm eval` fails when one breaks. The metrics that matter:
+
+| metric | what it catches |
+| ------ | --------------- |
+| `segmentLufsError` | did every speech segment land on target |
+| `outputPeakDbfs` | did the limiter ceiling hold |
+| `segmentSnrGainDb` | **the transparency check** — did a stage move speech and noise apart |
+| `snrGainDb` | the whole-file version: what levelling *costs* in noise |
+| `siSdrGainDb` | did the chain damage the signal relative to a clean reference |
+| `outputClickResidualDb` | how loud the worst surviving click is |
+| `changeDb` | did a stage touch the audio at all (`-inf` = bit-identical) |
+
+Two of these deserve a note, because getting them wrong makes a harness that
+lies to you:
+
+- **SI-SDR is scored against the clean reference put through the same chain**,
+  not against the raw reference. The leveller changes segment levels on purpose;
+  comparing against raw audio would score that intended change as damage.
+
+- **`segmentSnrGainDb` is local, `snrGainDb` is not.** Pulling segments toward a
+  common level genuinely shrinks whole-file programme-to-floor distance, because
+  boosting a quiet passage boosts its noise with it — so that figure is a
+  diagnostic, not a bound. Measured *within* a segment, where a single gain
+  applies, SNR is invariant, and that is the one worth asserting on. It is also
+  the number a denoiser has to move.
+
+### What the current baseline says
+
+Two findings worth carrying into later phases:
+
+- **Clicks break segmentation, not just ears.** On the `clicky` case, segment
+  levelling is off by ~8 LU — far more than the clicks' own energy explains. A
+  click landing in a pause lifts that window above the silence threshold, the
+  pause stops being detected as silence, and two segments at different levels
+  get merged and gained as one. De-clicking repairs segmentation.
+
+- **Noise degrades the leveller's decisions.** SI-SDR drifts about 4–5 dB on the
+  noisy cases even though nothing in the chain touches noise: the leveller is
+  measuring segment loudness *through* the noise and choosing different gains
+  than it would on clean audio. This is the baseline the denoiser has to beat.
+
 ## Roadmap
 
 The pipeline skeleton is in place; the stages that make this an Auphonic
@@ -217,8 +275,8 @@ replacement rather than a loudness tool are still to come.
 | Phase | Status | Deliverable |
 | ----- | ------ | ----------- |
 | **0** | ✅ done | Pipeline skeleton: stage contract, memoised analysis, lazy resampling, progress, JSON report. Leveller ported to a stage, no behaviour change. |
-| **1** | next | Evaluation harness — a fixture corpus and a `pnpm eval` that renders it and reports per-stage measurements, so later stages can be judged on evidence rather than vibes. |
-| **2** | | De-click: LPC/autoregressive detection and interpolation. Pure DSP, deterministic, no external dependencies. |
+| **1** | ✅ done | Evaluation harness — seeded synthetic corpus, bounds with stated reasons, baseline comparison. Real fixtures picked up from `eval/fixtures/`. |
+| **2** | next | De-click: LPC/autoregressive detection and interpolation. Pure DSP, deterministic, no external dependencies. Target: `segmentLufsError` under 1.5 and click residual below −40 dB on the `clicky` case. |
 | **3** | | Corrective EQ from the long-term average spectrum (a handful of gain-limited shelves and bells, not a 31-band match), rumble high-pass, and a true-peak limiter to replace the current sample-peak one. |
 | **4** | | AI denoise via ONNX (`onnxruntime-node`) with DeepFilterNet3 — models fetched on first run rather than bundled. |
 | **5** | | Dereverb — an evaluation between ClearerVoice, Resemble-Enhance and classical WPE before committing to one. |
