@@ -545,6 +545,20 @@ replacement rather than a loudness tool are still to come.
 | **7** | ✅ done | Chain inspector in the app: every stage says what it actually did, and can be toggled off and re-rendered for A/B. |
 | **8** | ✅ done | Compressor and downward expander, both fitted to a measured before/after pair from a commercial service rather than to taste, plus an optional voicing curve on the EQ. Loudness range 4.98 → 3.80 LU through the chain, against that service's 3.38. |
 
+### Known limitations
+
+- **The room-tone bed still admits breaths.** Clips are scored loudness-first
+  with penalties for clicks and swells, and a breath defeats all three: only
+  moderately louder than the floor, broadband rather than impulsive, and long
+  enough to read as a steady level. It needs a spectral-shape term — a breath
+  is noise, but tilted differently from room tone. The synthetic corpus has no
+  breaths in it, which is why this survived the harness.
+  ([#2](https://github.com/nino/audio-leveller/issues/2))
+- **Dereverb is slow and modest** — roughly 0.6× real time, solving a dense
+  complex system per frequency bin per iteration, for about 12% off the decay.
+  Single-channel dereverberation is a weak tool and the stage correctly
+  declines on dry material.
+
 A note on the generative enhancers (phases 4–5): they hallucinate plausible
 speech detail, which is fine for intelligibility and bad when the speaker's
 actual voice is the point. They will default to conservative settings.

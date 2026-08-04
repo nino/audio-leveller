@@ -121,7 +121,11 @@ function scoreRange(
 
   // Click term: loudest block peak vs the median block peak, in dB.
   const medPeak = median(blockPeak);
-  const clickDb = 20 * Math.log10(Math.max(...blockPeak) / (medPeak + EPS));
+  let loudestBlock = 0;
+  for (const p of blockPeak) {
+    if (p > loudestBlock) loudestBlock = p;
+  }
+  const clickDb = 20 * Math.log10(loudestBlock / (medPeak + EPS));
 
   // Swell/breath term: coefficient of variation of block RMS.
   const mean = blockRms.reduce((a, b) => a + b, 0) / blockRms.length;
@@ -206,7 +210,10 @@ export function buildRoomTone(
 
   // 2. Drop clips more than keepMarginDb dirtier than the cleanest (louder
   //    room, breaths, clicks), keeping at least the single best one.
-  const bestScore = Math.min(...candidates.map((c) => c.score));
+  let bestScore = Infinity;
+  for (const c of candidates) {
+    if (c.score < bestScore) bestScore = c.score;
+  }
   const cutoff = bestScore + opts.keepMarginDb;
   let clips = candidates.filter((c) => c.score <= cutoff);
   if (clips.length === 0) clips = [candidates.reduce((a, b) => (a.score <= b.score ? a : b))];

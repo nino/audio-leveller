@@ -192,3 +192,25 @@ describe("dereverb (WPE)", () => {
     expect(result.channels[1].every((v) => Number.isFinite(v))).toBe(true);
   });
 });
+
+describe("long recordings", () => {
+  it("measures decay on a file with more frames than a spread can carry", () => {
+    // The regression this exists for: `Math.max(...envelope)` where the
+    // envelope holds one entry per 5 ms of audio. It survives every fixture in
+    // this suite and dies on a real 21-minute recording, because V8's argument
+    // limit sits around 65k and that file produces 257,200 frames. Built at a
+    // low rate so the test costs a megabyte rather than a gigabyte.
+    const rate = 2000;
+    const frames = 150_000;
+    const samples = new Float32Array(frames * 2); // 2 samples per 1 ms frame
+    let seed = 99;
+    for (let i = 0; i < samples.length; i++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      samples[i] = ((seed / 0x7fffffff) * 2 - 1) * 0.25;
+    }
+
+    const signal = { sampleRate: rate, channels: [samples], length: samples.length };
+    expect(() => reverbDecayMs(signal, 1)).not.toThrow();
+    expect(Number.isNaN(reverbDecayMs(signal, 1))).toBe(false);
+  });
+});

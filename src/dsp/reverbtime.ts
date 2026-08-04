@@ -44,7 +44,15 @@ export function reverbDecayMs(signal: Signal, frameMs = 5): number {
     envelope[f] = 10 * Math.log10(acc / (frame * signal.channels.length) + 1e-30);
   }
 
-  const peak = Math.max(...envelope);
+  // Spreading the envelope into Math.max would blow the argument limit: at
+  // 5 ms a frame this array has one entry per 5 ms of audio, so a 21-minute
+  // recording arrives with a quarter of a million of them and the call
+  // overflows the stack. Every reduction over an array whose length scales
+  // with the file has to be a loop.
+  let peak = -Infinity;
+  for (let f = 0; f < frames; f++) {
+    if (envelope[f] > peak) peak = envelope[f];
+  }
   // Only consider offsets from frames loud enough to be speech, so the
   // measurement is not dominated by the noise floor wandering.
   const activeThreshold = peak - 25;

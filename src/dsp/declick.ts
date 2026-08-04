@@ -218,7 +218,7 @@ function detect(
     // drop all of it rather than interpolating chunks of real audio.
     const flagged = blockDetections.reduce((sum, d) => sum + (d.end - d.start), 0);
     if (flagged <= options.maxBlockDensity * (to - from)) {
-      detections.push(...blockDetections);
+      for (const d of blockDetections) detections.push(d);
     }
   }
 
