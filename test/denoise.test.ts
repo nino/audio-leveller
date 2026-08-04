@@ -1,4 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { denoise, estimateNoiseProfile, DEFAULT_DENOISE_OPTIONS } from "../src/dsp/denoise";
 import { stft } from "../src/dsp/stft";
 import { syntheticSpeech, addNoise, cloneSignal, rng } from "../src/eval/signals";
@@ -259,15 +263,47 @@ describe("backends", () => {
   it("verifies every file of a model, not just the first", () => {
     // A model is the whole set or nothing: an encoder that matches paired
     // with a decoder that does not is an unknown model, not a usable one.
+    //
+    // Built on a temporary directory rather than against whatever happens to
+    // sit in ~/.audio-leveller. `verifyModel` reports the *first* file that
+    // fails, so asserting that it names the third one only means anything if
+    // the ones before it genuinely verify — on a machine with no weights
+    // installed this passed for the wrong reason, and in CI it failed.
     const spec = MODELS[0];
     expect(Object.keys(spec.files).length).toBeGreaterThan(1);
-    const broken = {
-      ...spec,
-      files: { ...spec.files, dfDecoder: { ...spec.files.dfDecoder, sha256: "b".repeat(64) } },
-    };
-    const result = verifyModel(broken);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.reason).toMatch(/df_dec\.onnx/);
+
+    const dir = mkdtempSync(join(tmpdir(), "audio-leveller-models-"));
+    const previous = process.env.AUDIO_LEVELLER_MODELS;
+    process.env.AUDIO_LEVELLER_MODELS = dir;
+    try {
+      mkdirSync(join(dir, spec.directory), { recursive: true });
+
+      // Stand-in files, pinned to the hashes they actually have.
+      const files: Record<string, { name: string; sha256: string }> = {};
+      for (const [role, file] of Object.entries(spec.files)) {
+        const bytes = Buffer.from(`stand-in for ${file.name}`);
+        writeFileSync(join(dir, spec.directory, file.name), bytes);
+        files[role] = {
+          ...file,
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+        };
+      }
+
+      // The intact set verifies — which is what gives the next assertion force.
+      expect(verifyModel({ ...spec, files }).ok).toBe(true);
+
+      const broken = {
+        ...spec,
+        files: { ...files, dfDecoder: { ...files.dfDecoder, sha256: "b".repeat(64) } },
+      };
+      const result = verifyModel(broken);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.reason).toMatch(/df_dec\.onnx/);
+    } finally {
+      if (previous === undefined) delete process.env.AUDIO_LEVELLER_MODELS;
+      else process.env.AUDIO_LEVELLER_MODELS = previous;
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("pins a checksum for every file it lists", () => {
