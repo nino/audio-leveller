@@ -727,9 +727,7 @@ export const CASES: EvalCase[] = [
   {
     name: "warm-voicing",
     description: "The measured tonal curve, applied to clean speech — it must stay a whisper",
-    chain: chainWith({}, { only: ["eq"] }).map((s) =>
-      s.name === "eq" ? { ...s, params: { ...s.params, voicing: "warm" } } : s,
-    ),
+    chain: buildChain({ only: ["eq"], params: { eq: { voicing: "warm" } } }),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25]);
       return { input: signal, reference: cloneSignal(signal), segments };
@@ -753,7 +751,10 @@ export const CASES: EvalCase[] = [
   {
     name: "clean-eq",
     description: "Clean speech through EQ alone — an auto-EQ that always acts is not corrective",
-    chain: buildChain({ only: ["eq"] }),
+    // Voicing off: this case is about the corrective fitter, and the two are
+    // separate jobs. A fixed tilt riding on top would make the number measure
+    // both and bound neither. The voicing has `warm-voicing` to itself.
+    chain: buildChain({ only: ["eq"], params: { eq: { voicing: "neutral" } } }),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25]);
       return { input: signal, segments };
@@ -774,7 +775,8 @@ export const CASES: EvalCase[] = [
   {
     name: "boxy",
     description: "Speech through room resonances and sub-bass rumble",
-    chain: buildChain({ only: ["eq"] }),
+    // Voicing off, for the same reason as `clean-eq`.
+    chain: buildChain({ only: ["eq"], params: { eq: { voicing: "neutral" } } }),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25]);
       // A boxy low-mid mode and a harsh upper-mid peak, plus traffic underneath.

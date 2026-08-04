@@ -89,7 +89,10 @@ export const DEFAULT_EQ_PARAMS: EqParams = {
   rumbleEnabled: true,
   rumbleFreq: 80,
   rumbleMarginDb: -12,
-  voicing: "neutral",
+  // On by default because it is what this project is trying to sound like, and
+  // because at +1/-1 dB it is small enough that the corrective fit still does
+  // the substantive work. `neutral` turns it off.
+  voicing: "warm",
 };
 
 export interface EqStageReport {

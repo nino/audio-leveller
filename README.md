@@ -25,7 +25,7 @@ is a cost with no benefit, so most of them can decline.
 | `declick` | Finds impulsive damage on the linear-prediction residual and rebuilds it by AR interpolation. | Refuses entirely if detection covers more than 2% of the file — the threshold is wrong for that material. |
 | `denoise` | Attenuates background noise — DeepFilterNet3 when its weights are installed, Wiener suppression otherwise. | Scales itself back as the source gets cleaner, to nothing at a 35 dB noise floor; and throws away any backend's output that costs more than 3 dB of programme loudness. |
 | `dereverb` | Suppresses late reverberation by weighted prediction error. | Passes dry material through untouched, judged by a blind decay measurement. |
-| `eq` | Corrects room and microphone colouration from the long-term average spectrum. | Places no bands when the spectrum is already even. |
+| `eq` | Corrects room and microphone colouration from the long-term average spectrum, then applies a fixed tonal voicing. | Places no corrective bands when the spectrum is already even; the voicing is a taste and always applies unless set to `neutral`. |
 | `dyneq` | Suppresses resonances and sibilance while they occur — this is also the de-esser. | Cannot decline (it is per-frame by nature), so its transparency is measured instead. |
 | `expand` | Pushes the floor down between words, where nothing is masking it. | Passes through untouched when the floor already sits more than 50 dB below the programme. |
 | `compress` | Evens out level *within* a phrase, where segment levelling cannot reach. | Declines on material whose loudness range is already under 3 LU. |
@@ -221,8 +221,9 @@ honest about how much it took.
 
 ### Voicing, and what "their sound" turned out to be
 
-`eq` can apply a fixed tonal tilt on top of its corrective fit, via
-`voicing: "warm"`. Correction and voicing are different jobs kept apart:
+`eq` applies a fixed tonal tilt on top of its corrective fit, via `voicing`,
+which defaults to `"warm"`; `"neutral"` turns it off. Correction and voicing are
+different jobs kept apart:
 correction is fitted per recording and removes what that room and microphone
 added, voicing is the same on every file and is a taste.
 
@@ -238,8 +239,14 @@ recording duller for no reason anyone could hear.
 What survives that correction is very gentle: about **+1 dB under 130 Hz** and
 about **−1 dB across 2.5–5 kHz**, and nothing else outside ±0.6 dB. Which is the
 finding — that service's "sound" is almost entirely its dynamics and its
-per-band suppression, not its tone. The voicing is offered because it is real
-and because it was asked for, not because it is where the character comes from.
+per-band suppression, not its tone. The voicing is on by default because it is
+what this project is trying to sound like and because ±1 dB is small enough to
+leave the corrective fit doing the substantive work — not because it is where
+the character comes from.
+
+The corpus keeps the two apart the same way the stage does: `clean-eq` and
+`boxy` pin `voicing: "neutral"` so they still measure only the fitter, and
+`warm-voicing` bounds the tilt on its own.
 
 ## Architecture
 
