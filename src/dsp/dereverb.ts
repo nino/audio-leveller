@@ -192,6 +192,8 @@ function dereverbBin(
   const floor = meanPower * 1e-3;
   const matrix = new Float64Array(2 * taps * taps);
   const vector = new Float64Array(2 * taps);
+  const historyRe = new Float64Array(taps);
+  const historyIm = new Float64Array(taps);
   const outRe = new Float64Array(frameCount);
   const outIm = new Float64Array(frameCount);
 
@@ -205,24 +207,46 @@ function dereverbBin(
     for (let t = delay + taps; t < frameCount; t++) {
       const weight = 1 / Math.max(power[t], floor);
 
+      // The tap history, read once. The double loop below is 20x20, and
+      // reading `re(t - delay - j)` inside it meant 840 accessor calls per
+      // frame — each one an array-of-arrays indirection through a closure — to
+      // fetch the same twenty complex numbers over and over.
       for (let i = 0; i < taps; i++) {
         const ti = t - delay - i;
-        const ire = re(ti);
-        const iim = im(ti);
+        historyRe[i] = re(ti);
+        historyIm[i] = im(ti);
+      }
+      const yRe = re(t);
+      const yIm = im(t);
 
-        for (let j = 0; j < taps; j++) {
-          const tj = t - delay - j;
-          const jre = re(tj);
-          const jim = im(tj);
+      for (let i = 0; i < taps; i++) {
+        const ire = historyRe[i];
+        const iim = historyIm[i];
+
+        // R is Hermitian — R[j][i] is the conjugate of R[i][j] — so only the
+        // upper triangle is computed and the rest mirrored. That is exact
+        // rather than approximate: IEEE multiplication commutes and negation
+        // is lossless, so the mirrored entry is the same bits the full loop
+        // would have accumulated.
+        for (let j = i; j < taps; j++) {
+          const jre = historyRe[j];
+          const jim = historyIm[j];
           // R[i][j] = x_i * conj(x_j)
+          const real = weight * (ire * jre + iim * jim);
+          const imag = weight * (iim * jre - ire * jim);
           const idx = 2 * (i * taps + j);
-          matrix[idx] += weight * (ire * jre + iim * jim);
-          matrix[idx + 1] += weight * (iim * jre - ire * jim);
+          matrix[idx] += real;
+          matrix[idx + 1] += imag;
+          if (j !== i) {
+            const mirror = 2 * (j * taps + i);
+            matrix[mirror] += real;
+            matrix[mirror + 1] -= imag;
+          }
         }
 
         // r[i] = x_i * conj(y_t)
-        vector[2 * i] += weight * (ire * re(t) + iim * im(t));
-        vector[2 * i + 1] += weight * (iim * re(t) - ire * im(t));
+        vector[2 * i] += weight * (ire * yRe + iim * yIm);
+        vector[2 * i + 1] += weight * (iim * yRe - ire * yIm);
       }
     }
 
@@ -242,11 +266,13 @@ function dereverbBin(
       if (t >= delay + taps) {
         for (let i = 0; i < taps; i++) {
           const ti = t - delay - i;
+          const xre = re(ti);
+          const xim = im(ti);
           const gre = filter[2 * i];
           const gim = filter[2 * i + 1];
           // g^H x  =>  conj(g) * x
-          predRe += gre * re(ti) + gim * im(ti);
-          predIm += gre * im(ti) - gim * re(ti);
+          predRe += gre * xre + gim * xim;
+          predIm += gre * xim - gim * xre;
         }
       }
       outRe[t] = re(t) - predRe;
