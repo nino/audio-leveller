@@ -29,7 +29,15 @@
  * gets its bad reputation. The default 12 dB is deliberately modest.
  */
 
-import { stft, istft, binCount, magnitudes, applyGains, type StftFrames } from "./stft";
+import {
+  processStft,
+  scanStft,
+  stftFrameCount,
+  binCount,
+  magnitudes,
+  applyGains,
+  type StftFrames,
+} from "./stft";
 import { DEFAULT_STFT_OPTIONS } from "./stft";
 import type { SampleRange } from "./ltas";
 
@@ -76,18 +84,34 @@ export interface NoiseProfile {
 // range", so there is no reason for two of them.
 export type { SampleRange } from "./ltas";
 
-/** Which analysis frames fall wholly inside one of the ranges. */
-function framesInRanges(analysis: StftFrames, ranges: SampleRange[]): number[] {
-  const { frameSize, hopSize } = analysis;
-  const indices: number[] = [];
+/** Does frame `f` fall wholly inside one of the ranges? */
+function frameInRanges(
+  f: number,
+  frameSize: number,
+  hopSize: number,
+  ranges: SampleRange[],
+): boolean {
+  // The transform pads by one frame, so frame f covers [f*hop - frameSize, ...).
+  const start = f * hopSize - frameSize;
+  const end = start + frameSize;
+  return ranges.some((r) => start >= r.start && end <= r.end);
+}
 
-  for (let f = 0; f < analysis.frames.length; f++) {
-    // `stft` pads by one frame, so frame f covers [f*hop - frameSize, ...).
-    const start = f * hopSize - frameSize;
-    const end = start + frameSize;
-    if (ranges.some((r) => start >= r.start && end <= r.end)) indices.push(f);
-  }
-  return indices;
+/**
+ * Frames the minimum-statistics fallback will look at.
+ *
+ * It wants the quietest fifth of frames per bin, which means holding a value
+ * per bin per frame — 513 x 241,219 x 8 bytes, very nearly a gigabyte, on a
+ * twenty-minute recording. A noise floor is a stationary property, so it is
+ * estimated just as well from a few thousand frames spread across the file as
+ * from every one of them, and the count that was used is reported either way.
+ * Below the cap nothing changes, which covers everything the eval corpus and
+ * the unit suite contain.
+ */
+const MIN_STATISTICS_FRAME_CAP = 20_000;
+
+function subsampleStride(total: number): number {
+  return total <= MIN_STATISTICS_FRAME_CAP ? 1 : Math.ceil(total / MIN_STATISTICS_FRAME_CAP);
 }
 
 /**
@@ -99,45 +123,97 @@ function framesInRanges(analysis: StftFrames, ranges: SampleRange[]): number[] {
  * continuous speech the quietest frames still contain speech) which is why it
  * is reported, so the caller can be more conservative.
  */
-export function estimateNoiseProfile(
-  analysis: StftFrames,
+type FrameScan = (visit: (spectrum: Float64Array, frameIndex: number) => void) => void;
+
+function estimateProfile(
+  frameSize: number,
+  hopSize: number,
+  total: number,
+  scan: FrameScan,
   pauses: SampleRange[],
 ): NoiseProfile {
-  const bins = binCount(analysis.frameSize);
+  const bins = binCount(frameSize);
   const power = new Float64Array(bins);
-  const usable = framesInRanges(analysis, pauses);
 
-  if (usable.length >= 4) {
+  let usable = 0;
+  for (let f = 0; f < total; f++) {
+    if (frameInRanges(f, frameSize, hopSize, pauses)) usable++;
+  }
+
+  if (usable >= 4) {
     const scratch = new Float64Array(bins);
-    for (const f of usable) {
-      magnitudes(analysis.frames[f], scratch);
+    scan((spectrum, f) => {
+      if (!frameInRanges(f, frameSize, hopSize, pauses)) return;
+      magnitudes(spectrum, scratch);
       for (let k = 0; k < bins; k++) power[k] += scratch[k] * scratch[k];
-    }
-    for (let k = 0; k < bins; k++) power[k] /= usable.length;
-    return { power, frames: usable.length, fromPauses: true };
+    });
+    for (let k = 0; k < bins; k++) power[k] /= usable;
+    return { power, frames: usable, fromPauses: true };
   }
 
   // Minimum statistics: per bin, the mean of the quietest fifth of frames.
-  const total = analysis.frames.length;
   if (total === 0) return { power, frames: 0, fromPauses: false };
 
+  const stride = subsampleStride(total);
+  const kept = Math.ceil(total / stride);
   const perBin: Float64Array[] = [];
-  for (let k = 0; k < bins; k++) perBin.push(new Float64Array(total));
+  for (let k = 0; k < bins; k++) perBin.push(new Float64Array(kept));
   const scratch = new Float64Array(bins);
-  for (let f = 0; f < total; f++) {
-    magnitudes(analysis.frames[f], scratch);
-    for (let k = 0; k < bins; k++) perBin[k][f] = scratch[k] * scratch[k];
-  }
+  let at = 0;
+  scan((spectrum, f) => {
+    if (f % stride !== 0 || at >= kept) return;
+    magnitudes(spectrum, scratch);
+    for (let k = 0; k < bins; k++) perBin[k][at] = scratch[k] * scratch[k];
+    at++;
+  });
 
-  const take = Math.max(1, Math.floor(total * 0.2));
+  const take = Math.max(1, Math.floor(at * 0.2));
   for (let k = 0; k < bins; k++) {
-    const sorted = perBin[k].slice().sort();
+    const sorted = perBin[k].subarray(0, at).slice().sort();
     let acc = 0;
     for (let i = 0; i < take; i++) acc += sorted[i];
     power[k] = acc / take;
   }
 
   return { power, frames: take, fromPauses: false };
+}
+
+/**
+ * Estimate the noise spectrum from an already-materialised analysis.
+ *
+ * Kept for callers that have one in hand; the pipeline itself goes through
+ * {@link estimateNoiseProfileOf}, which never materialises the frames.
+ */
+export function estimateNoiseProfile(
+  analysis: StftFrames,
+  pauses: SampleRange[],
+): NoiseProfile {
+  return estimateProfile(
+    analysis.frameSize,
+    analysis.hopSize,
+    analysis.frames.length,
+    (visit) => analysis.frames.forEach((spectrum, f) => visit(spectrum, f)),
+    pauses,
+  );
+}
+
+/** Estimate the noise spectrum straight from samples, in bounded memory. */
+export function estimateNoiseProfileOf(
+  samples: Float32Array,
+  pauses: SampleRange[],
+  frameSize: number,
+  hopSize: number,
+): NoiseProfile {
+  const total = stftFrameCount(samples.length, { frameSize, hopSize });
+  return estimateProfile(
+    frameSize,
+    hopSize,
+    total,
+    (visit) => {
+      scanStft(samples, { frameSize, hopSize }, visit);
+    },
+    pauses,
+  );
 }
 
 export interface DenoiseResult {
@@ -156,9 +232,8 @@ function denoiseChannel(
   opts: DenoiseOptions,
   stats: { noiseGain: number; noiseCount: number; speechGain: number; speechCount: number },
 ): { samples: Float32Array; profile: NoiseProfile } {
-  const analysis = stft(samples, { frameSize: opts.frameSize, hopSize: opts.hopSize });
   const bins = binCount(opts.frameSize);
-  const profile = estimateNoiseProfile(analysis, pauses);
+  const profile = estimateNoiseProfileOf(samples, pauses, opts.frameSize, opts.hopSize);
 
   const floor = Math.pow(10, -Math.abs(opts.reductionDb) / 20);
   const gains = new Float64Array(bins);
@@ -167,7 +242,7 @@ function denoiseChannel(
   // Previous frame's clean power estimate, for the decision-directed rule.
   const previousClean = new Float64Array(bins);
 
-  for (const frame of analysis.frames) {
+  const out = processStft(samples, { frameSize: opts.frameSize, hopSize: opts.hopSize }, (frame) => {
     magnitudes(frame, mags);
 
     for (let k = 0; k < bins; k++) {
@@ -218,9 +293,9 @@ function denoiseChannel(
     }
 
     applyGains(frame, smoothed);
-  }
+  });
 
-  return { samples: istft(analysis), profile };
+  return { samples: out, profile };
 }
 
 /**

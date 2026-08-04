@@ -28,7 +28,7 @@
  *   de-esser: not a separate device, just this one weighted by frequency.
  */
 
-import { stft, istft, binCount, magnitudes, applyGains } from "./stft";
+import { processStft, binCount, magnitudes, applyGains } from "./stft";
 
 export interface DynEqOptions {
   frameSize: number;
@@ -196,7 +196,6 @@ export function dynamicEq(
   let totalCells = 0;
 
   const out = channels.map((samples) => {
-    const analysis = stft(samples, { frameSize: opts.frameSize, hopSize: opts.hopSize });
     const mags = new Float64Array(bins);
     const levelDb = new Float64Array(bins);
     const prefix = new Float64Array(bins + 1);
@@ -205,7 +204,7 @@ export function dynamicEq(
     const state = new Float64Array(bins);
     const gains = new Float64Array(bins);
 
-    for (const frame of analysis.frames) {
+    return processStft(samples, { frameSize: opts.frameSize, hopSize: opts.hopSize }, (frame) => {
       magnitudes(frame, mags);
 
       // Each bin's level in dB, computed once. The envelope below reads every
@@ -254,9 +253,7 @@ export function dynamicEq(
       }
 
       applyGains(frame, gains);
-    }
-
-    return istft(analysis);
+    });
   });
 
   return {

@@ -1,6 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { fftComplex, ifftComplex } from "../src/dsp/fft";
-import { stft, istft, magnitudes, applyGains, binCount, sqrtHannWindow } from "../src/dsp/stft";
+import {
+  stft,
+  istft,
+  processStft,
+  scanStft,
+  stftFrameCount,
+  magnitudes,
+  applyGains,
+  binCount,
+  sqrtHannWindow,
+} from "../src/dsp/stft";
 import { sine } from "./helpers";
 import { rng } from "../src/eval/signals";
 
@@ -141,5 +151,67 @@ describe("sqrtHannWindow", () => {
       }
       expect(sum).toBeCloseTo(2, 6);
     }
+  });
+});
+
+describe("streaming stft", () => {
+  const next = rng(4242);
+  const samples = new Float32Array(sr * 3);
+  for (let i = 0; i < samples.length; i++) samples[i] = (next() * 2 - 1) * 0.4;
+
+  it("agrees with stft on how many frames there are", () => {
+    for (const options of [{}, { frameSize: 2048, hopSize: 512 }, { frameSize: 512, hopSize: 128 }]) {
+      expect(stftFrameCount(samples.length, options)).toBe(stft(samples, options).frames.length);
+    }
+  });
+
+  it("reconstructs bit-identically to stft followed by istft", () => {
+    // The whole point of the streaming path is that it is the same computation
+    // with bounded memory, so anything less than bit-identical is a bug.
+    for (const options of [{}, { frameSize: 2048, hopSize: 512 }, { frameSize: 512, hopSize: 128 }]) {
+      const reference = istft(stft(samples, options));
+      const streamed = processStft(samples, options, () => {});
+      expect(Array.from(streamed)).toEqual(Array.from(reference));
+    }
+  });
+
+  it("applies the same modification as editing materialised frames", () => {
+    const gains = (spectrum: Float64Array): void => {
+      // Halve everything above the midpoint, an arbitrary but frame-dependent edit.
+      for (let k = spectrum.length / 4; k < spectrum.length / 2; k++) {
+        spectrum[2 * k] *= 0.5;
+        spectrum[2 * k + 1] *= 0.5;
+      }
+    };
+
+    const analysis = stft(samples);
+    for (const frame of analysis.frames) gains(frame);
+    const reference = istft(analysis);
+    const streamed = processStft(samples, {}, gains);
+
+    expect(Array.from(streamed)).toEqual(Array.from(reference));
+  });
+
+  it("visits every frame in order when only scanning", () => {
+    const seen: number[] = [];
+    const count = scanStft(samples, {}, (_spectrum, f) => seen.push(f));
+    expect(count).toBe(stftFrameCount(samples.length));
+    expect(seen).toEqual([...Array(count).keys()]);
+  });
+
+  it("holds memory that does not grow with the file", () => {
+    // The regression this exists for: a twenty-minute recording needed about
+    // two gigabytes for the frame array alone, and the render spent its time
+    // swapping. Ten times the audio must not mean ten times the footprint.
+    const long = new Float32Array(sr * 30);
+    for (let i = 0; i < long.length; i++) long[i] = (next() * 2 - 1) * 0.2;
+
+    global.gc?.();
+    const before = process.memoryUsage().heapUsed;
+    processStft(long, {}, () => {});
+    const growth = process.memoryUsage().heapUsed - before;
+
+    // The materialised path would need ~57 MB of frames for this signal.
+    expect(growth).toBeLessThan(20e6);
   });
 });
