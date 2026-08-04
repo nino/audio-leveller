@@ -31,7 +31,7 @@ const USAGE = `Usage: audio-leveller <input.wav> [output.wav] [options]
 Options:
   --only <a,b>      run only these stages (in chain order)
   --bypass <a,b>    run the chain but bypass these stages
-  --target <lufs>   target loudness for the level stage (default -23)
+  --target <lufs>   target loudness for the level stage (default -18)
   --report <file>   write the full JSON report to a file
   --json            print the JSON report instead of the text summary
   --quiet           suppress progress output

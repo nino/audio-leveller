@@ -183,7 +183,7 @@ export function segmentLufsError(
     if (end - start < signal.sampleRate * 0.5) continue;
 
     // Gated integrated loudness, not an ungated mean over the range: that is
-    // what "-23 LUFS" means, what the leveller measures to pick its gain, and
+    // what a LUFS target means, what the leveller measures to pick its gain, and
     // what the generator normalises to. An ungated mean reads ~2 LU low on
     // syllable-modulated speech, which would show up here as a phantom error.
     const measured = integratedLoudness(filtered, signal.sampleRate, start, end);

@@ -31,7 +31,16 @@ export interface LevellerOptions extends Partial<SilenceOptions> {
 }
 
 export const DEFAULT_LEVELLER_OPTIONS: LevellerOptions = {
-  targetLufs: -23,
+  /**
+   * -18 LUFS, not the -23 of EBU R128.
+   *
+   * R128 is a broadcast delivery target, and it was the right default when this
+   * was a tool for levelling material on its way *into* someone else's chain.
+   * It is now the chain, delivering finished spoken word, where -18 is the
+   * ordinary target and the one the reference this project is measured against
+   * uses. Broadcast delivery is still one `--target -23` away.
+   */
+  targetLufs: -18,
   maxGainDb: 30,
   ceilingDb: -1,
   minSilenceSec: 1.0,

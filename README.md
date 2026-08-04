@@ -9,7 +9,7 @@ It writes two files next to the input:
 - **`<name>_processed.wav`** — the recording through the whole chain: clicks
   repaired, steady noise attenuated, late reverberation suppressed, room and
   microphone colouration corrected, resonances and sibilance tamed, and every
-  speech segment normalised to **−23 LUFS** with smooth gain ramps across the
+  speech segment normalised to **−18 LUFS** with smooth gain ramps across the
   silences in between.
 - **`<name>_roomtone.wav`** — a seamless **room-tone bed** built from the
   cleanest bits of the silences (see below).
@@ -360,7 +360,7 @@ segment's measured loudness and applied gain, room-tone summary).
 | ---------------- | ---------------------------------------------------------- |
 | `--only <a,b>`   | run only these stages, in chain order                       |
 | `--bypass <a,b>` | run the chain but bypass these stages                       |
-| `--target <lufs>`| target loudness for the level stage (default −23)           |
+| `--target <lufs>`| target loudness for the level stage (default −18)           |
 | `--report <file>`| write the full JSON report to a file                        |
 | `--json`         | print the JSON report instead of the text summary           |
 | `--quiet`        | suppress progress output                                    |
@@ -389,7 +389,7 @@ pnpm dist           # package a distributable (electron-builder)
 
 | option           | default | meaning                                            |
 | ---------------- | ------- | -------------------------------------------------- |
-| `targetLufs`     | `-23`   | target loudness per segment                        |
+| `targetLufs`     | `-18`   | target loudness per segment                        |
 | `minSilenceSec`  | `1.0`   | minimum gap length to count as silence             |
 | `method`         | `"fraction"` | silence threshold: `"fraction"` or `"otsu"`   |
 | `fraction`       | `0.25`  | floor→integrated fraction for the threshold        |

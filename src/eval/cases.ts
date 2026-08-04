@@ -72,7 +72,7 @@ export interface EvalCase {
 }
 
 const SR = 48000;
-const TARGET = -23;
+const TARGET = -18;
 
 /**
  * Pin the denoiser to the classical backend.

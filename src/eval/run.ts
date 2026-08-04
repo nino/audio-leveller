@@ -192,7 +192,7 @@ function runCase(
  * fixtures directory — where the next run would pick them up as fixtures in
  * their own right. That is not a corpus, it is a feedback loop: the harness
  * would end up grading the chain on its own output, and on a room-tone bed
- * that no amount of levelling can bring to -23 LUFS.
+ * that no amount of levelling can bring to the loudness target.
  */
 const DERIVED = /_(processed|roomtone)$/;
 
@@ -225,7 +225,7 @@ async function fixtureCases(dir: string): Promise<EvalCase[]> {
       ),
       build: (): CaseInput => ({
         input: { sampleRate: audio.sampleRate, channels: audio.channels, length: audio.length },
-        targetLufs: -23,
+        targetLufs: -18,
       }),
       // No clean reference exists for real material, so only the
       // self-consistent measurements apply.
