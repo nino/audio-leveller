@@ -160,30 +160,50 @@ function gainAt(points: { at: number; db: number }[], sample: number): number {
 
 /**
  * Feed-forward limiter with a single gain-reduction curve applied to every
- * channel (preserving the stereo image), instant attack and a one-pole
- * release. Returns the maximum gain reduction applied, in dB.
+ * channel (preserving the stereo image), a ~5 ms lookahead attack ramp and a
+ * one-pole release. Returns the maximum gain reduction applied, in dB.
  *
  * The detector runs on the **true peak**, not the sample peak. Between two
  * samples the waveform a converter reconstructs can overshoot both of them, so
  * a sample-peak limiter set to -1 dBFS routinely lets through -0.3 dBTP, and
  * lossy encoders then clip on the way out. Detecting on the 4x-oversampled
  * envelope costs one pass and makes the ceiling mean what it says.
+ *
+ * The attack is a backward pass rather than a delay line: with the whole file
+ * in memory, easing the gain down *before* each peak is lookahead without the
+ * latency bookkeeping. A gain curve that steps down in one sample puts a sharp
+ * corner into the waveform — audibly much like clipping — whereas the ramp
+ * keeps the curve itself free of high-frequency energy. The pass only ever
+ * lowers gain, so the ceiling guarantee is untouched.
  */
 function limit(channels: Float32Array[], ceilingDb: number, sampleRate: number): number {
   const ceiling = dbToLin(ceilingDb);
   const length = channels[0]?.length ?? 0;
   const releaseCoeff = Math.exp(-1 / (0.05 * sampleRate)); // ~50 ms release
+  const attackCoeff = Math.exp(-1 / (0.005 * sampleRate)); // ~5 ms pre-peak ramp
   const peaks = truePeakEnvelope(channels);
+  const gain = new Float32Array(length);
   let env = 1; // current gain-reduction factor (1 = no reduction)
   let maxReduction = 1;
 
   for (let i = 0; i < length; i++) {
     const peak = peaks[i];
     const required = peak > ceiling ? ceiling / peak : 1;
-    // Instant attack: clamp down immediately; release recovers slowly.
+    // Clamp to the required reduction immediately; release recovers slowly.
     env = required < env ? required : env + (1 - env) * (1 - releaseCoeff);
     if (env < maxReduction) maxReduction = env;
-    for (let c = 0; c < channels.length; c++) channels[c][i] *= env;
+    gain[i] = env;
+  }
+
+  // Backward pass: ease into each reduction ahead of the peak, reaching the
+  // required value exactly when the peak arrives.
+  for (let i = length - 2; i >= 0; i--) {
+    const ramped = 1 - (1 - gain[i + 1]) * attackCoeff;
+    if (ramped < gain[i]) gain[i] = ramped;
+  }
+
+  for (let i = 0; i < length; i++) {
+    for (let c = 0; c < channels.length; c++) channels[c][i] *= gain[i];
   }
 
   return maxReduction < 1 ? -20 * Math.log10(maxReduction) : 0;
