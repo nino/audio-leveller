@@ -78,7 +78,8 @@ function median(values: number[]): number {
  *   - breaths/swells: high variation of short-window RMS.
  * Near-digital-silence is treated as maximally clean.
  */
-function scoreRange(
+/** Exported for the labelled-fixture evaluation; see `eval/fixtures/README.md`. */
+export function scoreRange(
   channels: Float32Array[],
   sampleRate: number,
   start: number,
