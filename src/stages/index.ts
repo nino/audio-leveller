@@ -6,10 +6,13 @@
  * matter: de-click before the denoiser (impulses are out-of-distribution for
  * the model and get smeared rather than removed), EQ after it (denoising
  * changes the spectrum you'd otherwise be fitting a curve to), the expander
- * before the compressor (the compressor applies upward gain in the middle of
- * its range, so compressing first would lift the very floor the expander is
- * then asked to push down), and levelling last so the loudness target is
- * exact and the true-peak limiter sees what the compressor actually produced.
+ * before the compressor (both set their thresholds from the programme loudness
+ * of whatever they are handed, and the expander only moves material far below
+ * the gate that measurement applies, so it leaves that number alone — whereas
+ * compressing first pulls the programme down onto a floor the compressor never
+ * touches, shifting both the expander's threshold and its decision about
+ * whether to act at all), and levelling last so the loudness target is exact
+ * and the true-peak limiter sees what the compressor actually produced.
  */
 
 import { registerStage } from "../pipeline/registry";
