@@ -17,9 +17,15 @@
  * is exactly what the room-tone bed elsewhere in this project exists to avoid.
  *
  * It runs after the tone stages and before the compressor, in that order for a
- * concrete reason: the compressor applies upward gain in the middle of its
- * range, so compressing first would lift the very floor the expander is then
- * asked to push back down, and the two would spend the file arguing.
+ * concrete reason. Both stages place their thresholds relative to the programme
+ * loudness of the audio handed to them, and this one additionally decides
+ * whether to act at all from the programme-to-floor distance it measures.
+ * Expanding first leaves those numbers intact: it only attenuates well below
+ * the programme, far under the relative gate the loudness measurement applies,
+ * so the compressor downstream sees the threshold it would have chosen on its
+ * own. Compressing first does not — it pulls the programme down while leaving
+ * the floor exactly where it was, narrowing the very distance this stage reads
+ * before choosing a threshold, and can flip its skip decision outright.
  */
 
 import { applyDynamics, expanderCurve, type DynamicsTiming } from "../dsp/dynamics";

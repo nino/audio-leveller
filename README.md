@@ -35,9 +35,12 @@ The order is load-bearing. De-click comes first because impulses are
 out-of-distribution for any denoiser and get smeared rather than removed. EQ
 comes after the denoiser and dereverberator because both change the spectrum you
 would otherwise be fitting a curve to. The expander comes before the compressor
-because the compressor applies upward gain in the middle of its range, so
-compressing first would lift the very floor the expander is then asked to push
-back down. Levelling is last so the loudness target is measured on the audio
+because both set their thresholds from the programme loudness of whatever they
+are handed, and the expander only moves material far below the gate that
+measurement applies, so it leaves that number alone — whereas compressing first
+pulls the programme down onto a floor the compressor never touches, shifting
+both the expander's threshold and its decision about whether to act at all.
+Levelling is last so the loudness target is measured on the audio
 that actually gets written, and so the true-peak limiter sees what the
 compressor actually produced.
 
