@@ -1,0 +1,32 @@
+{
+  "name": "chili-distortion",
+  "loudnessLufs": -28,
+  "windows": [
+    { "start": 1080, "dur": 15, "label": "loud passage (limiter busy)" },
+    { "start": 775, "dur": 15, "label": "control passage (limiter idle)" }
+  ],
+  "variants": {
+    "ours": { "file": "../chili_src/chili_15_raw_processed.wav", "description": "current chain (target -18)" },
+    "ours-nolimit": { "file": "../chili_src/chili_15_ours_t28.wav", "description": "current chain, target -28 so the limiter never engages" },
+    "auphonic": { "file": "../chili_src/chili_15_auphonic.wav", "description": "reference: Auphonic" },
+    "daw": { "file": "../chili_src/chili_15_daw.wav", "description": "reference: Reaper chain" },
+    "raw": { "file": "../chili_src/chili_15_raw.wav", "description": "chain input, unprocessed" },
+    "stage02-denoise": { "clips": { "0": "../chili/chili_15_raw_02_denoise_1080s.wav", "1": "../chili/chili_15_raw_02_denoise_775s.wav" }, "description": "after declick+denoise" },
+    "stage05-dyneq": { "clips": { "0": "../chili/chili_15_raw_05_dyneq_1080s.wav", "1": "../chili/chili_15_raw_05_dyneq_775s.wav" }, "description": "after eq+dyneq (cumulative)" },
+    "stage07-compress": { "clips": { "0": "../chili/chili_15_raw_07_compress_1080s.wav", "1": "../chili/chili_15_raw_07_compress_775s.wav" }, "description": "after expand+compress = limiter input" },
+    "lim-current": { "clips": { "0": "../chili/lim_current_a5_r50_1080s.wav" }, "description": "limiter: 5 ms attack, 50 ms release (current)" },
+    "lim-r200": { "clips": { "0": "../chili/lim_a5_r200_1080s.wav" }, "description": "limiter: 5 ms attack, 200 ms release" },
+    "lim-r500": { "clips": { "0": "../chili/lim_a5_r500_1080s.wav" }, "description": "limiter: 5 ms attack, 500 ms release" },
+    "lim-hold50": { "clips": { "0": "../chili/lim_a5_r50_hold50_1080s.wav" }, "description": "limiter: 5 ms attack, 50 ms hold, 50 ms release" },
+    "lim-dual600": { "clips": { "0": "../chili/lim_a5_r80_dual600_1080s.wav" }, "description": "limiter: 5 ms attack, 80 ms release + 600 ms slow envelope" },
+    "lim-a10-r300-hold30": { "clips": { "0": "../chili/lim_a10_r300_hold30_1080s.wav" }, "description": "limiter: 10 ms attack, 30 ms hold, 300 ms release" }
+  },
+  "trials": [
+    { "window": 0, "variants": ["ours", "ours-nolimit", "auphonic", "daw"], "title": "loud passage · is it the limiter?" },
+    { "window": 1, "variants": ["ours", "ours-nolimit", "auphonic", "daw"], "title": "control passage · same set" },
+    { "window": 0, "variants": ["raw", "stage02-denoise", "stage05-dyneq", "stage07-compress", "ours"], "title": "loud passage · stage by stage" },
+    { "window": 1, "variants": ["raw", "stage02-denoise", "stage05-dyneq", "stage07-compress", "ours"], "title": "control passage · stage by stage" },
+    { "window": 0, "variants": ["lim-current", "lim-r200", "lim-r500", "ours-nolimit"], "title": "loud passage · limiter release" },
+    { "window": 0, "variants": ["lim-current", "lim-hold50", "lim-dual600", "lim-a10-r300-hold30"], "title": "loud passage · limiter shapes" }
+  ]
+}

@@ -17,7 +17,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dist": "pnpm build && electron-builder",
     "eval": "pnpm build && node dist/eval/run.js",
-    "fetch-model": "pnpm build && node scripts/fetch-model.mjs"
+    "fetch-model": "pnpm build && node scripts/fetch-model.mjs",
+    "listen": "vite --config listen/vite.config.ts",
+    "listen:session": "pnpm build && node dist/listen/build-session.js",
+    "listen:typecheck": "tsc -p listen/tsconfig.json --noEmit"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -27,9 +30,16 @@
     ]
   },
   "devDependencies": {
+    "@tanstack/react-query": "^5.101.4",
+    "@tanstack/react-router": "^1.170.29",
     "@types/node": "^22.10.5",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^4.7.0",
     "electron": "^33.3.1",
     "electron-builder": "^25.1.8",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
     "vitest": "^2.1.8"
   },

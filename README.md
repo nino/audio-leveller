@@ -383,6 +383,7 @@ pnpm test:watch     # watch mode
 pnpm typecheck      # tsc --noEmit
 pnpm eval           # run the evaluation corpus (see below)
 pnpm fetch-model    # download and verify the DeepFilterNet3 weights
+pnpm listen         # open the blind listening-test app (see below)
 pnpm dist           # package a distributable (electron-builder)
 ```
 
@@ -412,6 +413,40 @@ Room-tone options are nested under `roomtone`:
 | `crossfadeSec`    | `0.05`  | crossfade length between clips                      |
 | `keepMarginDb`    | `6`     | drop clips more than this (dB) dirtier than the best |
 
+## Listening tests
+
+The metrics in the evaluation harness say whether the chain did what it was
+told; only ears say whether it *sounds* right. `listen/` is a small blind
+A/B app for that — a Vite + React front end with an Aqua-era face, and a tiny
+API served by the Vite dev server so there is nothing else to run.
+
+The workflow:
+
+1. **Make candidates.** Full-length renders of whatever you want to compare —
+   the CLI with different `--target` or `--bypass`, an Auphonic export, a
+   DAW bounce, a stage dump — anywhere on disk. Nothing large is committed;
+   `listening/` is gitignored except for `listening/specs/`.
+2. **Write a spec** (`listening/specs/<name>.json`): named variants, one or
+   more time windows, and trials of 2–5 variants each. See
+   `listening/specs/chili-distortion.json` for the shape.
+3. **Build the session**: `pnpm listen:session listening/specs/<name>.json`.
+   The builder cuts every window from every variant, matches all clips to
+   the same loudness with a static gain (a 1 dB louder clip reliably "sounds
+   better", which is not the question), shuffles them, and writes them as
+   `t03_B.wav` so file names leak nothing. The mapping goes to `key.json`.
+4. **Listen**: `pnpm listen`. One trial per screen; big A/B/C/D buttons and
+   the number keys switch clips *gaplessly at the same position*, which is
+   the only way to hear small differences. Drag on the waveform to loop a
+   region. Every clip gets a distortion score, artefact tags and notes; every
+   trial gets a "which is best" pick. Answers save as you go to
+   `listening/sessions/<name>/results.<listener>.json`.
+5. **Reveal**: the results page keeps the key sealed until you ask, then
+   shows per-variant means, picks and tag counts, and a CSV export of every
+   listener's answers joined with the key.
+
+The questions are part of the spec (`clipQuestions`, `trialQuestions`), so a
+session about sibilance can ask different things from one about pumping.
+
 ## Project layout
 
 ```
@@ -424,6 +459,8 @@ src/preload/     contextBridge API (getPathForFile, processFile, onProgress)
 src/renderer/    drag-and-drop UI
 src/worker/      worker thread that runs the pipeline off the main thread
 src/cli.ts       command-line entry point
+src/listen/      listening-test data model + blind session builder
+listen/          the listening-test app itself (Vite + React + TanStack)
 test/            Vitest suite
 reaper/          native REAPER ReaScript (non-destructive take-volume automation)
 ```
