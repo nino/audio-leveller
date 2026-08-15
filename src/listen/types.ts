@@ -128,3 +128,35 @@ export const DEFAULT_TRIAL_QUESTIONS: TrialQuestion[] = [
   { kind: "pick", id: "best", label: "Which sounds best overall?" },
   { kind: "text", id: "comment", label: "Anything else about this set?" },
 ];
+
+// ---- region annotation ----
+//
+// Files under `listening/annotate/*.wav` can be marked up in the app's
+// `/annotate` editor: regions with a label (breath, click, ...) that later
+// train and score a breath-reduction stage. Labels are saved next to the WAV
+// as `<name>.annotations.json`.
+
+export type Confidence = "sure" | "maybe";
+
+export interface Annotation {
+  id: string;
+  /** Seconds from the start of the file. */
+  start: number;
+  end: number;
+  label: string;
+  note?: string;
+  confidence: Confidence;
+}
+
+export interface AnnotationFile {
+  /** WAV file name inside `listening/annotate/`. */
+  file: string;
+  sampleRate: number;
+  duration: number;
+  /** The label set offered in the editor; the first letter of each is its shortcut. */
+  labels: string[];
+  annotations: Annotation[];
+  updatedAt: string;
+}
+
+export const DEFAULT_ANNOTATION_LABELS = ["breath", "click", "plosive", "mouth-noise", "other"];

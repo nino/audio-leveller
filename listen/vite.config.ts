@@ -11,12 +11,16 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { createReadStream, existsSync } from "node:fs";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { annotationsFileFor, annotationsToCsv, parseAnnotationFile } from "../src/listen/annotations";
+import type { AnnotationFile } from "../src/listen/types";
 
 const ROOT = resolve(__dirname, "..");
 const SESSIONS = join(ROOT, "listening", "sessions");
+/** WAVs to mark up (breaths, clicks, ...) live here, with their `.annotations.json` sidecars. */
+const ANNOTATE = join(ROOT, "listening", "annotate");
 
 const send = (res: ServerResponse, status: number, body: unknown): void => {
   res.statusCode = status;
@@ -32,7 +36,7 @@ const readBody = (req: IncomingMessage): Promise<string> =>
     req.on("error", fail);
   });
 
-/** Only ever touch files inside SESSIONS, and only by simple names. */
+/** Only ever touch files inside SESSIONS / ANNOTATE, and only by simple names. */
 const safeName = (s: string): string => {
   if (!/^[\w.-]+$/.test(s)) throw new Error(`bad name: ${s}`);
   return s;
@@ -94,6 +98,79 @@ async function exportCsv(name: string): Promise<string> {
   return rows.join("\n") + "\n";
 }
 
+/** Every WAV in `listening/annotate/`, with how far its markup has got. */
+async function listAnnotatable(): Promise<unknown[]> {
+  if (!existsSync(ANNOTATE)) return [];
+  const out: unknown[] = [];
+  for (const f of (await readdir(ANNOTATE)).sort()) {
+    if (!/\.wav$/i.test(f)) continue;
+    const info = await stat(join(ANNOTATE, f));
+    const sidecar = join(ANNOTATE, annotationsFileFor(f));
+    let annotations: number | null = null;
+    let updatedAt: string | null = null;
+    let duration: number | null = null;
+    if (existsSync(sidecar)) {
+      try {
+        const a = parseAnnotationFile(JSON.parse(await readFile(sidecar, "utf8")));
+        annotations = a.annotations.length;
+        updatedAt = a.updatedAt;
+        duration = a.duration;
+      } catch {
+        /* unreadable sidecar: show as unannotated */
+      }
+    }
+    out.push({ file: f, bytes: info.size, annotations, updatedAt, duration });
+  }
+  return out;
+}
+
+async function exportAnnotationsCsv(): Promise<string> {
+  const files: AnnotationFile[] = [];
+  if (existsSync(ANNOTATE)) {
+    for (const f of await readdir(ANNOTATE)) {
+      if (!f.endsWith(".annotations.json")) continue;
+      files.push(parseAnnotationFile(JSON.parse(await readFile(join(ANNOTATE, f), "utf8"))));
+    }
+  }
+  return annotationsToCsv(files);
+}
+
+/**
+ * `/api/annotate` — list files
+ * `/api/annotate/export.csv` — every annotation of every file
+ * `/api/annotate/<file>/audio` — the WAV
+ * `/api/annotate/<file>/annotations` — GET (404 until saved) / PUT the sidecar
+ */
+async function annotateApi(req: IncomingMessage, res: ServerResponse, parts: string[]): Promise<void> {
+  if (parts.length === 1) return send(res, 200, await listAnnotatable());
+  if (parts[1] === "export.csv" && parts.length === 2) {
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="annotations.csv"`);
+    res.end(await exportAnnotationsCsv());
+    return;
+  }
+  const file = safeName(parts[1]);
+  if (!/\.wav$/i.test(file)) return send(res, 404, { error: "not a wav" });
+  if (parts[2] === "audio") {
+    res.setHeader("Content-Type", "audio/wav");
+    createReadStream(join(ANNOTATE, file)).on("error", () => send(res, 404, { error: "no file" })).pipe(res);
+    return;
+  }
+  if (parts[2] === "annotations") {
+    const path = join(ANNOTATE, annotationsFileFor(file));
+    if (req.method === "PUT") {
+      const parsed = parseAnnotationFile(JSON.parse(await readBody(req)));
+      if (parsed.file !== file) return send(res, 400, { error: "file name mismatch" });
+      await mkdir(ANNOTATE, { recursive: true });
+      await writeFile(path, JSON.stringify(parsed, null, 2));
+      return send(res, 200, { ok: true });
+    }
+    if (!existsSync(path)) return send(res, 404, { error: "no annotations yet" });
+    return send(res, 200, JSON.parse(await readFile(path, "utf8")));
+  }
+  send(res, 404, { error: "not found" });
+}
+
 function api(): Plugin {
   return {
     name: "listening-api",
@@ -103,6 +180,7 @@ function api(): Plugin {
         if (!url.pathname.startsWith("/api/")) return next();
         try {
           const parts = url.pathname.split("/").filter(Boolean).slice(1); // drop "api"
+          if (parts[0] === "annotate") return await annotateApi(req, res, parts);
           if (parts[0] === "sessions" && parts.length === 1) return send(res, 200, await listSessions());
           if (parts[0] !== "sessions") return send(res, 404, { error: "not found" });
           const name = safeName(parts[1]);

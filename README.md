@@ -452,6 +452,23 @@ The workflow:
 The questions are part of the spec (`clipQuestions`, `trialQuestions`), so a
 session about sibilance can ask different things from one about pumping.
 
+### Annotating audio
+
+The same app has a region annotator at `/annotate`, for building labelled
+material (breaths, mouth clicks, plosives, other noises) that a
+breath-reduction stage can be trained on and scored against. Drop WAVs into
+`listening/annotate/` (gitignored) and open one: the whole file is drawn from
+a multi-resolution peak cache, so a 20-minute recording zooms and scrolls
+smoothly. Drag on the wave to select, then press a label's letter (`b`
+breath, `c` click, `p` plosive, `m` mouth-noise, `o` other — the first letter
+of each label in the configurable set) or `⏎` to make a region; drag a
+region's edges to resize it, its body to move it; `⌫` deletes, `⇥`/`⇧⇥` step
+through regions, `u` toggles sure/maybe, `space` plays (looping the
+selection or the selected region), the wheel and `+`/`-`/`0` zoom. Labels
+autosave to `listening/annotate/<name>.annotations.json` (`AnnotationFile`
+in `src/listen/types.ts`); `/api/annotate/export.csv` flattens every file to
+`file,start,end,label,confidence,note` for the eval harness.
+
 ## Project layout
 
 ```

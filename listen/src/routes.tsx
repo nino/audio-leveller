@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 import { TrialPage } from "./Trial";
 import { ResultsPage } from "./Results";
+import { AnnotateIndexPage, AnnotatePage } from "./Annotate";
 
 const LISTENER_KEY = "listening.listener";
 export const getListener = (): string => localStorage.getItem(LISTENER_KEY) ?? "";
@@ -61,6 +62,9 @@ function SessionsPage() {
       {sessions.isLoading && <p className="hint">Loading…</p>}
       {sessions.error && <p className="error">{String(sessions.error)}</p>}
       {sessions.data && sessions.data.length === 0 && <p className="hint">No sessions yet.</p>}
+      <p className="hint">
+        Also: <Link to="/annotate">annotate audio</Link> — mark breaths, clicks and plosives on real recordings.
+      </p>
       <ul className="session-list">
         {sessions.data?.map((s) => {
           const mine = s.results.find((r) => r.listener === listener);
@@ -115,8 +119,19 @@ const resultsRoute = createRoute({
   component: ResultsPage,
 });
 
+const annotateIndexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/annotate",
+  component: AnnotateIndexPage,
+});
+const annotateRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/annotate/$file",
+  component: AnnotatePage,
+});
+
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, trialRoute, resultsRoute]),
+  routeTree: rootRoute.addChildren([indexRoute, trialRoute, resultsRoute, annotateIndexRoute, annotateRoute]),
 });
 
 declare module "@tanstack/react-router" {
