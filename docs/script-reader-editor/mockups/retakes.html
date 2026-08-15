@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reader — retake review (mockup)</title>
+    <style>
+      /* Aqua, circa 10.2 — the same visual language as listen/src/aqua.css. */
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; }
+      body {
+        font-family: "Lucida Grande", "Lucida Sans Unicode", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-size: 13px; color: #1c1c1c;
+        background-color: #dfe6ef;
+        background-image: repeating-linear-gradient(
+          to bottom,
+          rgba(255,255,255,0.55) 0px, rgba(255,255,255,0.55) 1px,
+          rgba(120,140,170,0.14) 1px, rgba(120,140,170,0.14) 2px);
+      }
+      .desktop { min-height: 100vh; padding: 24px 20px 40px; display: flex; justify-content: center; }
+      .window {
+        width: 100%; max-width: 1120px; border-radius: 8px 8px 6px 6px; overflow: hidden;
+        background:
+          repeating-linear-gradient(to bottom,
+            rgba(255,255,255,0.07) 0px, rgba(255,255,255,0.07) 1px,
+            rgba(0,0,0,0.035) 2px, rgba(0,0,0,0.035) 3px),
+          linear-gradient(to bottom, #d6d6d6 0%, #c3c3c3 50%, #b9b9b9 100%);
+        border: 1px solid #6f6f6f;
+        box-shadow: 0 22px 45px rgba(0,0,0,0.42), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.55);
+      }
+      .titlebar {
+        height: 24px; position: relative; display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(to bottom, #e6e6e6 0%, #cfcfcf 45%, #bdbdbd 55%, #c8c8c8 100%);
+        border-bottom: 1px solid #8a8a8a; box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);
+      }
+      .title { font-size: 13px; color: #2b2b2b; text-shadow: 0 1px 0 rgba(255,255,255,0.7); }
+      .lights { position: absolute; left: 9px; top: 5px; display: flex; gap: 8px; }
+      .light { width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.35);
+        box-shadow: inset 0 -2px 3px rgba(0,0,0,0.25), inset 0 2px 2px rgba(255,255,255,0.85), 0 1px 1px rgba(255,255,255,0.5); }
+      .light.red { background: radial-gradient(circle at 50% 30%, #ffb2ad, #ee5b52 45%, #d3372f); }
+      .light.yellow { background: radial-gradient(circle at 50% 30%, #fff1a8, #f5c33a 45%, #d99f1a); }
+      .light.green { background: radial-gradient(circle at 50% 30%, #c8f7b0, #62c655 45%, #3d9b33); }
+
+      .toolbar {
+        display: flex; align-items: center; gap: 10px; padding: 8px 14px; flex-wrap: wrap;
+        border-bottom: 1px solid rgba(0,0,0,0.25);
+        background: linear-gradient(to bottom, rgba(255,255,255,0.4), rgba(255,255,255,0.06));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+      }
+      .toolbar .spacer { margin-left: auto; }
+      .content { padding: 14px 16px 20px; }
+
+      .aqua-button {
+        font: inherit; font-size: 13px; color: #111; padding: 4px 14px; min-height: 24px;
+        border-radius: 12px; border: 1px solid #6a6a6a; cursor: pointer;
+        background: linear-gradient(to bottom, #fdfdfd 0%, #e6e6e6 45%, #d1d1d1 50%, #ececec 100%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 1px 1px rgba(0,0,0,0.35);
+        text-shadow: 0 1px 0 rgba(255,255,255,0.8); text-decoration: none;
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      }
+      .aqua-button:hover:not(:disabled) { filter: brightness(1.04); }
+      .aqua-button:active:not(:disabled) { background: linear-gradient(to bottom, #d0d0d0, #bcbcbc); box-shadow: inset 0 1px 3px rgba(0,0,0,0.35); }
+      .aqua-button.small { font-size: 11px; padding: 2px 10px; min-height: 20px; }
+      .aqua-button.primary {
+        color: #fff; border-color: #3a5c9c; text-shadow: 0 -1px 0 rgba(0,0,0,0.35);
+        background: linear-gradient(to bottom, #b8d4ff 0%, #6aa2f5 45%, #3d82ea 50%, #77b3fb 100%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 1px 2px rgba(0,0,0,0.35), 0 0 8px rgba(80,140,240,0.55);
+      }
+      .aqua-button.danger { border-color: #96453f; color: #6b1a15; }
+
+      .panel { padding: 14px 16px; margin-top: 14px; border-radius: 6px; }
+      .glass {
+        background: linear-gradient(to bottom, rgba(255,255,255,0.85) 0%, rgba(230,238,250,0.75) 100%);
+        border: 1px solid rgba(60,80,120,0.35);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,1), inset 0 -14px 24px rgba(160,190,230,0.25), 0 1px 2px rgba(0,0,0,0.25);
+      }
+      .metal-inset {
+        background: linear-gradient(to bottom, rgba(255,255,255,0.35), rgba(255,255,255,0.15));
+        border: 1px solid rgba(0,0,0,0.22);
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.18), 0 1px 0 rgba(255,255,255,0.6);
+      }
+      .hint { color: #555; text-shadow: 0 1px 0 rgba(255,255,255,0.5); }
+      .hint.small { font-size: 11px; }
+      .mono { font: 11px Monaco, Menlo, monospace; }
+      kbd { font: bold 10px Monaco, Menlo, monospace; background: rgba(0,0,0,0.12); border-radius: 3px; padding: 1px 4px; }
+      h1 { font-size: 20px; margin: 2px 0 4px; text-shadow: 0 1px 0 rgba(255,255,255,0.7); }
+      h2 { font-size: 14px; margin: 0 0 8px; text-shadow: 0 1px 0 rgba(255,255,255,0.7); }
+
+      /* ---- a group card ---- */
+      .card.applied { opacity: 0.62; }
+      .card.rejected { opacity: 0.62; }
+      .cardhead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+      .cardhead .grow { flex: 1; }
+      .status {
+        font: 10px Monaco, Menlo, monospace; padding: 1px 7px; border-radius: 8px; background: rgba(0,0,0,0.1);
+      }
+      .status.applied { background: rgba(70,160,80,0.32); }
+      .status.rejected { background: rgba(200,90,80,0.3); }
+      .status.open { background: rgba(230,170,40,0.35); }
+
+      .axis {
+        position: relative; height: 15px; margin: 10px 0 2px;
+        font: 10px Monaco, Menlo, monospace; color: #556;
+      }
+      .axis .tick { position: absolute; top: 0; border-left: 1px solid rgba(60,80,120,0.35); padding-left: 3px; height: 15px; }
+
+      .lanes { display: flex; flex-direction: column; gap: 6px; }
+      .lane {
+        position: relative; display: grid; grid-template-columns: 74px minmax(0,1fr) 128px;
+        gap: 8px; align-items: center; padding: 5px 6px; border-radius: 5px; cursor: pointer;
+        border: 1px solid transparent;
+      }
+      .lane:hover { background: rgba(255,255,255,0.5); }
+      .lane.keep {
+        background: rgba(120,200,130,0.22);
+        border-color: rgba(60,150,70,0.6);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.16);
+      }
+      .lane.stitched { background: rgba(120,200,130,0.12); border-color: rgba(60,150,70,0.35); border-style: dashed; }
+      .lane .name { font-size: 12px; }
+      .lane .name b { display: block; }
+      .lane .meta { font: 10px Monaco, Menlo, monospace; color: #555; text-align: right; }
+      .track { position: relative; height: 34px; }
+      .track svg {
+        position: absolute; top: 0; height: 34px; display: block;
+        background: linear-gradient(to bottom, #f9fbff, #e7edf7);
+        border: 1px solid rgba(60,80,120,0.35); border-radius: 3px;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
+      }
+      .track .rail { position: absolute; left: 0; right: 0; top: 16px; height: 2px; background: rgba(60,80,120,0.14); }
+
+      .flags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+      .flag {
+        font-size: 10px; padding: 0 6px; border-radius: 8px; border: 1px solid #b09a6a;
+        background: linear-gradient(to bottom, #fff2cf, #f5dfa1); color: #6b4f10; white-space: nowrap;
+      }
+      .flag.bad { border-color: #b8736c; background: linear-gradient(to bottom, #ffe0dc, #f5bdb6); color: #762a22; }
+      .flag.good { border-color: #7fa87f; background: linear-gradient(to bottom, #dff5df, #bfe6bf); color: #2f5c32; }
+
+      .why { margin: 10px 0 0; padding: 8px 10px; border-radius: 5px; }
+      .why ul { margin: 4px 0 0; padding-left: 18px; }
+      .why li { margin: 1px 0; font-size: 12px; }
+      .result {
+        margin-top: 10px; padding: 9px 12px; border-radius: 5px; background: #fdfdfb;
+        border: 1px solid rgba(0,0,0,0.28); box-shadow: inset 0 1px 4px rgba(0,0,0,0.2);
+        font-family: Palatino, "Palatino Linotype", Georgia, serif; font-size: 15px; line-height: 1.7;
+      }
+      .result .cutout { color: #a89; text-decoration: line-through; opacity: 0.6; }
+      .result .kept { background: rgba(120,200,130,0.24); border-radius: 2px; }
+      .result .stitchword { background: rgba(120,200,130,0.14); border-bottom: 2px dashed rgba(60,150,70,0.6); }
+      .result .seam {
+        display: inline-block; width: 12px; text-align: center; color: #7a4fae; font-weight: bold;
+      }
+      .acts { display: flex; gap: 7px; margin-top: 11px; flex-wrap: wrap; align-items: center; }
+      .warn {
+        margin-top: 8px; padding: 7px 10px; border-radius: 5px; font-size: 12px;
+        border: 1px solid #b8934a; background: linear-gradient(to bottom, #fff6e0, #f7e6bd); color: #6a4d0d;
+      }
+      .summary { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+      .big { font-size: 22px; font-weight: bold; }
+      .slider { display: flex; align-items: center; gap: 8px; }
+      input[type="range"] { width: 150px; }
+      a.aqua-link { color: #2653a5; }
+    </style>
+  </head>
+  <body>
+    <div class="desktop">
+      <div class="window">
+        <div class="titlebar">
+          <div class="lights">
+            <span class="light red"></span><span class="light yellow"></span><span class="light green"></span>
+          </div>
+          <div class="title">Reader — retake review — <span class="mono">ch03-second-pass.wav</span></div>
+        </div>
+
+        <div class="toolbar">
+          <a class="aqua-button small" href="editor.html">← Editor</a>
+          <span class="spacer"></span>
+          <span class="slider">
+            <span class="hint small">auto-apply above</span>
+            <input type="range" id="floor" min="50" max="100" value="90" />
+            <span class="mono" id="floorval">0.90</span>
+          </span>
+          <button class="aqua-button small" id="applyall">Apply all above floor <kbd>⇧⏎</kbd></button>
+          <button class="aqua-button small primary" id="render">Render edit…</button>
+        </div>
+
+        <div class="content">
+          <div class="panel glass">
+            <div class="summary">
+              <div>
+                <div class="big" id="statOpen">3</div>
+                <div class="hint small">groups to review</div>
+              </div>
+              <div>
+                <div class="big" id="statTime">21.4 s</div>
+                <div class="hint small">audio these cuts remove</div>
+              </div>
+              <div>
+                <div class="big">4 : 1</div>
+                <div class="hint small">precision : recall weighting — a wrong cut costs far more than a missed one</div>
+              </div>
+              <div class="hint small" style="max-width: 330px">
+                Every group's default is <b>the last complete pass</b>. The reader stopped
+                re-reading when he was satisfied; that judgement outranks any score here.
+                The scores exist to <i>explain</i>, and to decide the cases the rule does not.
+              </div>
+            </div>
+          </div>
+
+          <div id="cards"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ------------------------------------------------------------------
+      // Fake data, shaped like RetakeGroup / Pass / PassMetrics in ../PLAN.md.
+      // ------------------------------------------------------------------
+      const GROUPS = [
+        {
+          id: "r1",
+          script: { from: 296, to: 340 },
+          text: ["The words are still arriving.", "The sentences still end where they should."],
+          conf: 0.97,
+          passes: [
+            { id: "p1", n: 1, audio: [18.0, 21.1], script: [296, 335], seed: 11,
+              m: { cover: 0.89, div: 2, dis: 1, rateZ: -0.2, lead: 0.7, lufsOff: -0.4, trunc: true, score: 0.81 },
+              flags: [["bad", "truncated tail"], ["", "1 disfluency"], ["", "2 divergences"]] },
+            { id: "p2", n: 2, audio: [21.6, 25.9], script: [296, 340], seed: 29,
+              m: { cover: 1.0, div: 0, dis: 0, rateZ: 0.1, lead: 0.5, lufsOff: -0.1, trunc: false, score: 0.96 },
+              flags: [["good", "complete"], ["good", "0 divergences"], ["good", "level −0.1 dB"]] },
+          ],
+          keep: "p2",
+        },
+        {
+          id: "r2",
+          script: { from: 512, to: 566 },
+          text: ["But some part of the machinery has gone over to autopilot,",
+                 "and you find that you have read half a page without hearing a word of it."],
+          conf: 0.93,
+          passes: [
+            { id: "p1", n: 1, audio: [30.5, 34.1], script: [512, 548], seed: 7,
+              m: { cover: 0.67, div: 1, dis: 0, rateZ: -0.4, lead: 1.1, lufsOff: -0.2, trunc: true, score: 0.74 },
+              flags: [["bad", "truncated tail"], ["", "misread “machinery”"]] },
+            { id: "p2", n: 2, audio: [34.7, 39.2], script: [512, 540], seed: 41,
+              m: { cover: 0.52, div: 0, dis: 1, rateZ: -1.9, lead: 0.6, lufsOff: -5.8, trunc: false, score: 0.58 },
+              flags: [["bad", "level −5.8 dB"], ["bad", "1.9σ slow"], ["", "muttered"]] },
+            { id: "p3", n: 3, audio: [39.6, 45.0], script: [524, 566], seed: 63,
+              m: { cover: 0.78, div: 0, dis: 0, rateZ: 0.2, lead: 0.4, lufsOff: 0.1, trunc: false, score: 0.94 },
+              flags: [["good", "0 divergences"], ["good", "reaches the end"], ["bad", "starts at word 524"]] },
+          ],
+          keep: "p3",
+        },
+        {
+          id: "r3",
+          script: { from: 980, to: 1040 },
+          text: ["Nobody has ever found a reliable way to notice it from the inside,",
+                 "which is why the second pass exists."],
+          conf: 0.99,
+          passes: [
+            { id: "p1", n: 1, audio: [60.4, 62.2], script: [980, 1002], seed: 5,
+              m: { cover: 0.37, div: 0, dis: 2, rateZ: -0.1, lead: 1.9, lufsOff: 0.0, trunc: true, score: 0.70 },
+              flags: [["bad", "truncated tail"], ["bad", "2 disfluencies"]] },
+            { id: "p2", n: 2, audio: [62.6, 64.3], script: [980, 1008], seed: 23,
+              m: { cover: 0.47, div: 1, dis: 0, rateZ: 0.6, lead: 0.4, lufsOff: -0.3, trunc: true, score: 0.76 },
+              flags: [["bad", "truncated tail"], ["", "false start on “second”"]] },
+            { id: "p3", n: 3, audio: [65.0, 69.8], script: [980, 1040], seed: 87,
+              m: { cover: 1.0, div: 0, dis: 0, rateZ: 0.0, lead: 0.7, lufsOff: 0.2, trunc: false, score: 0.98 },
+              flags: [["good", "complete"], ["good", "0 divergences"], ["good", "1.9 s lead-in"]] },
+          ],
+          keep: "p3",
+        },
+      ];
+
+      const state = { keep: {}, status: {}, floor: 0.9 };
+      GROUPS.forEach((g) => { state.keep[g.id] = g.keep; state.status[g.id] = "open"; });
+
+      // ------------------------------------------------------------------
+      // Cover: the keeper may not span the whole group. Fill the prefix with
+      // the latest earlier pass that reaches it — this is the tiny DP in the
+      // plan, run by hand for a mockup.
+      // ------------------------------------------------------------------
+      function cover(g) {
+        const keeper = g.passes.find((p) => p.id === state.keep[g.id]);
+        const out = [];
+        if (keeper.script[0] > g.script.from) {
+          // Cheapest pass that reaches the keeper's start: the DP's passPenalty
+          // is score-led, with recency only as a tiebreak.
+          const fillers = g.passes
+            .filter((p) => p !== keeper && p.script[0] <= g.script.from && p.script[1] > keeper.script[0])
+            .sort((a, b) => b.m.score - a.m.score || b.n - a.n);
+          if (fillers[0]) out.push({ pass: fillers[0], from: g.script.from, to: keeper.script[0], stitch: true });
+        }
+        out.push({ pass: keeper, from: Math.max(g.script.from, keeper.script[0]), to: keeper.script[1] });
+        return out;
+      }
+
+      function reasons(g) {
+        const keeper = g.passes.find((p) => p.id === state.keep[g.id]);
+        const last = g.passes[g.passes.length - 1];
+        const complete = keeper.m.cover >= 0.999;
+        const r = [];
+        r.push(
+          keeper === last && complete
+            ? `<b>Last complete pass</b> — pass ${keeper.n} of ${g.passes.length} reads to the end of the span and continues past it without another backward jump.`
+            : keeper === last
+            ? `<b>Last pass</b>, but it only covers ${(keeper.m.cover * 100) | 0}% of the span — the rest is stitched from an earlier pass.`
+            : `<b>Manual choice</b> — pass ${keeper.n} of ${g.passes.length}. This overrules the default (the last complete pass), which is a judgement the reader already made in the room.`
+        );
+        r.push(`${keeper.m.div === 0 ? "No divergences" : keeper.m.div + " divergence(s)"} against the script; ${keeper.m.dis === 0 ? "no disfluencies" : keeper.m.dis + " disfluency/-ies"}.`);
+        r.push(`Level ${keeper.m.lufsOff >= 0 ? "+" : ""}${keeper.m.lufsOff.toFixed(1)} dB against programme loudness; rate ${keeper.m.rateZ >= 0 ? "+" : ""}${keeper.m.rateZ.toFixed(1)}σ from this reader's median.`);
+        r.push(`${keeper.m.lead.toFixed(1)} s of silence before it — the cut point in and the cut point out are both in room tone.`);
+        if (keeper.m.trunc) r.push(`<b>Warning:</b> this pass's last word is cut off by whatever follows it.`);
+        r.push(`Detected from ${g.passes.length - 1} backward jump(s) in the alignment path, each with silence and a truncated word. Confidence ${g.conf.toFixed(2)}.`);
+        return r;
+      }
+
+      // deterministic pseudo-waveform for a lane
+      function waveSvg(seed, wPct) {
+        let s = seed * 7919 + 13;
+        const rnd = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+        const bars = 90, W = 300, H = 34, mid = 17;
+        let d = "";
+        for (let b = 0; b < bars; b++) {
+          const env = 0.35 + 0.65 * Math.abs(Math.sin((b / bars) * 9.4) * Math.sin((b / bars) * 3.1 + seed));
+          const h = Math.min(0.95, env * (0.5 + 0.7 * rnd())) * (mid - 2);
+          const x = 1.5 + (b / bars) * (W - 3);
+          d += `M${x.toFixed(1)},${(mid - h).toFixed(1)}L${x.toFixed(1)},${(mid + h).toFixed(1)}`;
+        }
+        return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="left:${wPct.left}%;width:${wPct.width}%">
+          <path d="${d}" stroke="#41618f" stroke-width="2" opacity="0.8"/></svg>`;
+      }
+
+      // ------------------------------------------------------------------
+      function render() {
+        const el = document.getElementById("cards");
+        el.innerHTML = "";
+        GROUPS.forEach((g, gi) => {
+          const span = g.script.to - g.script.from;
+          const cov = cover(g);
+          const stitched = cov.length > 1;
+          const card = document.createElement("div");
+          card.className = "panel glass card " + state.status[g.id];
+
+          const ticks = [0, 0.25, 0.5, 0.75, 1]
+            .map((f) => {
+              const w = Math.round(g.script.from + f * span);
+              return `<span class="tick" style="left:${f * 100}%">${f === 1 ? "" : "word " + w}</span>`;
+            }).join("");
+
+          const lanes = g.passes.map((p) => {
+            const left = ((p.script[0] - g.script.from) / span) * 100;
+            const width = ((p.script[1] - p.script[0]) / span) * 100;
+            const isKeep = p.id === state.keep[g.id];
+            const isStitch = stitched && cov.some((c) => c.pass === p && c.stitch);
+            return `<div class="lane ${isKeep ? "keep" : isStitch ? "stitched" : ""}" data-g="${g.id}" data-p="${p.id}">
+              <div class="name"><b>Pass ${p.n}${isKeep ? " ✓" : isStitch ? " ⊕" : ""}</b>
+                <span class="hint small mono">${p.audio[0].toFixed(1)}–${p.audio[1].toFixed(1)}s</span></div>
+              <div>
+                <div class="track"><div class="rail"></div>${waveSvg(p.seed, { left, width })}</div>
+                <div class="flags">${p.flags.map(([k, t]) => `<span class="flag ${k}">${t}</span>`).join("")}</div>
+              </div>
+              <div class="meta">
+                words ${p.script[0]}–${p.script[1]}<br />
+                cover ${(p.m.cover * 100) | 0}%<br />
+                score ${p.m.score.toFixed(2)}
+              </div>
+            </div>`;
+          }).join("");
+
+          const keeper = g.passes.find((p) => p.id === state.keep[g.id]);
+          const words = g.text.join(" ").split(/\s+/);
+          // Which pass supplies each word of the span, from the cover.
+          const resultHtml = words
+            .map((w, i) => {
+              const at = g.script.from + Math.floor((i / words.length) * span);
+              const seg = cov.find((c) => at >= c.from && at < c.to);
+              if (!seg) return `<span class="cutout">${w}</span>`;
+              const cls = seg.stitch ? "stitchword" : "kept";
+              const seam = seg.stitch && at + Math.ceil(span / words.length) >= seg.to
+                ? `<span class="seam" title="splice">⋮</span>` : "";
+              return `<span class="${cls}">${w}</span>${seam}`;
+            })
+            .join(" ");
+
+          card.innerHTML = `
+            <div class="cardhead">
+              <h2 class="grow">Retake group ${gi + 1} of ${GROUPS.length}
+                <span class="hint small">— words ${g.script.from}–${g.script.to},
+                ${g.passes.length} passes, ${(g.passes[g.passes.length - 1].audio[1] - g.passes[0].audio[0]).toFixed(1)} s of tape</span></h2>
+              <span class="status ${state.status[g.id]}">${state.status[g.id]}</span>
+              <span class="mono hint">conf ${g.conf.toFixed(2)}</span>
+            </div>
+            <div class="hint small">Lanes share a <b>script-position</b> axis, not a time axis — that is
+              what makes attempts at the same words line up.</div>
+            <div class="axis">${ticks}</div>
+            <div class="lanes">${lanes}</div>
+            <div class="why metal-inset">
+              <b>Why this take</b>
+              <ul>${reasons(g).map((r) => `<li>${r}</li>`).join("")}</ul>
+            </div>
+            ${stitched ? `<div class="warn"><b>Stitched result.</b> Pass ${keeper.n} starts at word
+              ${keeper.script[0]}, so words ${g.script.from}–${keeper.script[0]} come from pass
+              ${cov[0].pass.n}. Listen to the join before applying — a stitched take is the thing most
+              likely to sound wrong.</div>` : ""}
+            <div class="result">${resultHtml}</div>
+            <div class="hint small" style="margin-top:4px">Result after the cut — solid green is the
+              kept take${stitched ? ", dashed is stitched from an earlier pass, ⋮ is the splice" : ""}.</div>
+            <div class="acts">
+              <button class="aqua-button small" data-act="preview" data-g="${g.id}">▶ Preview join (±1.5 s)</button>
+              <button class="aqua-button small" data-act="whole" data-g="${g.id}">▶ All ${g.passes.length} passes</button>
+              <span style="flex:1"></span>
+              <button class="aqua-button small danger" data-act="reject" data-g="${g.id}">Reject — not a retake</button>
+              <button class="aqua-button small primary" data-act="apply" data-g="${g.id}">Apply cut <kbd>⏎</kbd></button>
+            </div>`;
+          el.appendChild(card);
+        });
+
+        el.querySelectorAll(".lane").forEach((l) => {
+          l.onclick = () => { state.keep[l.dataset.g] = l.dataset.p; state.status[l.dataset.g] = "open"; render(); };
+        });
+        el.querySelectorAll("[data-act]").forEach((b) => {
+          b.onclick = () => {
+            const g = b.dataset.g;
+            if (b.dataset.act === "apply") state.status[g] = "applied";
+            else if (b.dataset.act === "reject") state.status[g] = "rejected";
+            else return; // preview buttons are inert in a mockup
+            render();
+          };
+        });
+
+        const open = GROUPS.filter((g) => state.status[g.id] === "open").length;
+        document.getElementById("statOpen").textContent = open;
+        const removed = GROUPS
+          .filter((g) => state.status[g.id] === "applied")
+          .reduce((a, g) => {
+            const k = g.passes.find((p) => p.id === state.keep[g.id]);
+            return a + g.passes.filter((p) => p !== k).reduce((s, p) => s + (p.audio[1] - p.audio[0]), 0);
+          }, 0);
+        document.getElementById("statTime").textContent = removed.toFixed(1) + " s";
+      }
+
+      document.getElementById("floor").oninput = (e) => {
+        state.floor = e.target.value / 100;
+        document.getElementById("floorval").textContent = state.floor.toFixed(2);
+      };
+      document.getElementById("applyall").onclick = () => {
+        GROUPS.forEach((g) => { if (g.conf >= state.floor && state.status[g.id] === "open") state.status[g.id] = "applied"; });
+        render();
+      };
+      document.getElementById("render").onclick = () => {
+        alert("Mockup — this would render the EDL to ch03-second-pass_edited.wav,\n" +
+              "then run the existing eight-stage mastering chain over it.");
+      };
+
+      render();
+    </script>
+  </body>
+</html>
