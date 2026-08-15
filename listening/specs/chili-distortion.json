@@ -1,6 +1,7 @@
 {
   "name": "chili-distortion",
   "loudnessLufs": -28,
+  "matchBy": "momentaryMax",
   "windows": [
     { "start": 1080, "dur": 15, "label": "loud passage (limiter busy)" },
     { "start": 775, "dur": 15, "label": "control passage (limiter idle)" }

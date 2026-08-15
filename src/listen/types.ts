@@ -38,6 +38,7 @@ export interface Session {
   createdAt: string;
   /** Loudness every clip was matched to, so results are comparable. */
   loudnessLufs: number;
+  matchBy: "integrated" | "shortTermMax" | "momentaryMax";
   clipQuestions: ClipQuestion[];
   trialQuestions: TrialQuestion[];
   trials: Trial[];
@@ -75,6 +76,15 @@ export interface SessionSpec {
   name: string;
   /** Match every clip to this loudness (default -28 LUFS). */
   loudnessLufs?: number;
+  /**
+   * What "loudness" means for matching. `integrated` (BS.1770 gated) is the
+   * broadcast answer but lets a peakier clip's loud words stand out — clips
+   * with different dynamics can share an integrated value and still sound
+   * unequal. `shortTermMax` matches the loudest 3 s window (so nothing is
+   * ever louder than the others), `momentaryMax` the loudest 400 ms.
+   * Default `momentaryMax`: nothing is ever louder than the others, which is what a preference judgement needs.
+   */
+  matchBy?: "integrated" | "shortTermMax" | "momentaryMax";
   /**
    * Named sources. `file` is a full-length recording that gets cut per window;
    * `clip` is an already-cut excerpt (still loudness-matched, never cut);

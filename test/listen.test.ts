@@ -36,6 +36,7 @@ describe("listening-session builder", () => {
       {
         name: "t",
         loudnessLufs: -30,
+        matchBy: "integrated",
         windows: [
           { start: 1, dur: 2, label: "w0" },
           { start: 3, dur: 2, label: "w1" },

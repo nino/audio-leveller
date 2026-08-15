@@ -16,7 +16,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { decodeWav, encodeWav } from "../dsp/wav";
-import { integratedLoudness, preFilter } from "../dsp/loudness";
+import { integratedLoudness, loudnessOfRange, preFilter } from "../dsp/loudness";
 import { truePeakDbfs } from "../dsp/truepeak";
 import {
   DEFAULT_CLIP_QUESTIONS,
@@ -53,9 +53,31 @@ function cut(audio: Loaded, start: number, dur: number): Loaded {
   return { sampleRate: audio.sampleRate, channels: audio.channels.map((c) => c.slice(s0, s1)) };
 }
 
+type MatchBy = NonNullable<SessionSpec["matchBy"]>;
+
+/** Loudest `windowSec` window (100 ms hop) of pre-filtered audio, in LUFS. */
+function maxWindowLoudness(filtered: Float32Array[], sampleRate: number, windowSec: number): number {
+  const win = Math.round(windowSec * sampleRate);
+  const hop = Math.round(0.1 * sampleRate);
+  const length = filtered[0]?.length ?? 0;
+  if (length <= win) return loudnessOfRange(filtered, 0, length);
+  let max = -Infinity;
+  for (let s = 0; s + win <= length; s += hop) {
+    const l = loudnessOfRange(filtered, s, s + win);
+    if (l > max) max = l;
+  }
+  return max;
+}
+
+export function measure(audio: Loaded, by: MatchBy): number {
+  const filtered = preFilter(audio.channels, audio.sampleRate);
+  if (by === "integrated") return integratedLoudness(filtered, audio.sampleRate);
+  return maxWindowLoudness(filtered, audio.sampleRate, by === "momentaryMax" ? 0.4 : 3);
+}
+
 /** Static gain to `targetLufs`; returns the true peak afterwards for a clipping check. */
-function match(audio: Loaded, targetLufs: number): { channels: Float32Array[]; peakDb: number } {
-  const measured = integratedLoudness(preFilter(audio.channels, audio.sampleRate), audio.sampleRate);
+function match(audio: Loaded, targetLufs: number, by: MatchBy): { channels: Float32Array[]; peakDb: number } {
+  const measured = measure(audio, by);
   const g = Number.isFinite(measured) ? Math.pow(10, (targetLufs - measured) / 20) : 1;
   const channels = audio.channels.map((c) => {
     const out = new Float32Array(c.length);
@@ -83,9 +105,19 @@ function chunk<T>(items: T[], size: number): T[][] {
 
 export async function buildSession(spec: SessionSpec, specDir: string, outRoot: string): Promise<string> {
   const loudnessLufs = spec.loudnessLufs ?? -28;
+  const matchBy: MatchBy = spec.matchBy ?? "momentaryMax";
   const maxPerTrial = spec.maxClipsPerTrial ?? 4;
   const outDir = join(outRoot, spec.name);
   await mkdir(outDir, { recursive: true });
+
+  // Rebuilding an existing session (say, with a different loudness match)
+  // must not reshuffle: results already recorded refer to the old letters.
+  let previous: SessionKey | null = null;
+  try {
+    previous = JSON.parse(await readFile(join(outDir, "key.json"), "utf8")) as SessionKey;
+  } catch {
+    previous = null;
+  }
 
   const trialSpecs: NonNullable<SessionSpec["trials"]> =
     spec.trials ??
@@ -110,7 +142,12 @@ export async function buildSession(spec: SessionSpec, specDir: string, outRoot: 
       throw new Error(`Trial ${t} needs 2–${LETTERS.length} variants, got ${ts.variants.length}`);
     }
     const trialId = `t${String(t + 1).padStart(2, "0")}`;
-    const order = shuffle(ts.variants);
+    const kept = previous?.clips[trialId];
+    const sameSet =
+      kept && Object.values(kept).slice().sort().join("|") === ts.variants.slice().sort().join("|");
+    const order = sameSet
+      ? Object.keys(kept).sort().map((label) => kept[label])
+      : shuffle(ts.variants);
     key.clips[trialId] = {};
     key.windows[trialId] = window;
     const clips = [];
@@ -125,7 +162,7 @@ export async function buildSession(spec: SessionSpec, specDir: string, outRoot: 
       }
       const source = await load(resolve(specDir, precut ?? variant.file ?? ""));
       const excerpt = precut ? source : cut(source, window.start, window.dur);
-      const { channels, peakDb } = match(excerpt, loudnessLufs);
+      const { channels, peakDb } = match(excerpt, loudnessLufs, matchBy);
       if (peakDb > -0.1) {
         throw new Error(
           `Clip ${trialId}/${variantId} peaks at ${peakDb.toFixed(1)} dBTP after matching to ` +
@@ -155,13 +192,16 @@ export async function buildSession(spec: SessionSpec, specDir: string, outRoot: 
       title: ts.title ?? `${window.label ?? "passage"} · ${window.start}s (${window.dur}s)`,
       clips,
     });
-    process.stderr.write(`${trialId}: ${order.length} clips from ${window.start}s\n`);
+    process.stderr.write(
+      `${trialId}: ${order.length} clips from ${window.start}s${sameSet ? " (kept previous order)" : ""}\n`,
+    );
   }
 
   const session: Session = {
     name: spec.name,
     createdAt: new Date().toISOString(),
     loudnessLufs,
+    matchBy,
     clipQuestions: spec.clipQuestions ?? DEFAULT_CLIP_QUESTIONS,
     trialQuestions: spec.trialQuestions ?? DEFAULT_TRIAL_QUESTIONS,
     trials,

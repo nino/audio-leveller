@@ -434,6 +434,11 @@ The workflow:
    the same loudness with a static gain (a 1 dB louder clip reliably "sounds
    better", which is not the question), shuffles them, and writes them as
    `t03_B.wav` so file names leak nothing. The mapping goes to `key.json`.
+   Matching is on the loudest 400 ms by default (`matchBy: "momentaryMax"`),
+   not integrated loudness: clips with different dynamics can share an
+   integrated value and still sound clearly unequal, because the ear reads
+   the loud syllables. Rebuilding an existing session keeps its shuffle, so
+   answers already recorded stay valid.
 4. **Listen**: `pnpm listen`. One trial per screen; big A/B/C/D buttons and
    the number keys switch clips *gaplessly at the same position*, which is
    the only way to hear small differences. Drag on the waveform to loop a
