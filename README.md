@@ -14,6 +14,12 @@ It writes two files next to the input:
 - **`<name>_roomtone.wav`** — a seamless **room-tone bed** built from the
   cleanest bits of the silences (see below).
 
+There is a long-form explainer in
+[`docs/explainer/`](docs/explainer/pipeline-explained.md), which walks through
+every stage and the maths behind it for a reader who is fluent in mixing but
+not in signal processing. It is also built as an
+[EPUB](docs/explainer/audio-leveller-pipeline.epub).
+
 ## The chain
 
 Eight stages, in order. Each decides for itself whether it has anything to do
