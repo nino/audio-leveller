@@ -26,7 +26,7 @@ You need these five ideas and no more. They take about ten minutes.
 
 A microphone produces a voltage that varies continuously. An analogue-to-digital converter measures that voltage at a fixed rate — 44,100 or 48,000 times a second — and writes down each measurement as a number. That is the whole of digital audio: `x[0], x[1], x[2], …`, one number per instant, where the gap between instants is `1/fs` seconds and `fs` is the sample rate.
 
-In this codebase a mono channel is a `Float32Array`, an array of numbers between roughly −1 and +1, where ±1 is full scale — the loudest a converter can represent. `0 dBFS` is that ±1. When you see `−23 LUFS` or `−1 dBFS` later, those are all measured against that same ceiling.
+In this codebase a mono channel is a `Float32Array`, an array of numbers between roughly −1 and +1, where ±1 is full scale — the loudest a converter can represent. `0 dBFS` is that ±1. When you see `−18 LUFS` or `−1 dBFS` later, those are all measured against that same ceiling.
 
 The one piece of theory you do need: a sampled signal can only represent frequencies below half the sample rate. That half-rate is the **Nyquist frequency** — 24 kHz at 48 kHz sampling. Anything above it, if you let it in, does not simply disappear; it *folds back down* and appears as a lower frequency that was never there. That folding is aliasing, and it is why `src/dsp/resample.ts` is 150 lines of carefully-designed filter rather than "take every other sample". This is the same reason you do not simply throw away every other frame when you change a video's frame rate.
 
@@ -146,9 +146,31 @@ Compressing first is not symmetric. The compressor pulls the loud parts down and
 
 So the order is not about the two stages fighting over the floor. It is that one order leaves both measurements intact and the other perturbs one of them.
 
-**Level last, always.** So the loudness target is measured on the audio that actually gets written to disk. Any spectral processing after levelling would move the loudness off target, and `−23 LUFS` would become approximately −23 LUFS. Putting the compressor before it has a second benefit: the true-peak limiter at the end of the level stage sees what the compressor actually produced, rather than guessing at it.
+**Level last, always.** So the loudness target is measured on the audio that actually gets written to disk. Any spectral processing after levelling would move the loudness off target, and `−18 LUFS` would become approximately −18 LUFS. Putting the compressor before it has a second benefit: the true-peak limiter at the end of the level stage sees what the compressor actually produced, rather than guessing at it.
 
 This is the same reasoning you would apply to a mix chain — you do not put the loudness maximiser before the EQ — but it is worth having written down, because in code the order is a single array literal and nothing stops someone reordering it.
+
+### Whole files in memory, and what that costs
+
+There is one more architectural commitment, and it is the sort of thing that looks like an implementation detail until it isn't: **a stage is handed the entire recording at once.** Not a stream of blocks with state carried between them — the whole signal, as an array, with a stage free to look anywhere in it.
+
+That buys real things, and some of them are not available any other way:
+
+- **Free lookahead.** The true-peak limiter eases its gain down *before* each peak by running a backward pass over the gain curve. In a streaming design that is a delay line and a pile of latency bookkeeping; here it is a loop that counts down instead of up.
+- **Two-pass measurement.** Every stage that measures the file before deciding what to do — which is nearly all of them — needs the file first. The EQ fits a curve to the whole recording's average spectrum. The leveller needs every segment's loudness before it can choose any segment's gain.
+- **Algorithms that genuinely need it.** The dereverberator estimates one room from the entire recording, which means it needs every frame of a frequency bin simultaneously. That is not laziness; it is what the method is.
+
+What it costs is that **memory scales with the length of the recording**, and that cost stayed invisible for a long time because everything the project was tested on was short. The eval corpus is seconds long. The unit fixtures are shorter. The first genuinely long recording put through the chain — twenty-one minutes — found the wall immediately, and then a second wall behind it.
+
+The first was a crash. A blind reverb-decay measurement built an envelope with one entry per 5 ms of audio and then took its maximum with `Math.max(...envelope)`. Spreading an array into a call passes each element as a separate argument, and V8 stops at somewhere around 65,000 of them. A 1286-second recording produces 257,200. Every test in the suite passed; the first real recording died. Three more places had the same shape and were fixed the same way.
+
+The second was slower and worse. The short-time Fourier transform materialised every frame and handed back the lot: at the usual frame settings that is 8 KB per frame and 241,219 frames — about 2 GB for the frame array alone, per channel, before the inverse transform's accumulators and the signal copies. The render sat at 4.5 GB and ran at roughly 1.5× real time, against about 40× on a one-minute clip. It was not computing; it was swapping.
+
+The fix keeps the whole-file commitment for the *signal* and drops it for the *spectrogram*. `processStft` does the same work through a fixed-size overlap-add buffer: once the frame starting at a given sample has been added, that sample can receive no further contributions, so exactly one hop's worth of slots retire per frame and are immediately reused. Memory becomes O(frame size) regardless of file length. The dynamic EQ and the denoiser were both holding a full spectrogram for no reason — both are per-frame with carried state — and both were converted.
+
+Two details are worth noting because they are the difference between a refactor and a rewrite. The output is **bit-identical**, and that is asserted rather than hoped for: the tests compare the streaming path against the old materialising path at three frame sizes, with and without a modification applied. It can be bit-identical because frames still arrive in increasing order, so each output sample accumulates its contributions in exactly the same sequence as before. And the one place where behaviour did change is stated plainly rather than buried — a fallback noise estimator that wants the quietest fifth of frames per bin, which needs a value per bin per frame, now subsamples above 20,000 frames. A noise floor is a stationary property, so a few thousand frames spread across a recording estimate it as well as all of them; below the cap nothing changes at all, which covers the entire corpus.
+
+The dereverberator is the exception that proves the rule. It still materialises its whole spectrogram — about 2 GB on a file that long — because it genuinely needs every frame of a bin at once. Bounding *that* means processing in blocks, which is a behaviour change rather than a refactor: the room estimate would start adapting over the file instead of being fitted once. That is a real design question, so it is recorded as a limitation rather than quietly changed.
 
 ### Lazy sample-rate conversion
 
@@ -195,6 +217,8 @@ There is no `Math.random` anywhere in it. A small deterministic pseudo-random ge
 The second reason is that you can degrade synthetic material *in known ways*. The corpus can add noise at an exact requested SNR, scatter exactly 40 clicks at known sample positions, convolve with a synthetic room impulse response of known RT60, add a resonance at exactly 2.5 kHz, or drift the segment levels by exactly 25 LU. And crucially it retains the **clean reference** — the same material without the degradation — so metrics can ask "how far is the output from what it should have been" rather than merely "does the output look plausible".
 
 Real recordings are still supported: any `.wav` dropped into `eval/fixtures/` is picked up as an extra case automatically. A fixture on its own cannot carry a reference, so it gets the subset of metrics that do not need one — but there is a trick that recovers the rest. Take the first sixty seconds of the recording, add broadband noise at a known SNR, and run the denoiser on *that*: now the recording itself is the clean reference, and every reference-based metric is available on real speech. Those degraded-fixture cases are where the model backend's quality is actually bounded, for reasons that will become clear in the denoise section.
+
+That trick has since been pointed at a second stage, and for a reason that turns out to be the most important thing in this document. The de-clicker now gets two fixture cases of its own: the excerpt with forty clicks injected at half its peak (did they get repaired, and was anything *else* touched), and the excerpt completely untouched (the stage should do almost nothing). Both exist because the synthetic voice turned out to be unfit for judging this particular stage — not slightly unfit, but wrong in the direction that made the stage look good while it was quietly damaging every real recording it saw. That story is in "The bugs the harness missed", below, and again in Part 4.
 
 There is one more piece of determinism worth naming, because it was added late and it is easy to miss. Every case now **pins the denoise backend by name** rather than taking whatever the machine can run. Without that, installing model weights in your home directory would silently change numbers on cases that have nothing to do with the model, and a colleague without the weights would see a different corpus from yours. The corpus must not depend on what happens to be sitting in `~/.audio-leveller`. Same instinct as seeding the noise: a number that changes must mean the code changed.
 
@@ -275,13 +299,35 @@ Note also that some bounds have **upper** limits on improvement, not just lower 
 
 One recent bound was wrong on its first outing and it is worth recording, because the mistake is instructive rather than careless. The expander's own case, `floor-expand`, was written by copying the levelling rationale — it asserted that segment-local SNR must not move. Which, for a stage whose entire purpose is to move segment-local SNR, would have been asserting that the expander does not work. Written down like that it is obvious; written as one line copied from the case above it, it looked like diligence. The replacement gives the case a genuine clean reference: the same programme generated from the same seed with the floor pushed to −100 dBFS, so the speech is sample-identical and the only difference is the noise. SI-SDR against that reference can then answer the question that actually matters — did it remove noise or did it remove words — and it reads +1.20 dB, so: noise.
 
+### The other half: blind listening
+
+Everything above is the argument for measuring. The counter-argument — the one the top of this part conceded and then walked past — is that metrics only ever answer the question you thought to ask. A number can tell you the chain did what it was told. It cannot tell you the result sounds right, because "sounds right" is not a property of the audio, it is a property of a listener.
+
+So the project grew a second instrument, and it is deliberately built to defeat the person using it. `listen/` is a small blind A/B app — a local web page, nothing uploaded, no account. The workflow is:
+
+1. **Render candidates.** Whatever you want to compare: the CLI with different flags, a commercial service's export, a DAW bounce, the same file with one stage bypassed.
+2. **Write a spec** naming the variants, some time windows, and which variants appear in each trial.
+3. **Build a session.** The builder cuts every window from every variant, **loudness-matches** them, **shuffles** them, and writes them under names that leak nothing — `t03_B.wav`. The mapping from `B` back to a variant goes into a `key.json` the app refuses to show you until you ask.
+4. **Listen.** One trial per screen. A/B/C/D switch clips *gaplessly at the same playback position*, which is the only way to hear a small difference — stop, reload, and press play again and you are comparing your memory of one clip against another. Score each clip, tag artefacts, pick a winner.
+5. **Reveal.** Per-variant means, picks, tag counts, CSV export.
+
+Two details in there are doing more work than they look.
+
+**The loudness match is on the loudest 400 ms, not the integrated loudness.** This was originally integrated, which is the obvious choice and is wrong. Two clips with different dynamics can share an integrated value and still sound plainly unequal, because the ear weighs the loud syllables far more than the quiet ones. Measured on an actual session, the unlimited variant's loud syllables sat about 2.5 dB above the others and its peaks 7 dB above, at matched integrated loudness. A clip that is even slightly louder reliably wins a preference test, so an unmatched comparison is not measuring what you think it is measuring — it is measuring the level error. This is the same fact every mix engineer knows about A/B'ing with the bypass button, formalised.
+
+**Rebuilding a session keeps its shuffle.** Add a variant, rebuild, and the trials you have already scored stay valid rather than silently becoming answers to different questions.
+
+The reason this sits in the middle of a part about *measurement* is that the harness and the listening app fail in opposite directions, and you need both. The corpus is exhaustive, repeatable, and only sees what someone wrote a metric for. The ear sees everything and remembers nothing, cannot be repeated, and lies to you the moment it knows which render is yours. Nothing in the next two sections would have been found by either instrument alone.
+
 ### The bugs the harness caught
 
 This is the argument for the whole approach, so it deserves to be concrete. All of these are documented in the commit messages.
 
 **The WAV round-trip lost one LSB per sample.** The byte-identical bypass guarantee exposed this immediately. The decoder converted 16-bit integers to floats by dividing by 32768; the encoder converted back by multiplying by 32767. Those are different numbers. Every decode-encode round trip therefore shifted every sample very slightly toward zero — a vanishingly small error, inaudible on one pass, but present on *every sample of every file* and compounding across renders. It exists because signed PCM is asymmetric: the range is −32768 to +32767, so 32767 looks like the right scale for the write side. It is not; the fix is to scale both sides by 32768 and clamp, accepting that only true full scale gets clipped, which is inherent to the format. Nobody would have found this by listening. The bit-identity assertion found it on day one.
 
-**The de-clicker fired on glottal pulses.** When the synthetic speech generator was rewritten to be more realistic (phase 3), the de-clicker suddenly started detecting clicks in clean speech at about two per second. The generator had not got worse — it had got *right*. Voiced speech is driven by a glottal pulse every pitch period: impulsive excitation, five to fifteen milliseconds apart. That is precisely what an impulsive-outlier detector is designed to fire on. The old generator's smooth harmonic sum had no such pulses, so the bug had been invisible. The fix is discussed in Part 3, and the `clean-declick` case now guards it permanently.
+**The de-clicker fired on glottal pulses.** When the synthetic speech generator was rewritten to be more realistic (phase 3), the de-clicker suddenly started detecting clicks in clean speech at about two per second. The generator had not got worse — it had got *right*. Voiced speech is driven by a glottal pulse every pitch period: impulsive excitation, five to fifteen milliseconds apart. That is precisely what an impulsive-outlier detector is designed to fire on. The old generator's smooth harmonic sum had no such pulses, so the bug had been invisible. Shortening the analysis blocks so the robust threshold could rise over a run of pulses brought the synthetic case back to nearly nothing, and the `clean-declick` case was written to guard it.
+
+That fix was wrong, and the corpus certified it for months. See below.
 
 **The dynamic EQ attenuated 92% of clean speech.** The threshold had been set at a sensible-sounding 6 dB above the local spectral envelope. Measured on clean material: 92% of all time-frequency cells were being attenuated. That is not resonance suppression, it is reshaping the entire recording — and it would have sounded like a slightly dull, slightly squashed version of the voice, which is very easy to rationalise as "smoother". Raising the threshold to 12 dB brought it to 5% of cells while delivering the *same* benefit on the actual resonance case. All the extra activity was cost with no benefit. Why the threshold has to be so much higher than intuition suggests is explained in Part 3.
 
@@ -295,7 +341,29 @@ This is the argument for the whole approach, so it deserves to be concrete. All 
 
 That progression is worth dwelling on. Two-thirds of the work on that metric was discovering what "a good repair" even means, and the answer turned out to have a hard physical floor: at a pause site, the residual of a *perfect* repair is the noise realisation that was under the click, which nothing can reconstruct. So the bound sits at +2 dB rather than a fantasy −40, and the harness is honest about what is achievable rather than aspirational about it.
 
-**The harness was enrolling its own output as test material.** This one is almost funny and it is entirely the harness's fault. Real recordings are picked up automatically from `eval/fixtures/`, which is the whole point of that directory. But the pipeline writes its results *next to its input*, so processing a fixture in place leaves `<name>_processed.wav` and `<name>_roomtone.wav` sitting in the fixtures directory — and the next run scooped them up as fixtures in their own right. The chain was being graded on audio it had produced itself, which is not a corpus, it is a feedback loop. Worse, one of those files is a room-tone bed: pure noise floor, no speech, and therefore something no amount of levelling can bring to −23 LUFS, so it contributed a permanent failure that had nothing to do with anything. The fix is four characters of regular expression, `/_(processed|roomtone)$/`, and the interesting part is not the fix but that the harness's own conveniences can be the thing that lies to you.
+**The harness was enrolling its own output as test material.** This one is almost funny and it is entirely the harness's fault. Real recordings are picked up automatically from `eval/fixtures/`, which is the whole point of that directory. But the pipeline writes its results *next to its input*, so processing a fixture in place leaves `<name>_processed.wav` and `<name>_roomtone.wav` sitting in the fixtures directory — and the next run scooped them up as fixtures in their own right. The chain was being graded on audio it had produced itself, which is not a corpus, it is a feedback loop. Worse, one of those files is a room-tone bed: pure noise floor, no speech, and therefore something no amount of levelling can bring to the loudness target, so it contributed a permanent failure that had nothing to do with anything. The fix is four characters of regular expression, `/_(processed|roomtone)$/`, and the interesting part is not the fix but that the harness's own conveniences can be the thing that lies to you.
+
+### The bugs the harness missed
+
+The section above is the sales pitch. This one is the correction to it, and it is more useful.
+
+Every bug listed above was found by the corpus. The corpus is synthetic, seconds long, and generated by a program. So it can only find bugs that survive being synthetic, and only bugs that appear within a few seconds. When a real twenty-one-minute recording was finally put through the chain and listened to blind, four things came out at once, and none of them had ever registered as anything but green.
+
+**The de-clicker was destroying real speech, and the corpus said it was fine.** This is the serious one. On the real recording, the de-clicker "repaired" **21,591 clicks** — about nineteen a second, spaced at the voice's pitch period. It was the glottal-pulse bug from the section above, never actually fixed: shortening the analysis blocks had been enough to satisfy the synthetic voice and nothing more. In blind listening this was the source of the distortion in the chain, and it had been misattributed to the limiter.
+
+The reason the corpus missed it is worth stating precisely, because it is the opposite of the obvious guess. The synthetic voice is not *less* impulsive than a real one — it is **several times more** impulsive. Its glottal source is a Rosenberg pulse, which stops dead at closure, where a real glottis has a return phase. So on synthetic material the voice's own excitation towered over everything, the threshold rose to clear it, and clean speech passed. On a real voice, whose pulses are gentler, the same threshold sat neatly *between* the pulses and flagged every one of them.
+
+That is a corpus that is not merely unrepresentative but **anti-representative**: it was harder than reality in exactly the dimension being tested, so passing it was evidence of nothing. And it had a second consequence that took a while to see. The synthetic click cases injected clicks at 0.9× the waveform peak, which sounds aggressive, and on a real voice would be. On *this* voice a 0.9× click barely stands out from the excitation — so once a correct fix landed, those cases started failing, and they were failing for the right reason. They now inject at 2× with a stated explanation, and the real sensitivity check moved to the fixture cases, on real speech.
+
+The fix itself is a nice piece of reasoning and is described in Part 3, but the shape of it belongs here: what separates a click from a glottal pulse is not its size against the noise floor — both are large — but its size against *its own neighbours one pitch period away*. A pulse has company; a click stands alone. On the real recording that took 21,591 repairs down to 433, and on the eval fixture 749 down to 16, while injected clicks at half the waveform peak are still repaired 30 out of 30.
+
+**The limiter's instant attack was audible.** With the gain stepping down in a single sample, the waveform gets a sharp corner in it — which is, fairly literally, what clipping is. On the corpus the limiter barely engaged and the corner never appeared. On real material at 8.7 dB of reduction it was obvious. The fix is the backward-pass lookahead ramp described in Part 1.
+
+**The chain fell over on length.** The stack overflow and the 4.5 GB spectrogram, both in Part 1. A corpus of multi-second fixtures cannot find a bug whose trigger is 65,000 array elements or 2 GB of frames, and no amount of adding cases to it would have helped — the bugs are not in the space the corpus samples.
+
+**The room-tone bed admits breaths.** Clips for the room-tone bed are scored for loudness with penalties for clicks and swells, and a breath defeats all three at once: only moderately louder than the floor, broadband rather than impulsive, and long enough to read as a steady level. It needs a term for spectral shape, since a breath is noise but tilted differently from room tone. The synthetic corpus has no breaths in it, so this could not have been caught — and it is now an open issue with labelled real material being collected against it.
+
+The honest summary is that the harness catches regressions superbly and validates novel behaviour only as far as its material is real. Both instruments were needed, in a specific order: the corpus kept the chain from rotting while it was built, and the ear found the things the corpus was structurally incapable of seeing. A metric can only be as good as the material you point it at, and *synthetic material is a model of speech, with all a model's assumptions baked in and invisible.*
 
 ### A test that passed for the wrong reason
 
@@ -391,11 +459,23 @@ Any analysis block where detections cover more than 5% of the samples is discard
 
 And if detection covers more than 2% of the entire file, the stage refuses to touch the file at all and says so in its report. That means the threshold is wrong for this material, and doing nothing is far safer than rewriting 2% of every channel on a bad hypothesis.
 
-**The block length, and the glottal pulse problem.** The model is refitted and the threshold re-estimated per analysis block, and that block is **10 ms** — much shorter than the 20–50 ms that AR speech modelling conventionally uses. This is the fix for the glottal-pulse bug, and it is a lovely piece of reasoning.
+**The glottal pulse problem, and the fix that wasn't.** This is the most instructive part of the stage, because the first solution was elegant, well-argued, measured, guarded by a test — and wrong.
 
-Voiced speech is a train of glottal pulses, one every pitch period — 5 to 15 ms apart for adult voices. Those pulses are impulsive excitation. An impulsive-outlier detector will fire on them happily. Over a 50 ms block, four or five glottal pulses are a small minority of ~2400 samples, so they sit well above the median and read as outliers. Over a 10 ms block — comparable to one pitch period — the pulse **dominates its own statistics**. The median absolute deviation of the block is computed largely from the pulse itself, so the threshold rises above it, and the pulse is no longer an outlier relative to a block that is mostly pulse.
+Voiced speech is a train of glottal pulses, one every pitch period — 5 to 15 ms apart for adult voices. Those pulses are impulsive excitation. An impulsive-outlier detector will fire on them happily, and it did.
 
-Measured: 50 ms blocks give about two false positives per second of clean speech; 10 ms blocks give none, and both still catch every injected click. Adaptation, in exactly the sense that a compressor's auto-release adapts — let the material set its own reference.
+The original fix was to shorten the analysis block. The model is refitted and the threshold re-estimated per block, and that block was cut to **10 ms**, much shorter than the 20–50 ms that AR speech modelling conventionally uses. The reasoning: over a 50 ms block, four or five glottal pulses are a small minority of ~2400 samples, so they sit well above the median and read as outliers; over a 10 ms block — comparable to one pitch period — the pulse **dominates its own statistics**, the median absolute deviation is computed largely from the pulse itself, the threshold rises above it, and the pulse stops being an outlier relative to a block that is mostly pulse. Measured on the corpus: 50 ms blocks gave about two false positives per second of clean speech, 10 ms blocks gave none, and both still caught every injected click.
+
+Every sentence of that is true about the synthetic voice and false about a real one. On a real 19-minute recording the stage repaired **21,591 clicks** — nineteen a second, at the pitch period. The shortened block reduces the problem; it does not cure it. Why the corpus certified the fix anyway is in "The bugs the harness missed", and it is because the synthetic voice's Rosenberg pulse stops dead at closure and is therefore *more* impulsive than a real glottis, not less.
+
+**The fix that works: a pulse-train veto.** The insight is that the discriminating quantity was never the pulse's size against the residual floor. Both a click and a glottal pulse are large there — that is what makes this hard. What separates them is **size against their own neighbours one pitch period away**:
+
+> A click towers over the excitation around it. A glottal pulse has neighbours its own size.
+
+So a candidate is vetoed when the residual anywhere from 2.5 to 20 ms away on either side — one to two pitch periods, covering 50 to 400 Hz — reaches 0.3× its own peak. At that ratio a click must be about 10 dB more impulsive than the voice's own excitation around it to survive; one that is not is being masked by that excitation anyway, so leaving it alone costs nothing audible.
+
+Two sources of "neighbour" are consulted, because each alone has a blind spot. Other *candidates* are checked, since glottal pulses are candidates — but only the cycles that happened to cross threshold. So the raw residual **envelope** is checked too, which sees every cycle. And that in turn needs one guard: a click corrupts the AR model of its own block and inflates that block's residual everywhere, so bins from the candidate's own block are excluded. Without that exclusion a loud click would hide behind the pollution it caused, veto itself, and survive.
+
+The results, and note that the two corpora disagree about what "good" means: on the real recording, 21,591 repairs → **433**; on the eval fixture, 749 → **16**, with the transparency measure going from −34 dB to −49 dB; injected clicks at half the waveform peak still repaired 30 out of 30, at 0.3× still 28 out of 30. On the synthetic corpus, a 0.9× click is now — correctly — left alone, because against that unnaturally spiky voice it is not impulsive enough to be a click. The synthetic cases therefore inject at 2×, with that explanation written into the case, and the honest sensitivity test moved to the fixture cases on real speech.
 
 **Repair.** Once you know which samples are damaged, you replace them with the values that make the signal fit the model best. This is **Janssen interpolation**, and it is genuinely clever.
 
@@ -413,7 +493,9 @@ Two extra details. The detected burst is **dilated by two samples** on each side
 
 And the repair runs **twice**. The first pass uses the model that did the detecting, which was fitted on a block *containing the click*. In quiet audio that is a serious problem: three samples at click amplitude carry orders of magnitude more energy than 10 ms of noise floor, so the model's autocorrelation is dominated by the click, and the "model of the speech" is really a model of the click. The repair inherits that error. So after the first repair — with the click now gone — the model is refitted on the repaired neighbourhood and the gap interpolated again, this time with a model of the actual signal.
 
-**The trade-offs.** De-click is conservative by design: three separate refusal mechanisms, an under-corrected repair, and a false-positive rate held at zero on clean material at the cost of possibly missing very quiet clicks. That is the right bias for a tool that will run automatically on material nobody is going to audition frame by frame. Results on the corpus: `segmentLufsError` on the `clicky` case 7.93 → 0.32 LU, SI-SDR −20.7 → +29.3 dB, worst repair −1.2 dB against local peaks with the bound at +2.
+**The trade-offs.** De-click is conservative by design: three refusal mechanisms, the pulse-train veto, an under-corrected repair, and a false-positive rate held near zero on clean material at the cost of missing quiet clicks. That is the right bias for a tool that runs automatically on material nobody is going to audition frame by frame — and the veto sharpens the bias deliberately, since a click quiet enough to be vetoed is a click quiet enough to be masked. Results on the corpus: `segmentLufsError` on the `clicky` case 7.93 → 0.32 LU, SI-SDR −20.7 → +29.3 dB, worst repair −1.2 dB against local peaks with the bound at +2.
+
+One standing instruction, written into the source: **judge this stage on real recordings.** It is the one place in the project where the synthetic corpus is known to point the wrong way.
 
 ---
 
@@ -440,6 +522,8 @@ Defaults: 1024-sample frames, 256-sample hop. At 48 kHz that is 21 ms frames eve
 **Estimating the noise.** You cannot remove noise until you know what it looks like. The best possible source is the pauses — the moments where there is no speech, so whatever is there is by definition the thing you want gone. The silence analysis has already found them, so the denoiser averages the power spectrum over frames lying wholly inside detected pauses. That is a direct measurement of the target.
 
 When there are not enough pauses (fewer than four usable frames), it falls back to **minimum statistics**: for each frequency bin independently, take the quietest fifth of all frames and average those. The logic is that even in continuous speech, any given frequency band is momentarily unoccupied fairly often, so the quiet end of each bin's distribution is mostly noise. It is more fragile — in genuinely continuous speech the quietest frames still contain speech — which is why the report says which method was used, so the caller can be more conservative.
+
+That fallback is also the one place in the streaming rework of Part 1 where behaviour genuinely changed, and it is worth seeing why. Taking a *percentile* per bin means keeping every frame's value for that bin, which is a number per bin per frame — a gigabyte on a twenty-minute file, and the one quantity in the stage that cannot be folded into a running accumulator. Above 20,000 frames it now subsamples. The justification is the same property the method already assumes: a noise floor is stationary, so a few thousand frames spread across a recording estimate it as well as all of them do. Below the cap — which is the whole corpus and the whole unit suite — nothing changes, and the frame count used was already in the report.
 
 **Spectral subtraction and the Wiener gain.** Now the core. For each time-frequency cell you have an observed power `Y` (magnitude squared) and an estimated noise power `N`. You want an estimate of the clean speech power `S`.
 
@@ -472,6 +556,8 @@ Read it as: this bin's a-priori SNR is mostly (α = 0.98) what the *previous fra
 **Three more things, all of which cost raw reduction and all of which exist to prevent musical noise.**
 
 *A gain floor.* No bin is ever attenuated by more than a set amount. So residual noise is left as a quiet, natural version of the original rather than as a field of holes with tones scattered in it. This is a genuinely important design point in the codebase: **the floor literally is the reduction target.** Asking for 12 dB of noise reduction sets the floor at −12 dB. Which is why there is no wet/dry control — a global blend would dilute the speech along with the noise, whereas the floor only ever binds where a bin is noise-dominated. That is a better answer to "make it less aggressive" than a mix knob.
+
+*Two passes over the file.* Estimating the noise profile now happens in its own scanning pass before the processing pass, rather than reading frames out of a spectrogram that was going to be kept anyway. That costs a second Fourier sweep and saves holding every frame — the trade the streaming rework in Part 1 makes everywhere.
 
 *Noise over-estimation.* The noise profile is multiplied by 1.5 before subtraction. Slightly over-estimating trades a little speech dulling for markedly less musical noise, and a profile measured from pauses is a slight under-estimate of what sits under speech anyway.
 
@@ -619,7 +705,11 @@ Note also where that measurement lives: in `src/dsp/`, not with the eval metrics
 
 What WPE does offer, and the reason it earns its place over a trained enhancer, is that **it cannot invent speech**. It only ever subtracts a linear prediction. Its failure mode is leaving reverberation behind, not fabricating words that were never said. For a podcast where the speaker's actual voice is the product, that is the right trade.
 
-It is also the slowest stage in the chain by a wide margin — roughly 0.6× real time, because it solves a dense complex 20×20 system per bin per iteration, 2049 bins × 3 iterations per channel. No optimisation work has been done. This is noted in the README rather than hidden.
+It is also the slowest stage in the chain by a wide margin — roughly 0.6× real time, because it solves a dense complex 20×20 system per bin per iteration, 2049 bins × 3 iterations per channel.
+
+It has since had one round of optimisation, worth 1.7×, and the interesting thing about it is that both wins were the *same shape* as the one that made the dynamic EQ slow: a value recomputed inside an inner loop that could have been read once. The correlation accumulator is a 20×20 double loop per frame, and it was fetching the real and imaginary parts of the tap history *inside* it — 840 accessor calls per frame, each an array-of-arrays indirection through a closure, to read the same twenty complex numbers over and over. Reading them into two small flat arrays first is 1.5× on its own. Then: the correlation matrix is **Hermitian**, so half of it was being computed twice. Accumulating only the upper triangle and mirroring the rest is another 1.2×, and it is *exact* rather than approximate — IEEE multiplication commutes and negation is lossless, so the mirrored entry carries the same bits the full loop produced. Both changes are bit-identical, verified sample-for-sample against the previous implementation, and the eval baseline did not move.
+
+What that did not fix is memory. Dereverb still materialises its entire spectrogram — about 2 GB on a twenty-minute file — because WPE genuinely needs every frame of a bin at once, as described in Part 1. Bounding it means block-wise processing, which changes behaviour rather than just cost: the room estimate would begin adapting over the file instead of being fitted once. That is a design decision, so it is recorded as a limitation rather than made silently.
 
 ---
 
@@ -742,6 +832,14 @@ The other cause of that 92% was the smoothing window, which is Part 4.
 
 Results: +5.1 dB SI-SDR on the `ringing` case, about 5% of cells touched on clean speech. And because this stage cannot decline to act — it is per-frame by nature, with no "should I engage" decision available — its transparency has to be *measured* rather than arranged. The `clean-dyneq` case bounds absolute output SI-SDR at ≥15 dB with exactly that reasoning written into it.
 
+**A logarithm in the wrong place.** For a while this stage was the chain's bottleneck by an absurd margin: 4951 ms of a 6.3 s render, about 79% of the total, against 344 ms for the two Fourier transforms it depends on. Profiling put 93% of its runtime in a single loop, and the cause is worth knowing because it is a mistake that is invisible in the algebra and obvious in the code.
+
+Look again at the two lines above. `level[k]` is a logarithm. `envelope[k]` averages `level` over a smoothing window that is, on average, 84 bins wide. Written naively, the average is a loop over neighbours that computes each neighbour's level as it goes — so every bin's logarithm is recomputed once for each neighbour whose window covers it. That is **443 million `Math.log10` calls per minute of audio to produce 5 million distinct values.** Hoisting the conversion out of the inner loop is a 5.5× speedup by itself, and it is bit-identical: the same expression, evaluated once instead of 84 times.
+
+Two smaller wins take it to 6.8× overall. The window average now comes from a **running prefix sum** — sum every level once, and any window is then two lookups and a subtraction instead of a loop. And a bin whose gain state is exactly zero, which is most of them, skips its `Math.pow`; that works because a settled bin sits at literal zero, which is exactly representable, so the comparison is safe in a way float comparisons usually are not.
+
+The prefix sum is the one change that is *not* bit-identical — summing in a different order gives different rounding — so it was measured rather than assumed. Across 2.6 million samples exactly one differs, by 1.7 × 10⁻¹⁸: about 355 dB below peak, three orders of magnitude below what a float32 sample can even represent, and the corpus reported nothing moved. The stage is now 624 ms of a 2.1 s render, in line with its neighbours rather than dwarfing them, and `pnpm eval` went from 51 s to 31 s as a side effect.
+
 ---
 
 ### Interlude — the two level-domain stages, and where their numbers came from
@@ -854,7 +952,7 @@ where `z_c` is the mean of the squared K-weighted samples in channel `c`, `G_c` 
 
 The relative gate is what makes the measurement report *the loudness of the programme* rather than the loudness of the programme diluted by the pauses. Without it, a recording with long silences would measure quieter than an identical recording with the silences edited out, which is not what anyone means by loudness.
 
-This gating also matters inside the harness. A bug found in phase 1: segment loudness was being measured **ungated**, which reads about 2 LU low on syllable-modulated speech — because the dips between syllables get counted. That would have shown up as a phantom levelling error in every result. Gated integrated loudness is what −23 LUFS means, what the leveller measures to pick its gain, and what the generator normalises to; the metric now uses the same thing.
+This gating also matters inside the harness. A bug found in phase 1: segment loudness was being measured **ungated**, which reads about 2 LU low on syllable-modulated speech — because the dips between syllables get counted. That would have shown up as a phantom levelling error in every result. Gated integrated loudness is what a LUFS target means, what the leveller measures to pick its gain, and what the generator normalises to; the metric now uses the same thing.
 
 **Silence detection.** A short window — 100 ms, hopping 25 ms — slides across the file and each window's loudness is measured. The threshold sits between the estimated noise floor (the 10th percentile of window loudness) and the integrated loudness:
 
@@ -864,7 +962,7 @@ threshold = floor + fraction · (integrated − floor),   fraction = 0.25
 
 "A quarter of the way from the floor up to the programme level." Runs of sub-threshold windows longer than 1 second become silence regions. There is also **Otsu's method** available as an alternative — the bimodal-histogram valley trick from image thresholding, which finds the split point that best separates two clusters. It is a nice option to have because it makes no assumption about where in the range the threshold should sit; it lets the data show you the valley between "speech" and "not speech".
 
-**Segmentation and gain.** Segment boundaries are the file edges plus every silence **midpoint** — so a segment runs from the middle of one silence to the middle of the next. Each segment's gated integrated loudness gives a target gain of `−23 − measured` dB, clamped to ±30 dB.
+**Segmentation and gain.** Segment boundaries are the file edges plus every silence **midpoint** — so a segment runs from the middle of one silence to the middle of the next. Each segment's gated integrated loudness gives a target gain of `target − measured` dB, clamped to ±30 dB.
 
 Gain is held constant across each segment's speech and **ramped linearly across each silence** from the left segment's gain to the right's. If segment A was cut 3 dB and segment B boosted 2, the silence between them ramps −3 → +2 dB. All the gain movement happens where there is no speech to hear it move.
 
@@ -872,7 +970,21 @@ This is the core insight of the whole original tool, and it is worth appreciatin
 
 That distinction survives the arrival of Stage 7 rather than being undermined by it, and the relationship between the two is worth stating plainly. The chain now does both jobs, with different tools, on purpose: the compressor works inside a phrase at 1.7:1 and a 12 dB cap, which is a light touch by any standard, and the leveller does everything between phrases without touching dynamics at all. What is being avoided is doing *all* of it with a compressor — riding a single detector hard enough to reconcile a whisper and a shout thirty seconds apart, which is how you get speech that is even in level and dead in life. Split the job by timescale, and each half can be gentle.
 
-**The true-peak limiter.** After levelling, some boosted segments will exceed the ceiling, so a feed-forward limiter with instant attack and a ~50 ms one-pole release catches them, applying one gain-reduction curve to all channels so the stereo image does not shift.
+**The target, and why it moved.** The default is **−18 LUFS**, and it used to be −23. That is not a tuning change, it is a change of what the tool is for. −23 is EBU R128, a broadcast *delivery* target, and it was exactly right while this was a Levelator-style tool handing material to someone else's chain — you leave headroom because the next person is going to use it. It is now the chain, delivering finished spoken word, where −18 is the ordinary target and the one the commercial reference this project is measured against uses. Broadcast delivery is one `--target -23` away.
+
+Two consequences worth noting. The eval corpus reads the default rather than restating it, so the harness keeps testing what a user actually gets rather than fossilising a number. And one leveller unit test that asserted −23 as a literal — where it meant "the target" — now reads the default, so it checks that the leveller *hits* its target instead of checking which target that is. The REAPER script is deliberately left at −23, because it writes a take-volume envelope inside a session rather than rendering a finished file, and so is still doing the old job.
+
+**The true-peak limiter.** After levelling, some boosted segments will exceed the ceiling, so a feed-forward limiter with a ~5 ms lookahead attack and a ~50 ms one-pole release catches them, applying one gain-reduction curve to all channels so the stereo image does not shift.
+
+The attack was originally instant — clamp the gain to whatever the peak requires, in one sample — and that was a bug you could hear, though not on anything in the corpus. A gain curve that steps down in a single sample puts a sharp corner into the waveform, and a corner is broadband: this is very nearly the definition of clipping, arriving by a different route. On the corpus the limiter barely engages and the corner never appears. On a real recording at 8.7 dB of reduction it was obvious enough to be mistaken, at first, for the source of all the distortion in the chain.
+
+The fix exploits the whole-file design from Part 1. Rather than a delay line and the latency bookkeeping that lookahead normally implies, the gain curve is computed forward as before and then walked **backwards**, easing each sample's gain down toward its successor's so the required reduction is reached exactly when the peak arrives:
+
+```
+gain[i] = min( gain[i],  1 − (1 − gain[i+1]) · attackCoeff )
+```
+
+That is a one-pole running in reverse. Because the pass only ever *lowers* gain, the ceiling guarantee is untouched — no sample can end up louder than the forward pass allowed — which is the property that makes this safe to bolt on rather than a redesign of the limiter.
 
 The detector runs on the **true peak**, not the sample peak, and this is where Part 0's second consequence of sampling comes back. Between two samples, the waveform a converter reconstructs can overshoot both of them. A signal measuring −1 dBFS sample peak can genuinely reach +0.5 dBTP coming out of a DAC — and, more practically, lossy encoders reconstruct the same inter-sample content and clip on it. A sample-peak ceiling of −1 dBFS routinely passes material that hits −0.3 dBTP.
 
@@ -931,6 +1043,20 @@ So this is the same lesson as the four above, one level up. There, the mistake w
 
 And in both cases the fix has the same shape too — decide what question you are asking, and pick the instrument that can answer *that* question. Which is why there is no synthetic quality bound on the model, why the model's quality is bounded on real recordings degraded with known noise, and why the stage carries a programme-loss guard that does not care which backend produced the damage. "Pitch is not a defect" and "synthesis is not a voice" are the same sentence with the scope widened.
 
+### The sixth variant, which is the theme turning round and biting
+
+The five above are all versions of the same warning: the pitch is there, do not mistake it for damage. The sixth is the same fact arriving from the opposite direction, and it is the most expensive one in the project, so it goes last.
+
+The de-clicker fires on impulsive outliers in the prediction residual. Glottal pulses are impulsive outliers in the prediction residual — this is variant one all over again, in the time domain rather than the frequency domain: the pitch, mistaken for a defect, in the most literal way available. It was noticed early, a fix was written, the fix was measured on the corpus, and a case was added to guard it. Everything the first four variants teach you to do was done.
+
+And the fix was still wrong on real speech, by a factor of fifty, for months.
+
+The reason is the fifth variant compounding the first. The synthetic voice's glottal source is a **Rosenberg pulse**, which stops dead at the moment of closure. A real glottis has a return phase — it closes over a few hundred microseconds, not instantly — and that difference makes the real excitation measurably gentler. So the synthetic voice was not a slightly-imperfect model of a real one in this dimension; it was *harder than reality in exactly the dimension being tested*, and a threshold tuned to clear its spiky pulses sat comfortably between the softer pulses of every real voice. The corpus said zero false positives. Reality said nineteen a second.
+
+That is the failure mode worth taking away, because it is the one the other five do not prepare you for. A corpus that is easier than reality gives you optimistic numbers, which you will eventually notice. A corpus that is *harder than reality in the wrong dimension* gives you a passing test that actively certifies a broken stage, and there is nothing in the number to tell you.
+
+The eventual fix, described in Stage 1, is the theme resolved rather than avoided. You cannot separate a click from a glottal pulse by how big it is, because the whole difficulty is that both are big. You separate them by asking whether the thing has **neighbours one pitch period away**. The discriminator is the periodicity itself: pitch is not a defect, and here it is not even a nuisance — it is the evidence.
+
 ### The lesson
 
 There is no single correct resolution for analysing speech. There is a correct resolution *for each question*:
@@ -938,12 +1064,12 @@ There is no single correct resolution for analysing speech. There is a correct r
 - "What is the room doing to this voice?" — coarse enough to skip the comb entirely. Envelope only.
 - "Is there sub-bass that isn't the voice?" — fine enough to separate 40 Hz from a 110 Hz fundamental, so raw bins.
 - "Is this frequency ringing right now?" — coarse in frequency, fine in time.
-- "Is this sample damaged?" — no frequency analysis at all; a time-domain model over 10 ms.
+- "Is this sample damaged?" — no frequency analysis at all; a time-domain model over 10 ms. But "damaged, or just voiced?" *is* a pitch question, answered by looking one pitch period either side.
 - "Is this a voice at all?" — not a resolution question. No window setting makes synthetic material answerable, which is why that question has to be asked of a real recording or not asked.
 
 And the sneaky part is that the wrong resolution does not produce an error or a crash. It produces a perfectly plausible measurement of the wrong thing, and a stage that acts on it confidently. The dynamic EQ at 6 dB threshold with a half-octave window was not broken in any way a programmer would notice. It ran, it produced audio, the audio sounded fine-ish. Only a harness that could say "you are attenuating 92% of everything" caught it.
 
-Which brings us back to Part 2, and is the best argument for it that this project produced.
+Which brings us back to Part 2 — and, in the sixth variant, back to Part 2's limits. The harness caught four of these six. It certified the fifth as a failure it could not interpret, and it certified the sixth as a pass when the stage was mangling every real recording it touched. The instrument that found that one was a pair of ears listening to twenty-one minutes of an actual voice, blind, not knowing which render was which.
 
 ---
 
@@ -964,17 +1090,29 @@ The backend's *absence* remains loud rather than silent, which was true before a
 
 The corpus checks that both stages act when they should and decline when they should, and that neither exceeds its cap. It does not and cannot check that the curve is the correct curve.
 
-**Dereverb is slow.** About 0.6× real time — a ten-minute recording takes over sixteen minutes in that stage alone. It solves a dense complex 20×20 system per frequency bin per iteration, three iterations, 2049 bins, per channel. No optimisation work has been done at all, and there is plenty available (the correlation matrix is Hermitian, so a Cholesky factorisation would roughly halve the solve; bins could be processed in parallel; the matrix accumulation loop is `O(taps²)` per frame and could be restructured). This is noted rather than hidden.
+**Dereverb is slow, and it is the one stage whose memory still scales with file length.** It has had one round of optimisation worth 1.7×, described in Part 3, but it still solves a dense complex 20×20 system per frequency bin per iteration, three iterations, 2049 bins, per channel, and it is still the chain's dominant cost when it engages. There is more available: the correlation matrix is Hermitian, so a Cholesky factorisation would roughly halve the solve, and the bins are completely independent of each other, so they are embarrassingly parallel.
+
+The memory is the sharper problem. Every other spectral stage now streams, so the chain's footprint is flat in file length; dereverb still materialises its whole spectrogram, about 2 GB on a twenty-minute file, because WPE genuinely wants every frame of a bin at once. Fixing that means block-wise processing, which is a behaviour change — the room estimate would adapt over the file instead of being fitted once — and possibly a better one for a recording where someone moves. It has not been tried.
 
 **Dereverb is also just modest.** Restating from Part 3 because it matters for expectations: ~12% off the decay, +1.3 dB SI-SDR. Single-channel dereverberation is a weak tool. The dramatic results you have heard are multi-channel. This will not rescue a recording made in a stairwell.
 
 **Almost everything is still tuned against synthetic material.** This remains the biggest caveat, though it is now a sharper one than it used to be. The corpus is speech-*shaped*, not speech. It has a glottal source, moving formants, prosody, jitter and syllable-rate amplitude modulation — which is enough to exercise everything the *classical* pipeline measures — but it is not a person talking into a microphone in a room. Real speech has consonants with genuinely different statistics (plosives, fricatives, nasals), breaths, mouth noises, lip smacks, variable mic distance, and rooms that are not exponentially-decaying noise.
 
-What has changed is that the limit of that approach is no longer a suspicion, it is a measured fact with a number on it: a trained model handed this corpus decides it is not hearing speech and removes 10 dB of it. Part 4 argues that this is the corpus being honest about what it is rather than the corpus being broken, and that argument holds — but only for the tools whose question the corpus can answer. Every stage in the chain except the model backend is such a tool. The model backend is not, and its quality is bounded only on real recordings degraded with known noise.
+What has changed is that the limit of that approach is no longer a suspicion. It is now two measured facts, and the second is worse than the first.
+
+The first: a trained model handed this corpus decides it is not hearing speech and removes 10 dB of it. Part 4 argues that this is the corpus being honest about what it is rather than the corpus being broken, and that argument holds.
+
+The second is the one that should change how much you trust the rest of this document. **The claim that "every stage except the model backend is a tool whose question the corpus can answer" was itself false, and it took a real recording to find out.** The de-clicker's question — is this sample damaged, or is it the voice's own excitation — is exactly the kind of question the corpus was supposed to be able to answer, and it answered it wrongly for months, in the direction that made a badly broken stage look perfect. The full account is in Part 4's sixth variant; the short version is that the synthetic glottal source is *more* impulsive than a real one, so passing the synthetic transparency test was evidence of nothing.
+
+That does not invalidate the corpus, which is still the reason nothing else in the chain has rotted. It does mean the correct statement is weaker than the one this section used to make: the corpus reliably catches *regressions*, and validates *novel behaviour* only as far as the material happens to be representative in the dimension that stage cares about — which is not knowable in advance. Every remaining synthetic-only bound in the list below should be read in that light.
+
+**Room tone still admits breaths.** The room-tone bed scores candidate clips for loudness with penalties for clicks and swells, and a breath defeats all three at once: only moderately louder than the floor, broadband rather than impulsive, and long enough to read as a steady level. It needs a term for spectral shape, since a breath is noise but tilted differently from room tone. There are no breaths anywhere in the synthetic corpus, so this was never going to be caught by the harness — it is tracked as an open issue, and labelled real material is being collected against it with the annotator described in Part 2.
+
+**Long recordings were unexercised until recently, and one class of bug lives only there.** Two failures — an `Math.max(...array)` spread that overflows V8's argument limit at about 65,000 elements, and a spectrogram that reached 4.5 GB — were invisible to every test in the suite because fixtures are seconds long and recordings are minutes long. Both are fixed (Part 1), and there is now a regression test that builds 150,000 frames at a low sample rate so it costs a megabyte rather than a gigabyte. But the general hazard remains: nothing runs a twenty-minute file in CI, so the next bug of that shape will also be found by a person rather than by the suite.
 
 The `eval/fixtures/` mechanism exists precisely so real recordings can be dropped in and picked up as extra cases, and it is now doing real work: the degraded-fixture cases are the only place the model's quality is asserted at all. Extending that treatment to the rest of the chain is still the highest-value next step available. Some specific things worth watching for when it happens:
 
-- The de-clicker's block length was tuned against a synthetic glottal source. Real breathy or creaky voices have very different pulse statistics, and creak in particular is impulsive and irregular — exactly the pattern the detector is designed to fire on.
+- The de-clicker's remaining thresholds are still corpus-tuned even though its pulse-train veto is now calibrated on real speech. Creaky voice is the obvious hazard: creak is impulsive *and irregular*, so its pulses may not have the evenly-spaced neighbours the veto looks for, which is precisely the configuration that would read as a burst of clicks. Nothing in the corpus contains creak.
 - The dynamic EQ's 12 dB threshold was swept against synthetic material with a single injected sine resonance. Real sibilance is broadband and noisy, not a tone.
 - The rumble detector's 12 dB margin has only ever seen a synthetic 38 Hz sine standing in for traffic.
 - The synthetic room impulse response is exponentially-decaying noise. Real rooms have discrete early reflections and frequency-dependent decay (high frequencies die first), neither of which is modelled. The file is honest about being a model rather than a measurement.
@@ -990,12 +1128,16 @@ The `eval/fixtures/` mechanism exists precisely so real recordings can be droppe
 ## Appendix: poking at it
 
 ```bash
-pnpm test            # the Vitest suite — 223 tests
+pnpm test            # the Vitest suite — 236 tests
 pnpm eval            # the corpus, with bounds — 26 cases, 2 of which need model weights
 pnpm typecheck
 pnpm start           # build and launch the Electron window
 pnpm fetch-model     # download and verify the DeepFilterNet3 weights
+pnpm listen          # the blind A/B listening app
+pnpm listen:session  # build a blinded session from a spec
 ```
+
+Dropping a `.wav` into `eval/fixtures/` adds several more cases beyond those 26, and after everything in Part 4 you should read that as the important half rather than the optional extra: it is where the de-clicker's sensitivity, the de-clicker's transparency, and the model backend's quality are all actually asserted.
 
 `pnpm fetch-model` is the only step between a fresh checkout and the model backend running. It downloads the export from upstream's own repository, verifies the archive's hash, verifies every file extracted from it, and installs into `~/.audio-leveller/models`. Without it, the two ONNX cases in the corpus report as skipped and the denoiser falls back to the classical suppressor — everything else works exactly as before.
 
