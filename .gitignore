@@ -14,3 +14,4 @@ eval/fixtures/*
 # are small and document the experiment, so they are tracked.
 listening/*
 !listening/specs/
+.claude/worktrees/

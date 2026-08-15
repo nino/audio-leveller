@@ -312,6 +312,13 @@ export interface ClickOptions {
   relativeAmplitude: number;
   /** Click length in samples. Real clicks are a handful of samples wide. */
   widthSamples?: number;
+  /**
+   * Keep neighbouring clicks at least this far apart (default 0: unconstrained
+   * jitter). The de-clicker treats two comparable impulses one pitch period
+   * apart as voicing, by design; dense injection would otherwise manufacture
+   * exactly that and score it as a miss.
+   */
+  minGapSec?: number;
   seed: number;
 }
 
@@ -326,7 +333,7 @@ export interface ClickedSignal {
  * couple of samples wide with a sharp bipolar shape.
  */
 export function addClicks(signal: Signal, options: ClickOptions): ClickedSignal {
-  const { count, relativeAmplitude, widthSamples = 3, seed } = options;
+  const { count, relativeAmplitude, widthSamples = 3, seed, minGapSec = 0 } = options;
   const out = cloneSignal(signal);
 
   let peak = 0;
@@ -338,11 +345,14 @@ export function addClicks(signal: Signal, options: ClickOptions): ClickedSignal 
   const next = rng(seed);
   const positions: number[] = [];
   const margin = Math.max(widthSamples * 4, 64);
+  // Jitter is bounded so neighbouring clicks stay at least `minGapSec` apart.
+  const span = signal.length - 2 * margin;
+  const jitterSpan = Math.max(0, 1 / count - (minGapSec * signal.sampleRate) / Math.max(1, span));
   for (let k = 0; k < count; k++) {
     // Evenly spread with jitter, so clicks land in speech and in pauses alike.
     const slot = (k + 0.5) / count;
-    const jitter = (next() - 0.5) / count;
-    const at = Math.round((slot + jitter) * (signal.length - 2 * margin)) + margin;
+    const jitter = (next() - 0.5) * jitterSpan;
+    const at = Math.round((slot + jitter) * span) + margin;
     positions.push(at);
 
     for (const ch of out.channels) {

@@ -44,9 +44,16 @@ function covered(bursts: { start: number; end: number }[], positions: number[]):
 describe("declick detection", () => {
   it("finds essentially every click that was injected", () => {
     const { signal } = speech();
+    // 2x the waveform peak and 50 ms apart, as in the eval corpus. The
+    // synthetic voice's excitation is far more impulsive than a real one, so
+    // only clicks this size stand out from it the way real clicks stand out
+    // from a real voice; the pulse-train veto deliberately leaves anything
+    // within ~10 dB of the surrounding excitation alone. Real sensitivity is
+    // measured on real material in the eval fixture cases.
     const { signal: clicked, positions } = addClicks(signal, {
       count: 30,
-      relativeAmplitude: 0.5,
+      relativeAmplitude: 2,
+      minGapSec: 0.05,
       seed: 99,
     });
 
@@ -125,22 +132,88 @@ describe("declick detection", () => {
   });
 });
 
+describe("declick pulse-train veto", () => {
+  /**
+   * A bare pulse train through a resonator: the most impulsive "voice"
+   * possible, every pulse a textbook outlier in the LPC residual. Without the
+   * veto the detector repairs all of them; with it, none — and a click that
+   * towers over the pulses is still caught.
+   */
+  function pulseTrain(seconds: number, f0: number): Float32Array {
+    const n = Math.round(seconds * sr);
+    const out = new Float32Array(n);
+    const period = sr / f0;
+    let next = 100;
+    const noise = rng(7);
+    for (let i = 0; i < n; i++) {
+      // A little aspiration noise, so the residual has a scale to threshold
+      // against — an exactly-zero floor is treated as "nothing to measure".
+      out[i] = (noise() - 0.5) * 0.03;
+      if (i >= next) {
+        out[i] += 1;
+        next += period * (1 + 0.02 * Math.sin(i / 700));
+      }
+    }
+    // Two-pole resonator ~ a formant at 700 Hz.
+    const r = 0.985;
+    const w = (2 * Math.PI * 700) / sr;
+    let y1 = 0;
+    let y2 = 0;
+    for (let i = 0; i < n; i++) {
+      const y = out[i] + 2 * r * Math.cos(w) * y1 - r * r * y2;
+      out[i] = y * 0.05;
+      y2 = y1;
+      y1 = y;
+    }
+    return out;
+  }
+
+  it("leaves a periodic pulse train alone, where the bare detector would not", () => {
+    const train = pulseTrain(2, 120);
+    const bare = declick([train], sr, { pulseVetoRatio: 1e9 });
+    const vetoed = declick([train], sr);
+    expect(bare.bursts.length).toBeGreaterThan(50);
+    expect(vetoed.bursts.length).toBe(0);
+    // `vetoed` counts raw candidates, `bursts` are post-merge — so at least.
+    expect(vetoed.vetoed).toBeGreaterThanOrEqual(bare.bursts.length);
+  });
+
+  it("still catches a click that towers over the pulses", () => {
+    const train = pulseTrain(2, 120);
+    const clicked = Float32Array.from(train);
+    const at = Math.round(1.0137 * sr);
+    let peak = 0;
+    for (let i = 0; i < train.length; i++) peak = Math.max(peak, Math.abs(train[i]));
+    clicked[at] += peak * 1.5;
+    clicked[at + 1] -= peak * 1.2;
+    const result = declick([clicked], sr);
+    expect(result.bursts.length).toBe(1);
+    expect(result.bursts[0].start).toBeLessThanOrEqual(at);
+    expect(result.bursts[0].end).toBeGreaterThan(at + 1);
+  });
+});
+
 describe("declick repair", () => {
   it("removes the click energy it detects", () => {
     const { signal } = speech();
     const { signal: clicked, positions } = addClicks(signal, {
       count: 25,
-      relativeAmplitude: 0.7,
+      relativeAmplitude: 2,
+      minGapSec: 0.05,
       seed: 21,
     });
 
     const result = declick(clicked.channels, sr);
 
     // Compare the repaired signal against the original clean one at the click
-    // sites: the residual there should be far smaller than the clicks were.
+    // sites it reported: the residual there should be far smaller than the
+    // clicks were. (Detection coverage is asserted separately above; here the
+    // question is whether a repair, once attempted, actually removes the click.)
+    const detected = positions.filter((p) => result.bursts.some((b) => p >= b.start - 4 && p < b.end + 4));
+    expect(detected.length).toBeGreaterThanOrEqual(Math.floor(positions.length * 0.8));
     let worstBefore = 0;
     let worstAfter = 0;
-    for (const p of positions) {
+    for (const p of detected) {
       for (let i = Math.max(0, p - 4); i < Math.min(signal.length, p + 8); i++) {
         worstBefore = Math.max(worstBefore, Math.abs(clicked.channels[0][i] - signal.channels[0][i]));
         worstAfter = Math.max(worstAfter, Math.abs(result.channels[0][i] - signal.channels[0][i]));

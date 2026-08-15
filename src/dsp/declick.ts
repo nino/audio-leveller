@@ -72,6 +72,33 @@ export interface DeclickOptions {
    *  file — that means the threshold is wrong for this material, and doing
    *  nothing is much safer than rewriting it. */
   maxRepairFraction: number;
+  /**
+   * Pulse-train veto. Voiced speech is excited by a glottal pulse every pitch
+   * period, and in the LPC residual those pulses *are* impulsive outliers —
+   * a robust per-block threshold sits between them and flags them, and on
+   * real speech that comes to ~20 "clicks" a second, every one of them a
+   * repair that replaces a real pulse with interpolated mush. Short blocks
+   * (see `blockSec`) reduce this but do not cure it.
+   *
+   * What separates a click from a pulse is not its size against the residual
+   * floor but its size against the *neighbouring pulses*: a pulse has
+   * comparable neighbours one pitch period away, a click towers over them.
+   * So a candidate is vetoed when the residual within `pulseLagMinSec` to
+   * `pulseLagMaxSec` on either side (one to two pitch periods, 50–400 Hz)
+   * reaches `pulseVetoRatio` of its own peak. At 0.3 a click has to be ~10 dB
+   * more impulsive than the voice's own excitation around it; one that is
+   * not is masked by that excitation anyway.
+   *
+   * Measured on a real 44.1 kHz podcast recording (clean, no clicks): the
+   * detector alone repaired ~780 "clicks" per minute of speech, all glottal
+   * pulses; with the veto, ~20. Injected clicks at 0.3× the waveform peak
+   * were still caught 28/30, at 0.5× 30/30. Judge this on real recordings:
+   * the synthetic eval voice is more impulsive than a real one even after
+   * its glottal return phase was added, so there the margin is thinner.
+   */
+  pulseVetoRatio: number;
+  pulseLagMinSec: number;
+  pulseLagMaxSec: number;
 }
 
 export const DEFAULT_DECLICK_OPTIONS: DeclickOptions = {
@@ -83,6 +110,9 @@ export const DEFAULT_DECLICK_OPTIONS: DeclickOptions = {
   dilateSamples: 2,
   maxBlockDensity: 0.05,
   maxRepairFraction: 0.02,
+  pulseVetoRatio: 0.3,
+  pulseLagMinSec: 0.0025,
+  pulseLagMaxSec: 0.02,
 };
 
 export interface ClickBurst {
@@ -106,6 +136,8 @@ export interface DeclickResult {
    * declined to touch the audio at all.
    */
   aborted: boolean;
+  /** Candidates dropped by the pulse-train veto (see `pulseVetoRatio`). */
+  vetoed: number;
 }
 
 /** Median of a copy; the input is left alone. */
@@ -123,6 +155,8 @@ interface Detection {
   start: number;
   end: number;
   peakSigma: number;
+  /** Absolute peak of the forward residual over the burst. */
+  peakAbs: number;
   /** Index of the analysis block this burst sits in, for the repair model. */
   block: number;
 }
@@ -135,7 +169,7 @@ function detect(
   samples: Float32Array,
   sampleRate: number,
   options: DeclickOptions,
-): { detections: Detection[]; models: Float64Array[] } {
+): { detections: Detection[]; models: Float64Array[]; vetoed: number } {
   const { order, thresholdSigma } = options;
   const blockSamples = Math.max(order * 4, Math.round(options.blockSec * sampleRate));
   const maxBurst = Math.max(1, Math.round(options.maxBurstSec * sampleRate));
@@ -143,6 +177,12 @@ function detect(
 
   const models: Float64Array[] = [];
   const detections: Detection[] = [];
+
+  // Coarse envelope of |forward residual| (max per ~1 ms bin) plus which block
+  // each bin came from, for the pulse-train veto below.
+  const binSamples = Math.max(1, Math.round(0.001 * sampleRate));
+  const envelope = new Float32Array(Math.ceil(length / binSamples));
+  const envelopeBlock = new Int32Array(envelope.length).fill(-1);
 
   // The residuals need `order` samples of context each side, so the first and
   // last `order` samples can't be examined. Clicks that land there are rare
@@ -177,6 +217,12 @@ function detect(
       }
       forward[n - from] = f;
       backward[n - from] = b;
+      const af = Math.abs(f);
+      const bin = Math.floor(n / binSamples);
+      if (af > envelope[bin]) {
+        envelope[bin] = af;
+        envelopeBlock[bin] = block;
+      }
     }
 
     // Robust scale from the forward residual. Median absolute deviation, not
@@ -201,13 +247,13 @@ function detect(
           runStart = i;
           runPeak = 0;
         }
-        runPeak = Math.max(runPeak, Math.abs(forward[i]) / sigma);
+        runPeak = Math.max(runPeak, Math.abs(forward[i]));
       } else if (runStart >= 0) {
         const start = from + runStart;
         const end = from + i;
         // Long events are more likely to be real transients than damage.
         if (end - start <= maxBurst) {
-          blockDetections.push({ start, end, peakSigma: runPeak, block });
+          blockDetections.push({ start, end, peakSigma: runPeak / sigma, peakAbs: runPeak, block });
         }
         runStart = -1;
       }
@@ -222,7 +268,49 @@ function detect(
     }
   }
 
-  return { detections, models };
+  // Pulse-train veto: a candidate with a comparable residual peak one pitch
+  // period away on either side is a glottal pulse, not a click. Two sources
+  // of "neighbour", because each alone has a blind spot:
+  //
+  //  - other candidates (runs where forward and backward residual agree),
+  //    which glottal pulses are — but only the cycles that crossed threshold;
+  //  - the raw residual envelope, which sees every cycle — but a click
+  //    corrupts the AR model of its own block and inflates that block's
+  //    residual everywhere, so bins from the candidate's own block are
+  //    ignored, otherwise the click would hide behind its own pollution.
+  const lagMin = Math.round(options.pulseLagMinSec * sampleRate);
+  const lagMax = Math.round(options.pulseLagMaxSec * sampleRate);
+  const envelopeMax = (fromSample: number, toSample: number, ownBlock: number): number => {
+    const b0 = Math.max(0, Math.ceil(fromSample / binSamples));
+    const b1 = Math.min(envelope.length, Math.floor(toSample / binSamples));
+    let m = 0;
+    for (let b = b0; b < b1; b++) {
+      if (envelopeBlock[b] !== ownBlock && envelope[b] > m) m = envelope[b];
+    }
+    return m;
+  };
+  const kept: Detection[] = [];
+  let vetoed = 0;
+  let lo = 0;
+  for (let i = 0; i < detections.length; i++) {
+    const d = detections[i];
+    const bar = options.pulseVetoRatio * d.peakAbs;
+    let comparable =
+      envelopeMax(d.start - lagMax, d.start - lagMin, d.block) >= bar ||
+      envelopeMax(d.end + lagMin, d.end + lagMax, d.block) >= bar;
+    while (lo < i && detections[lo].end + lagMax < d.start) lo++;
+    for (let j = lo; !comparable && j < detections.length; j++) {
+      if (j === i) continue;
+      const o = detections[j];
+      if (o.start > d.end + lagMax) break;
+      const gap = o.start >= d.end ? o.start - d.end : d.start - o.end;
+      if (gap >= lagMin && gap <= lagMax && o.peakAbs >= bar) comparable = true;
+    }
+    if (comparable) vetoed++;
+    else kept.push(d);
+  }
+
+  return { detections: kept, models, vetoed };
 }
 
 /**
@@ -270,9 +358,11 @@ export function declick(
   const bursts: ClickBurst[] = [];
   const perChannel: { detections: Detection[]; models: Float64Array[] }[] = [];
   let detectedSamples = 0;
+  let vetoed = 0;
 
   for (const samples of channels) {
     const found = detect(samples, sampleRate, opts);
+    vetoed += found.vetoed;
     const merged = mergeDetections(found.detections, opts.mergeGapSamples, maxBurst);
     perChannel.push({ detections: merged, models: found.models });
     for (const d of merged) detectedSamples += d.end - d.start;
@@ -292,6 +382,7 @@ export function declick(
       samplesRepaired: 0,
       repairedFraction: 0,
       aborted: true,
+      vetoed,
     };
   }
 
@@ -345,5 +436,6 @@ export function declick(
     samplesRepaired,
     repairedFraction: totalSamples > 0 ? samplesRepaired / totalSamples : 0,
     aborted: false,
+    vetoed,
   };
 }

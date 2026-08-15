@@ -22,7 +22,7 @@ import { onnxBackend } from "../models";
 import { buildChain } from "../stages";
 import { CASES, type CaseInput, type EvalCase, type Expectation } from "./cases";
 import { computeMetrics, type Metrics } from "./metrics";
-import { addNoise } from "./signals";
+import { addClicks, addNoise } from "./signals";
 
 /** The first `seconds` of a signal, or all of it when it is shorter. */
 function clip(signal: Signal, seconds: number): Signal {
@@ -296,6 +296,62 @@ async function fixtureCases(dir: string): Promise<EvalCase[]> {
         ],
       });
     }
+
+    // The de-clicker's sensitivity can only be judged on real speech as well:
+    // real voicing is what its pulse-train veto is calibrated against, and the
+    // synthetic voice is far more impulsive than any real one. Two cases:
+    // clicks injected at 0.5x the excerpt's peak, de-click alone — did they
+    // get repaired without touching anything else — and the untouched excerpt,
+    // where the stage should do (almost) nothing.
+    const clickChain = buildChain({ only: ["declick"] });
+    cases.push({
+      name: `fixture:${basename(file, extname(file))}:clicks`,
+      description: "That recording plus 40 clicks at half its peak, de-click alone",
+      chain: clickChain,
+      build: (): CaseInput => {
+        const { signal: clicked, positions } = addClicks(excerpt, {
+          count: 40,
+          relativeAmplitude: 0.5,
+          minGapSec: 0.05,
+          seed: 4771,
+        });
+        return { input: clicked, reference: excerpt, clickPositions: positions };
+      },
+      expectations: [
+        {
+          metric: "outputClickResidualDb",
+          max: 2,
+          because:
+            "every injected click must be repaired to within the local peaks " +
+            "around it; a missed one reads +20 dB or more on this measure",
+        },
+        {
+          metric: "changeDb",
+          max: -20,
+          because:
+            "the change should be the clicks and nothing else. A correct repair " +
+            "of these 40 lands near -26 dB; a detector that also fires on the " +
+            "voice's own glottal pulses adds broad change on top of that",
+        },
+      ],
+    });
+    cases.push({
+      name: `fixture:${basename(file, extname(file))}:clean-declick`,
+      description: "That recording untouched, de-click alone — the real transparency check",
+      chain: clickChain,
+      build: (): CaseInput => ({ input: excerpt, reference: excerpt }),
+      expectations: [
+        {
+          metric: "changeDb",
+          max: -40,
+          because:
+            "clean real speech has no clicks, so the stage should barely act. " +
+            "Before the pulse-train veto it repaired ~12 glottal pulses a " +
+            "second here and this read -34 dB — audible as smeared, roomy " +
+            "consonants in blind listening; with the veto it reads -49 dB",
+        },
+      ],
+    });
   }
 
   return cases;
