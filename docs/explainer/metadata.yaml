@@ -1,0 +1,16 @@
+---
+title: The Audio Leveller Pipeline, Explained
+subtitle: How the speech-processing chain works, and why it is shaped that way
+author: Nino Annighoefer
+lang: en-GB
+# Bump this by hand when the prose is substantively revised. It is not the
+# build date: a rebuild that changes nothing should produce the same file.
+date: 2026-08-04
+# Pinned so rebuilding does not mint a new identifier every time and churn the
+# committed .epub. Change it only if this ever becomes a genuinely different
+# publication.
+identifier:
+  - scheme: uuid
+    text: urn:uuid:786cb676-20b4-4189-b31b-2838d86abf15
+rights: MIT
+---

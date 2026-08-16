@@ -1,12 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { levelAudio } from "../src/dsp/leveller";
+import { levelAudio, DEFAULT_LEVELLER_OPTIONS } from "../src/dsp/leveller";
 import { preFilter, integratedLoudness } from "../src/dsp/loudness";
 import { sine, silence, concat, mono, peak } from "./helpers";
 
 const sr = 48000;
 
+const TARGET = DEFAULT_LEVELLER_OPTIONS.targetLufs;
+
 describe("leveller (end-to-end)", () => {
-  it("brings every segment to the target loudness (-23 LUFS)", () => {
+  it("brings every segment to the target loudness", () => {
     // Two speech-like segments at very different levels, split by silence.
     const quietSeg = sine(220, 3, sr, 0.08); // quiet
     const loudSeg = sine(440, 3, sr, 0.6); // loud
@@ -54,7 +56,9 @@ describe("leveller (end-to-end)", () => {
     const { audio, report } = levelAudio(input);
     expect(report.segments.length).toBe(1);
     const measured = integratedLoudness(preFilter(audio.channels, sr), sr);
-    expect(measured).toBeCloseTo(-23, 0);
+    // Against the default rather than a literal: this asserts the leveller
+    // hits its target, not that the target is any particular number.
+    expect(measured).toBeCloseTo(TARGET, 0);
   });
 
   it("never lets the output clip past the ceiling", () => {

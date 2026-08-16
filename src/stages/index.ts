@@ -1,0 +1,93 @@
+/**
+ * Built-in stages, registered in chain order.
+ *
+ * `DEFAULT_CHAIN` is the order stages run in when a caller doesn't specify
+ * one. As the pipeline grows this list encodes the ordering decisions that
+ * matter: de-click before the denoiser (impulses are out-of-distribution for
+ * the model and get smeared rather than removed), EQ after it (denoising
+ * changes the spectrum you'd otherwise be fitting a curve to), the expander
+ * before the compressor (both set their thresholds from the programme loudness
+ * of whatever they are handed, and the expander only moves material far below
+ * the gate that measurement applies, so it leaves that number alone — whereas
+ * compressing first pulls the programme down onto a floor the compressor never
+ * touches, shifting both the expander's threshold and its decision about
+ * whether to act at all), and levelling last so the loudness target is exact
+ * and the true-peak limiter sees what the compressor actually produced.
+ */
+
+import { registerStage } from "../pipeline/registry";
+import type { Stage, StageSpec } from "../pipeline/types";
+import { compressStage } from "./compress";
+import { declickStage } from "./declick";
+import { denoiseStage } from "./denoise";
+import { expandStage } from "./expand";
+import { dereverbStage } from "./dereverb";
+import { dyneqStage } from "./dyneq";
+import { eqStage } from "./eq";
+import { levelStage } from "./level";
+
+const BUILT_IN: Stage<object, unknown>[] = [
+  declickStage as Stage<object, unknown>,
+  denoiseStage as Stage<object, unknown>,
+  dereverbStage as Stage<object, unknown>,
+  eqStage as Stage<object, unknown>,
+  dyneqStage as Stage<object, unknown>,
+  expandStage as Stage<object, unknown>,
+  compressStage as Stage<object, unknown>,
+  levelStage as Stage<object, unknown>,
+];
+
+for (const stage of BUILT_IN) registerStage(stage);
+
+/** Default chain, in order. */
+export const DEFAULT_CHAIN: string[] = BUILT_IN.map((s) => s.name);
+
+export interface ChainOptions {
+  /** Restrict the chain to these stages (in default order). */
+  only?: string[];
+  /** Run the chain but bypass these stages. They still appear in the report. */
+  bypass?: string[];
+  /** Parameter overrides, keyed by stage name. */
+  params?: Record<string, Record<string, unknown>>;
+}
+
+/**
+ * Build a chain spec from the default order. Unknown stage names are rejected
+ * here rather than silently ignored, so a typo in `--bypass` is an error
+ * instead of a stage that quietly stayed on.
+ */
+export function buildChain(options: ChainOptions = {}): StageSpec[] {
+  const { only, bypass = [], params = {} } = options;
+
+  for (const name of [...(only ?? []), ...bypass, ...Object.keys(params)]) {
+    if (!DEFAULT_CHAIN.includes(name)) {
+      throw new Error(`Unknown stage "${name}" (available: ${DEFAULT_CHAIN.join(", ")})`);
+    }
+  }
+
+  const selected = only ? DEFAULT_CHAIN.filter((n) => only.includes(n)) : DEFAULT_CHAIN;
+  return selected.map((name) => ({
+    name,
+    enabled: !bypass.includes(name),
+    params: params[name],
+  }));
+}
+
+export {
+  compressStage,
+  declickStage,
+  denoiseStage,
+  dereverbStage,
+  dyneqStage,
+  eqStage,
+  expandStage,
+  levelStage,
+};
+export type { CompressParams } from "./compress";
+export type { DeclickParams } from "./declick";
+export type { DenoiseParams } from "./denoise";
+export type { DereverbParams } from "./dereverb";
+export type { DynEqParams } from "./dyneq";
+export type { EqParams, VoicingName } from "./eq";
+export type { ExpandParams } from "./expand";
+export type { LevelParams } from "./level";

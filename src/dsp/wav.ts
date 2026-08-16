@@ -185,21 +185,32 @@ function sampleWriter(
     if (bits === 64) return (o, v) => view.setFloat64(o, v, true);
     throw new Error(`Unsupported float bit depth: ${bits}`);
   }
-  const clamp = (v: number) => (v > 1 ? 1 : v < -1 ? -1 : v);
+  /**
+   * Scale by the same power of two the reader divides by, then clamp to the
+   * format's range. Signed PCM is asymmetric (-32768..32767), so scaling the
+   * write side by 32767 instead — as is tempting — would make every decoded
+   * sample come back one LSB short and a decode/encode round trip lossy.
+   * Only true full scale is clamped, which is inherent to the format.
+   */
+  const quantize = (v: number, scale: number, min: number, max: number): number => {
+    const s = Math.round(v * scale);
+    return s > max ? max : s < min ? min : s;
+  };
+
   switch (bits) {
     case 16:
-      return (o, v) => view.setInt16(o, Math.round(clamp(v) * 32767), true);
+      return (o, v) => view.setInt16(o, quantize(v, 32768, -32768, 32767), true);
     case 24:
       return (o, v) => {
-        const s = Math.round(clamp(v) * 8388607);
+        const s = quantize(v, 8388608, -8388608, 8388607);
         view.setUint8(o, s & 0xff);
         view.setUint8(o + 1, (s >> 8) & 0xff);
         view.setUint8(o + 2, (s >> 16) & 0xff);
       };
     case 32:
-      return (o, v) => view.setInt32(o, Math.round(clamp(v) * 2147483647), true);
+      return (o, v) => view.setInt32(o, quantize(v, 2147483648, -2147483648, 2147483647), true);
     case 8:
-      return (o, v) => view.setUint8(o, Math.round(clamp(v) * 127) + 128);
+      return (o, v) => view.setUint8(o, quantize(v, 128, -128, 127) + 128);
     default:
       throw new Error(`Unsupported PCM bit depth: ${bits}`);
   }

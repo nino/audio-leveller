@@ -1,0 +1,77 @@
+/* Tuned for e-readers: no fixed colours that fight a dark theme, relative
+   sizes so the reader's own font-size control still works, and code that
+   wraps instead of running off a narrow screen. */
+
+body {
+  line-height: 1.5;
+  margin: 0 5%;
+  text-align: left;
+  widows: 2;
+  orphans: 2;
+}
+
+h1, h2, h3, h4 {
+  line-height: 1.25;
+  text-align: left;
+  page-break-after: avoid;
+  break-after: avoid;
+  margin-top: 1.4em;
+}
+
+h1 { font-size: 1.6em; }
+h2 { font-size: 1.35em; }
+h3 { font-size: 1.15em; }
+h4 { font-size: 1em; font-style: italic; }
+
+p { margin: 0.6em 0; }
+
+/* Long code lines must wrap: an e-reader has no horizontal scroll. */
+pre {
+  font-size: 0.8em;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  border-left: 3px solid currentColor;
+  padding: 0.4em 0 0.4em 0.8em;
+  margin: 1em 0;
+}
+
+code {
+  font-size: 0.9em;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+pre code { font-size: 1em; }
+
+/* Tables are the other thing that overflows. Small, and never wider than the
+   page; cells wrap rather than forcing a scroll. */
+table {
+  border-collapse: collapse;
+  font-size: 0.8em;
+  margin: 1em 0;
+  width: 100%;
+  table-layout: fixed;
+}
+
+th, td {
+  border: 1px solid currentColor;
+  padding: 0.3em 0.4em;
+  text-align: left;
+  vertical-align: top;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+th { font-weight: bold; }
+
+blockquote {
+  margin: 1em 1.5em;
+  font-style: italic;
+}
+
+ul, ol { margin: 0.6em 0; padding-left: 1.4em; }
+li { margin: 0.35em 0; }
+
+hr { border: none; border-top: 1px solid currentColor; margin: 1.5em 0; }

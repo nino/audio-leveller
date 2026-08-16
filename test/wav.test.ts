@@ -45,6 +45,36 @@ describe("wav codec", () => {
     }
   });
 
+  it("re-encodes decoded integer PCM bit-for-bit", () => {
+    // A bypassed pipeline must produce a byte-identical file, which only holds
+    // if decode and encode use the same scale. Cover every integer depth, and
+    // include the extreme codes where clamping bites.
+    for (const bitDepth of [8, 16, 24, 32]) {
+      const original = encodeWav(stereo, { bitDepth, format: "int" });
+      const decoded = decodeWav(original);
+      const reencoded = encodeWav(decoded, { bitDepth, format: "int" });
+      expect(Array.from(new Uint8Array(reencoded)), `${bitDepth}-bit`).toEqual(
+        Array.from(new Uint8Array(original)),
+      );
+    }
+  });
+
+  it("clamps rather than wrapping at and beyond full scale", () => {
+    const extremes: AudioBuffer = {
+      sampleRate: sr,
+      channels: [new Float32Array([-1, 1, -1.5, 1.5, 0])],
+      length: 5,
+      bitDepth: 16,
+      format: "int",
+    };
+    const view = new DataView(encodeWav(extremes, { bitDepth: 16, format: "int" }));
+    expect(view.getInt16(44, true)).toBe(-32768); // -1.0 is exactly full scale
+    expect(view.getInt16(46, true)).toBe(32767); // +1.0 clamps to the top code
+    expect(view.getInt16(48, true)).toBe(-32768); // over-range clamps, not wraps
+    expect(view.getInt16(50, true)).toBe(32767);
+    expect(view.getInt16(52, true)).toBe(0);
+  });
+
   it("writes a valid 44-byte RIFF/WAVE header", () => {
     const buf = encodeWav(stereo, { bitDepth: 24, format: "int" });
     const view = new DataView(buf);

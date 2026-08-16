@@ -1,0 +1,30 @@
+{
+  "name": "chili-stages",
+  "loudnessLufs": -28,
+  "matchBy": "momentaryMax",
+  "windows": [
+    { "start": 1080, "dur": 15, "label": "loud passage" },
+    { "start": 775, "dur": 15, "label": "control passage" }
+  ],
+  "variants": {
+    "raw": { "file": "../chili_src/chili_15_raw.wav", "description": "chain input, unprocessed" },
+    "auphonic": { "file": "../chili_src/chili_15_auphonic.wav", "description": "reference: Auphonic" },
+    "daw": { "file": "../chili_src/chili_15_daw.wav", "description": "reference: Reaper chain" },
+    "ours": { "file": "../chili_src/chili_15_raw_processed.wav", "description": "current full chain" },
+    "ours-nodeclick": { "file": "../chili_iso/full_nodeclick.wav", "description": "full chain with declick bypassed" },
+    "only-declick": { "file": "../chili_iso/only_declick.wav", "description": "raw + declick only" },
+    "only-denoise": { "file": "../chili_iso/only_denoise.wav", "description": "raw + denoise only (spectral backend)" },
+    "only-eq": { "file": "../chili_iso/only_eq.wav", "description": "raw + eq only" },
+    "only-dyneq": { "file": "../chili_iso/only_dyneq.wav", "description": "raw + dyneq only" },
+    "only-expand": { "file": "../chili_iso/only_expand.wav", "description": "raw + expand only" },
+    "only-compress": { "file": "../chili_iso/only_compress.wav", "description": "raw + compress only" }
+  },
+  "trials": [
+    { "window": 1, "variants": ["ours", "ours-nodeclick", "auphonic", "daw"], "title": "control passage · does bypassing declick fix it?" },
+    { "window": 0, "variants": ["ours", "ours-nodeclick", "auphonic", "daw"], "title": "loud passage · does bypassing declick fix it?" },
+    { "window": 1, "variants": ["raw", "only-declick", "only-denoise", "daw"], "title": "control passage · declick vs denoise alone" },
+    { "window": 0, "variants": ["raw", "only-declick", "only-denoise", "daw"], "title": "loud passage · declick vs denoise alone" },
+    { "window": 1, "variants": ["raw", "only-eq", "only-dyneq", "only-expand", "only-compress"], "title": "control passage · one stage at a time" },
+    { "window": 0, "variants": ["raw", "only-eq", "only-dyneq", "only-expand", "only-compress"], "title": "loud passage · one stage at a time" }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "chili-declick-fix",
+  "loudnessLufs": -28,
+  "matchBy": "momentaryMax",
+  "windows": [
+    { "start": 775, "dur": 15, "label": "control passage" },
+    { "start": 1080, "dur": 15, "label": "loud passage" },
+    { "start": 300, "dur": 15, "label": "third passage" }
+  ],
+  "variants": {
+    "raw": { "file": "../chili_src/chili_15_raw.wav", "description": "chain input, unprocessed" },
+    "auphonic": { "file": "../chili_src/chili_15_auphonic.wav", "description": "reference: Auphonic" },
+    "daw": { "file": "../chili_src/chili_15_daw.wav", "description": "reference: Reaper chain" },
+    "ours-old": { "file": "../chili_src/chili_15_raw_processed.wav", "description": "full chain, old de-clicker (21.6k repairs)" },
+    "ours-new": { "file": "../chili_iso/full_newdeclick.wav", "description": "full chain, de-clicker with pulse-train veto (433 repairs)" },
+    "declick-old": { "file": "../chili_iso/only_declick.wav", "description": "raw + old de-click only" },
+    "declick-new": { "file": "../chili_iso/only_declick_new.wav", "description": "raw + new de-click only" }
+  },
+  "trials": [
+    { "window": 0, "variants": ["ours-old", "ours-new", "auphonic", "daw"], "title": "control passage · full chain, old vs new" },
+    { "window": 1, "variants": ["ours-old", "ours-new", "auphonic", "daw"], "title": "loud passage · full chain, old vs new" },
+    { "window": 2, "variants": ["ours-old", "ours-new", "auphonic", "daw"], "title": "third passage · full chain, old vs new" },
+    { "window": 0, "variants": ["raw", "declick-old", "declick-new"], "title": "control passage · de-click alone" },
+    { "window": 1, "variants": ["raw", "declick-old", "declick-new"], "title": "loud passage · de-click alone" }
+  ]
+}

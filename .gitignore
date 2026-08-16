@@ -5,3 +5,13 @@ release/
 .DS_Store
 scratch/
 *.processed.wav
+
+# Evaluation fixtures are local-only (large, and often not ours to share).
+eval/fixtures/*
+!eval/fixtures/README.md
+
+# Local listening-test material (large WAVs, never committed). Session specs
+# are small and document the experiment, so they are tracked.
+listening/*
+!listening/specs/
+.claude/worktrees/
