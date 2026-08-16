@@ -1,0 +1,37 @@
+{
+  "$comment": "Real recordings the harness can be run against, pinned by checksum. Fetch with `pnpm fetch-fixtures`. See README.md for what the roles mean.",
+  "sets": [
+    {
+      "id": "chili-15",
+      "description": "A 19-minute excerpt from a solo audiobook narration (Chili and the Chocolate Factory), edited but unmastered, plus the same material as mastered three different ways. The set exists so the chain can be judged against something other than itself, on the kind of material it is actually used for.",
+      "baseUrl": "https://f001.backblazeb2.com/file/NinoPublic/audio-leveller-samples/",
+      "format": "32-bit float mono, 44.1 kHz, ~19 min, ~200 MB each",
+      "files": [
+        {
+          "name": "chili_15_raw.wav",
+          "role": "input",
+          "sha256": "ae725741babc72f5a036950e59c5110c1aee244d0dacccc0ecd59be1e1c0c0b5",
+          "description": "Edited and levelled with the REAPER extension in this repo, no other processing. One voice, close-miked in an untreated room. This is what the chain is given."
+        },
+        {
+          "name": "chili_15_auphonic.wav",
+          "role": "reference",
+          "sha256": "7f8ee894c98b0bc709b14dc38df7ba648f14d0664b17c0dfd9baf3eb3b7e583e",
+          "description": "Auphonic's master of the same source. Preferred over every other version in blind listening, so it is the target rather than merely a comparison."
+        },
+        {
+          "name": "chili_15_daw.wav",
+          "role": "reference",
+          "sha256": "d18b78d699d2e49244e25ccbac06836e824898887329ed165ceadfe68963f9c8",
+          "description": "Hand-built REAPER chain, the workflow this tool is meant to replace."
+        },
+        {
+          "name": "chili_15_raw_processed.wav",
+          "role": "archive",
+          "sha256": "5c5bb039d10bb7062ff23fabe45d15bb19362b63d72a62d463ff689eb68f3bb5",
+          "description": "This chain's output from before the de-clicker's pulse-train veto, kept because it can no longer be regenerated: it is the audible record of the glottal-pulse bug, ~19 false repairs a second. Useful as a floor when judging whether a change has undone that fix."
+        }
+      ]
+    }
+  ]
+}
