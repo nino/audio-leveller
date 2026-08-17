@@ -13,17 +13,20 @@ import { processFile, outputPathFor, levellerReportOf } from "./process";
 import type { PipelineProgress, PipelineReport } from "./pipeline/types";
 import { DEFAULT_CHAIN } from "./stages";
 import { registeredStages } from "./pipeline/registry";
+import { PRESETS, presetByName, type ParamOverrides } from "./params";
 
 interface Args {
   inputPath?: string;
   outputPath?: string;
   only?: string[];
   bypass?: string[];
+  preset?: string;
   targetLufs?: number;
   reportPath?: string;
   json: boolean;
   quiet: boolean;
   listStages: boolean;
+  listPresets: boolean;
 }
 
 const USAGE = `Usage: audio-leveller <input.wav> [output.wav] [options]
@@ -31,15 +34,17 @@ const USAGE = `Usage: audio-leveller <input.wav> [output.wav] [options]
 Options:
   --only <a,b>      run only these stages (in chain order)
   --bypass <a,b>    run the chain but bypass these stages
-  --target <lufs>   target loudness for the level stage (default -18)
+  --preset <name>   start from a preset's parameters (default Nino)
+  --target <lufs>   target loudness for the level stage (overrides the preset)
   --report <file>   write the full JSON report to a file
   --json            print the JSON report instead of the text summary
   --quiet           suppress progress output
   --list-stages     list the available stages and exit
+  --list-presets    list the available presets and exit
   -h, --help        show this help`;
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { json: false, quiet: false, listStages: false };
+  const args: Args = { json: false, quiet: false, listStages: false, listPresets: false };
   const positional: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -72,6 +77,9 @@ function parseArgs(argv: string[]): Args {
         args.targetLufs = parsed;
         break;
       }
+      case "--preset":
+        args.preset = value();
+        break;
       case "--report":
         args.reportPath = value();
         break;
@@ -83,6 +91,9 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--list-stages":
         args.listStages = true;
+        break;
+      case "--list-presets":
+        args.listPresets = true;
         break;
       case "-h":
       case "--help":
@@ -171,6 +182,13 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (args.listPresets) {
+    for (const preset of PRESETS) {
+      console.log(`${preset.name.padEnd(12)} ${preset.description}`);
+    }
+    return;
+  }
+
   if (!args.inputPath) {
     console.error(USAGE);
     process.exit(1);
@@ -185,13 +203,22 @@ async function main(): Promise<void> {
     process.stderr.write(`[${p.index + 1}/${p.total}] ${p.stage}...\n`);
   };
 
+  // A preset is only a set of overrides, so `--target` layers on top of it
+  // rather than fighting it.
+  const params: ParamOverrides = args.preset ? { ...presetByName(args.preset).params } : {};
+  if (args.targetLufs !== undefined) {
+    params.level = { ...params.level, targetLufs: args.targetLufs };
+  }
+  const presetBypass = args.preset ? presetByName(args.preset).bypass : [];
+  const bypass =
+    args.bypass || presetBypass.length > 0 ? [...(args.bypass ?? []), ...presetBypass] : undefined;
+
   const { report, extraPaths } = await processFile(
     args.inputPath,
     {
       only: args.only,
-      bypass: args.bypass,
-      params:
-        args.targetLufs === undefined ? undefined : { level: { targetLufs: args.targetLufs } },
+      bypass,
+      params: Object.keys(params).length > 0 ? params : undefined,
       onProgress,
     },
     outputPath,
