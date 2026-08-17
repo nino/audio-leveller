@@ -11,15 +11,42 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main>
-      <div id="drop" class="dropzone">
-        <div class="icon">🎚️</div>
-        <h1>Audio Leveller</h1>
-        <p class="hint">Drop a <strong>.wav</strong> file here</p>
-        <p class="sub">Each segment is normalised to −18 LUFS</p>
+    <div class="window">
+      <div class="titlebar">
+        <div class="lights">
+          <button class="light red" data-window="close" aria-label="Close"></button>
+          <button class="light yellow" data-window="minimise" aria-label="Minimise"></button>
+          <button class="light green" data-window="zoom" aria-label="Zoom"></button>
+        </div>
+        <span class="title">Audio Leveller</span>
       </div>
-      <section id="status" class="status" hidden></section>
-    </main>
+      <div class="content">
+        <div id="drop" class="dropzone">
+          <div class="icon">🎚️</div>
+          <h1>Audio Leveller</h1>
+          <p class="lede">Drop a <strong>.wav</strong> file here</p>
+          <p class="sub" id="drop-sub">Each speech segment is normalised to its target loudness</p>
+        </div>
+
+        <section id="status" class="panel glass status" hidden></section>
+
+        <section class="panel metal-inset">
+          <div class="preset-row">
+            <h2>Preset</h2>
+            <div id="presets" class="segmented"></div>
+            <button id="reset" class="aqua-button small" disabled>Revert</button>
+            <span class="spacer"></span>
+            <button id="rerender" class="aqua-button" disabled>Re-render</button>
+          </div>
+          <p id="preset-note" class="preset-note"></p>
+        </section>
+
+        <section class="panel metal-inset">
+          <h2>Pipeline</h2>
+          <ul id="chain" class="chain"></ul>
+        </section>
+      </div>
+    </div>
     <script type="module" src="./renderer.js"></script>
   </body>
 </html>

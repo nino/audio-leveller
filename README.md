@@ -354,6 +354,23 @@ pnpm start          # build + launch the Electron window
 Drag a `.wav` onto the window. Supported formats: 8/16/24/32-bit PCM and
 32-bit float, mono or stereo, any sample rate.
 
+Under the drop target the window shows the chain itself: every stage with a
+checkbox that bypasses it, a disclosure triangle that opens its parameters, and
+— once a file has been through — a note saying what that stage actually decided.
+**Re-render** runs the same file again with whatever is set now, which is the
+tuning loop the CLI does with `--bypass` and `--report`, done by ear.
+
+Two presets sit above the chain:
+
+| preset | what it is |
+| ------ | ---------- |
+| `Nino` | the chain as tuned — spoken word, warm voicing, −18 LUFS. The defaults, with no overrides, so this preset cannot drift away from them. |
+| `ACX`  | Audible/ACX submission: −20 LUFS (mid-window for their −23…−18 dB RMS rule), a −3.5 dBTP ceiling, neutral voicing, and both floor stages pushed harder to clear the −60 dB noise-floor requirement. |
+
+A preset is only a set of parameter overrides — there is no second path through
+the pipeline. Changing anything marks the edited parameters in amber and leaves
+the preset selected as the base you started from; **Revert** puts it back.
+
 ### CLI
 
 ```bash
@@ -369,11 +386,13 @@ segment's measured loudness and applied gain, room-tone summary).
 | ---------------- | ---------------------------------------------------------- |
 | `--only <a,b>`   | run only these stages, in chain order                       |
 | `--bypass <a,b>` | run the chain but bypass these stages                       |
-| `--target <lufs>`| target loudness for the level stage (default −18)           |
+| `--preset <name>`| start from a preset's parameters (`Nino`, `ACX`)            |
+| `--target <lufs>`| target loudness for the level stage (overrides the preset)  |
 | `--report <file>`| write the full JSON report to a file                        |
 | `--json`         | print the JSON report instead of the text summary           |
 | `--quiet`        | suppress progress output                                    |
 | `--list-stages`  | list the available stages and exit                          |
+| `--list-presets` | list the available presets and exit                         |
 
 `--bypass` plus `--report` is the tuning loop: render the same file with a stage
 on and off, compare the reports, and listen to the two outputs.
