@@ -166,11 +166,15 @@ interface ProcessRequest {
   params?: ParamOverrides;
 }
 
+type WindowCommand = "close" | "minimise" | "zoom";
+
 interface LevellerBridge {
   getPathForFile(file: File): string;
   getSchema(): Promise<PipelineSchema>;
   processFile(inputPath: string, request?: ProcessRequest): Promise<ProcessResponse>;
   onProgress(callback: (progress: PipelineProgress) => void): () => void;
+  windowCommand(command: WindowCommand): void;
+  onWindowActive(callback: (active: boolean) => void): void;
 }
 
 // The preload script exposes this on window. Typed access without turning this
@@ -762,6 +766,20 @@ drop.addEventListener("drop", (e) => {
 // Guard the whole window so a stray drop elsewhere doesn't navigate away.
 window.addEventListener("dragover", stop);
 window.addEventListener("drop", stop);
+
+/* ---- title bar ---- */
+
+// The traffic lights are drawn by this window, so they have to ask the main
+// process to do what the system's own buttons would have done.
+for (const light of document.querySelectorAll<HTMLButtonElement>(".light[data-window]")) {
+  light.addEventListener("click", () => {
+    leveller.windowCommand(light.dataset.window as WindowCommand);
+  });
+}
+
+leveller.onWindowActive((active) => {
+  document.body.classList.toggle("inactive", !active);
+});
 
 void (async () => {
   try {

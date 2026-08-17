@@ -5,6 +5,8 @@
  *   - getSchema: the stages, their exposed parameters and the presets
  *   - processFile: kick off processing in the main process
  *   - onProgress: subscribe to per-stage progress while a file is running
+ *   - windowCommand / onWindowActive: the title bar's traffic lights, which are
+ *     drawn by the renderer and so have to ask for what they do
  */
 
 import { contextBridge, ipcRenderer, webUtils } from "electron";
@@ -17,6 +19,8 @@ export interface ProcessResponse {
   result?: ProcessResult;
   error?: string;
 }
+
+export type WindowCommand = "close" | "minimise" | "zoom";
 
 /** What the renderer sends when it asks for a render. */
 export interface ProcessRequest {
@@ -39,6 +43,12 @@ const api = {
     return () => {
       ipcRenderer.off("process-progress", listener);
     };
+  },
+  /** Close, minimise or zoom the window this renderer is in. */
+  windowCommand: (command: WindowCommand): void => ipcRenderer.send("window-command", command),
+  /** Whether the window is the front one, for dimming the traffic lights. */
+  onWindowActive: (callback: (active: boolean) => void): void => {
+    ipcRenderer.on("window-active", (_event, active: boolean) => callback(active));
   },
 };
 

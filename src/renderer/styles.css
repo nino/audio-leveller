@@ -1,11 +1,13 @@
 /*
  * Aqua, circa 10.2 — the same look as the listening app in `listen/`:
- * pinstriped desktop, brushed-metal window, gel buttons, glass panels.
+ * brushed metal, gel buttons, glass panels.
  *
  * The vocabulary is deliberately shared with `listen/src/aqua.css`, so the two
  * apps in this repo read as one piece of software. What is here and not there
  * is the drop target, the stage chain and the parameter panel; the buttons,
- * panels, segmented controls and tables are the same components.
+ * panels, segmented controls and tables are the same components. The pinstriped
+ * desktop is only in the listening app, which runs in a browser and so has one
+ * to paint; here the metal is the window.
  */
 
 * {
@@ -24,15 +26,9 @@ body {
   color: #1c1c1c;
   user-select: none;
   -webkit-user-select: none;
-  /* Aqua pinstripes */
-  background-color: #dfe6ef;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.55) 0px,
-    rgba(255, 255, 255, 0.55) 1px,
-    rgba(120, 140, 170, 0.14) 1px,
-    rgba(120, 140, 170, 0.14) 2px
-  );
+  /* Behind the metal, for the frame before the first paint. */
+  background: #c3c3c3;
+  overflow: hidden;
 }
 
 /* Aqua-toned scrollbars, in place of the default bright ones. */
@@ -56,23 +52,16 @@ body {
   background: #e4e4e4;
 }
 
-.desktop {
-  min-height: 100vh;
-  padding: 22px 20px 34px;
-  display: flex;
-  justify-content: center;
-  /* The window hugs its content and sits on the desktop, rather than being
-     stretched to the viewport with a field of empty metal underneath. */
-  align-items: flex-start;
-}
-
+/*
+ * The brushed-metal window *is* the Electron window: it fills the frame edge to
+ * edge, rather than floating on a painted desktop inside a window that already
+ * has a title bar of its own. The rounded corners and the drop shadow belong to
+ * the real window, so this one has neither.
+ */
 .window {
-  width: 100%;
-  max-width: 760px;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  border-radius: 8px 8px 6px 6px;
-  overflow: hidden;
   /* brushed metal */
   background:
     repeating-linear-gradient(
@@ -83,19 +72,16 @@ body {
       rgba(0, 0, 0, 0.035) 3px
     ),
     linear-gradient(to bottom, #d6d6d6 0%, #c3c3c3 50%, #b9b9b9 100%);
-  border: 1px solid #6f6f6f;
-  box-shadow:
-    0 22px 45px rgba(0, 0, 0, 0.42),
-    0 2px 6px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 /*
- * The window's own title strip. On macOS the native traffic lights are drawn
- * over it (titleBarStyle: hiddenInset), which is why it is tall enough to hold
- * them and why it is a drag region.
+ * The window's own title strip, drawn in place of the system's: the main
+ * process asks for a hidden title bar, so everything in here — the name, the
+ * traffic lights — belongs to the page. It is the drag region for the window.
  */
 .titlebar {
+  flex: none;
   height: 28px;
   position: relative;
   display: flex;
@@ -107,13 +93,105 @@ body {
   -webkit-app-region: drag;
 }
 
+/*
+ * The traffic lights, gel as they were in 10.2 rather than the flat circles the
+ * system draws now — the same three buttons as `listen/src/aqua.css`, but these
+ * ones work: each drives the window from the main process. They are outside the
+ * drag region, or a click would start a drag instead.
+ */
+.lights {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.light {
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow:
+    inset 0 -2px 3px rgba(0, 0, 0, 0.25),
+    inset 0 2px 2px rgba(255, 255, 255, 0.85),
+    0 1px 1px rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: bold;
+}
+
+/*
+ * The glyphs, which Aqua shows only while the pointer is over the group. They
+ * hide by opacity rather than by colour, or their shadow would stay behind.
+ */
+.light::before {
+  opacity: 0;
+  color: rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.lights:hover .light::before {
+  opacity: 1;
+}
+
+.light.red::before {
+  content: "×";
+}
+
+.light.yellow::before {
+  content: "−";
+}
+
+.light.green::before {
+  content: "+";
+}
+
+.light.red {
+  background: radial-gradient(circle at 50% 30%, #ffb2ad, #ee5b52 45%, #d3372f);
+}
+
+.light.yellow {
+  background: radial-gradient(circle at 50% 30%, #fff1a8, #f5c33a 45%, #d99f1a);
+}
+
+.light.green {
+  background: radial-gradient(circle at 50% 30%, #c8f7b0, #62c655 45%, #3d9b33);
+}
+
+.light:active {
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.4);
+}
+
+/* A window that is not in front has grey lights, and no glyphs on hover. */
+body.inactive .light {
+  background: radial-gradient(circle at 50% 30%, #f2f2f2, #cfcfcf 45%, #b4b4b4);
+}
+
+body.inactive .lights:hover .light::before {
+  opacity: 0;
+}
+
 .title {
   font-size: 13px;
   color: #2b2b2b;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
+/* The title strip stays put; only the content below it scrolls. */
 .content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 16px 20px 22px;
 }
 

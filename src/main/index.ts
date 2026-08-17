@@ -19,18 +19,29 @@ function createWindow(): void {
     minWidth: 560,
     minHeight: 560,
     title: "Audio Leveller",
-    // The pinstriped desktop the renderer paints, so a slow first frame and a
-    // window resize both show the same colour rather than a flash of white.
-    backgroundColor: "#dfe6ef",
-    // On macOS the traffic lights float over the brushed metal, as they did on
-    // the windows this look is borrowed from. Elsewhere, keep the native frame.
-    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    // The brushed metal the renderer paints, so a slow first frame and a window
+    // resize both show the same colour rather than a flash of white.
+    backgroundColor: "#c3c3c3",
+    // The renderer draws the title bar, the traffic lights included: the modern
+    // buttons are flat circles, and this window is a 10.2 one, where they were
+    // gel. So hide the real ones and let the renderer's own lights drive the
+    // window over IPC. Off macOS there are no such buttons to hide.
+    titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+
+  if (process.platform === "darwin") win.setWindowButtonVisibility(false);
+
+  // Aqua dims the lights of a window that is not in front.
+  const sendFocus = (active: boolean) => (): void => {
+    if (!win.webContents.isDestroyed()) win.webContents.send("window-active", active);
+  };
+  win.on("focus", sendFocus(true));
+  win.on("blur", sendFocus(false));
 
   win.webContents.on("console-message", (_e, _level, message, line, source) => {
     console.log(`[renderer] ${message} (${source}:${line})`);
@@ -84,6 +95,17 @@ function processInWorker(
 
 app.whenReady().then(() => {
   ipcMain.handle("pipeline-schema", () => pipelineSchema());
+
+  // What the renderer's traffic lights do. Zoom is a toggle, as the green
+  // button has always been.
+  ipcMain.on("window-command", (event, command: "close" | "minimise" | "zoom") => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    if (command === "close") win.close();
+    else if (command === "minimise") win.minimize();
+    else if (win.isMaximized()) win.unmaximize();
+    else win.maximize();
+  });
 
   ipcMain.handle("process-file", async (event, inputPath: string, request: ProcessRequest = {}) => {
     const sender: WebContents = event.sender;
