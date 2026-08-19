@@ -172,15 +172,6 @@ body {
     inset 0 -1px 2px rgba(255, 255, 255, 0.4);
 }
 
-/* A window that is not in front has grey lights, and no glyphs on hover. */
-body.inactive .light {
-  background: radial-gradient(circle at 50% 30%, #f2f2f2, #cfcfcf 45%, #b4b4b4);
-}
-
-body.inactive .lights:hover .light::before {
-  opacity: 0;
-}
-
 .title {
   font-size: 13px;
   color: #2b2b2b;
@@ -659,4 +650,198 @@ table.segments th {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* ---- a window that is not in front ---- */
+
+/*
+ * Aqua drew an inactive window flat. The gel went out of the buttons, the blue
+ * went grey, the glow and the throb stopped, and the metal lost nearly all of
+ * its grain. The window stays perfectly legible — it is still your document —
+ * but nothing in it asks for a click any more.
+ *
+ * `body.inactive` comes from the main process, which watches the window's focus
+ * and blur. Everything below is an override of a rule above it: read the active
+ * look first, and read this as what is left of it when the window steps back.
+ * Content text keeps its colour; only the chrome and the controls go quiet.
+ */
+
+body.inactive {
+  /* The grey that stands in for the blue gel, and the flatter, darker grey for
+     a control that is pressed or selected. */
+  --gel-off: linear-gradient(to bottom, #f6f6f6 0%, #eaeaea 45%, #dfdfdf 50%, #eaeaea 100%);
+  --gel-off-on: linear-gradient(to bottom, #d9d9d9 0%, #c7c7c7 45%, #bfbfbf 50%, #cdcdcd 100%);
+  --edge-off: #9b9b9b;
+}
+
+/* The brushed grain all but disappears, and the metal settles to one tone. */
+body.inactive .window {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.03) 0px,
+      rgba(255, 255, 255, 0.03) 1px,
+      rgba(0, 0, 0, 0.015) 2px,
+      rgba(0, 0, 0, 0.015) 3px
+    ),
+    linear-gradient(to bottom, #cdcdcd 0%, #c6c6c6 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+body.inactive .titlebar {
+  background: linear-gradient(to bottom, #dedede, #d0d0d0);
+  border-bottom-color: #a8a8a8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+body.inactive .title {
+  color: #8b8b8b;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+/* Grey lights, with the dome pressed out of them and no glyphs on hover. */
+body.inactive .light {
+  background: linear-gradient(to bottom, #d0d0d0, #b8b8b8);
+  border-color: rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+body.inactive .lights:hover .light::before {
+  opacity: 0;
+}
+
+/* ---- inactive: panels and the drop target ---- */
+
+/* The glass keeps its shape but loses the blue light inside it. */
+body.inactive .glass {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.72) 0%, rgba(240, 240, 240, 0.66) 100%);
+  border-color: rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 1px 1px rgba(0, 0, 0, 0.14);
+}
+
+body.inactive .metal-inset {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
+  border-color: rgba(0, 0, 0, 0.16);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+body.inactive .dropzone {
+  border-color: rgba(0, 0, 0, 0.2);
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.7) 0%, rgba(238, 238, 238, 0.6) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+/* The fader glyph is the one piece of colour in the drop target. */
+body.inactive .dropzone .icon {
+  filter: grayscale(0.85) opacity(0.75);
+}
+
+/* ---- inactive: controls ---- */
+
+body.inactive .aqua-button,
+body.inactive .seg,
+body.inactive .aqua-select {
+  color: #5e5e5e;
+  border-color: var(--edge-off);
+  background: var(--gel-off);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  text-shadow: none;
+}
+
+/* A click on an inactive window brings it forward first, so nothing here
+   lights up under the pointer. */
+body.inactive .aqua-button:hover:not(:disabled) {
+  filter: none;
+}
+
+/* The default button stops throbbing and hands its blue back. */
+body.inactive .aqua-button.primary {
+  color: #5e5e5e;
+  border-color: var(--edge-off);
+  background: var(--gel-off);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  text-shadow: none;
+  animation: none;
+}
+
+body.inactive .segmented {
+  border-color: var(--edge-off);
+  box-shadow: none;
+}
+
+body.inactive .seg {
+  border-right-color: #b6b6b6;
+}
+
+body.inactive .seg.on {
+  color: #3f3f3f;
+  background: var(--gel-off-on);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+  text-shadow: none;
+}
+
+body.inactive .stage-head input[type="checkbox"],
+body.inactive .check-value {
+  accent-color: #9b9b9b;
+}
+
+body.inactive .param input[type="range"]::-webkit-slider-runnable-track {
+  border-color: #a4a4a4;
+  background: linear-gradient(to bottom, #dadada, #e9e9e9);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.18);
+}
+
+body.inactive .param input[type="range"]::-webkit-slider-thumb {
+  border-color: #9b9b9b;
+  background: linear-gradient(to bottom, #f4f4f4, #dadada);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+body.inactive ::-webkit-scrollbar-thumb {
+  border-color: #a4a4a4;
+  background: linear-gradient(to right, #e8e8e8 0%, #d2d2d2 50%, #dedede 100%);
+}
+
+/* ---- inactive: the status panel ---- */
+
+/* The stripes stay — they say the work goes on while you are elsewhere. */
+body.inactive .bar {
+  border-color: #a4a4a4;
+}
+
+body.inactive .bar span {
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.28) 0px,
+      rgba(255, 255, 255, 0.28) 6px,
+      rgba(255, 255, 255, 0) 6px,
+      rgba(255, 255, 255, 0) 12px
+    ),
+    linear-gradient(to bottom, #d6d6d6 0%, #bcbcbc 55%, #cacaca 100%);
+}
+
+body.inactive .spinner {
+  border-color: rgba(0, 0, 0, 0.15);
+  border-top-color: #909090;
+}
+
+/*
+ * The success green and the edited-parameter amber are decoration, so they go
+ * quiet with the rest. The error red does not: a failure must read as a failure
+ * from across the desk, whichever window is in front.
+ */
+body.inactive .status .done {
+  color: #4f6b52;
+}
+
+body.inactive .param.changed > .name,
+body.inactive .preset-note .edited {
+  color: #7b6a4a;
 }
