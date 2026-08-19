@@ -659,3 +659,226 @@ table.results.small td {
   border: 1px solid rgba(0, 0, 0, 0.3);
   vertical-align: -1px;
 }
+
+/* ---- a window that is not in front ---- */
+
+/*
+ * The same treatment as the Electron app's window in `src/renderer/styles.css`,
+ * for the same reason: Aqua drew an inactive window flat. The gel goes out of
+ * the buttons, the blue goes grey, the glow and the throb stop, the metal loses
+ * nearly all of its grain, and the window's shadow draws in as it settles back.
+ *
+ * Here the front-most window is the browser's, so `body.inactive` is set from
+ * the page's own focus and blur — see `windowActive.ts`. The pinstriped desktop
+ * behind the window does not change: a desktop never cared which window was in
+ * front. Content text keeps its colour; only the chrome and the controls go
+ * quiet, and the error red stays red.
+ */
+
+body.inactive {
+  /* The grey that stands in for the blue gel, and the flatter, darker grey for
+     a control that is pressed or selected. */
+  --gel-off: linear-gradient(to bottom, #f6f6f6 0%, #eaeaea 45%, #dfdfdf 50%, #eaeaea 100%);
+  --gel-off-on: linear-gradient(to bottom, #d9d9d9 0%, #c7c7c7 45%, #bfbfbf 50%, #cdcdcd 100%);
+  --edge-off: #9b9b9b;
+}
+
+/* The grain all but disappears, and the window sits closer to the desktop. */
+body.inactive .window {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.03) 0px,
+      rgba(255, 255, 255, 0.03) 1px,
+      rgba(0, 0, 0, 0.015) 2px,
+      rgba(0, 0, 0, 0.015) 3px
+    ),
+    linear-gradient(to bottom, #cdcdcd 0%, #c6c6c6 100%);
+  border-color: #8d8d8d;
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.2),
+    0 1px 3px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+body.inactive .titlebar {
+  background: linear-gradient(to bottom, #dedede, #d0d0d0);
+  border-bottom-color: #a8a8a8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+body.inactive .title {
+  color: #8b8b8b;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+/* Grey lights, with the dome pressed out of them. */
+body.inactive .light {
+  background: linear-gradient(to bottom, #d0d0d0, #b8b8b8);
+  border-color: rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* ---- inactive: panels ---- */
+
+/* The glass keeps its shape but loses the blue light inside it. */
+body.inactive .glass {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.72) 0%, rgba(240, 240, 240, 0.66) 100%);
+  border-color: rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 1px 1px rgba(0, 0, 0, 0.14);
+}
+
+body.inactive .metal-inset {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
+  border-color: rgba(0, 0, 0, 0.16);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+body.inactive .crumbs a,
+body.inactive .aqua-link {
+  color: #5c6b83;
+}
+
+/* ---- inactive: controls ---- */
+
+body.inactive .aqua-button,
+body.inactive .seg,
+body.inactive .tag {
+  color: #5e5e5e;
+  border-color: var(--edge-off);
+  background: var(--gel-off);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  text-shadow: none;
+}
+
+/* A click on a window that is not in front brings it forward first, so nothing
+   here lights up under the pointer. */
+body.inactive .aqua-button:hover:not(:disabled) {
+  filter: none;
+}
+
+/* The default button stops throbbing and hands its blue back. */
+body.inactive .aqua-button.primary {
+  color: #5e5e5e;
+  border-color: var(--edge-off);
+  background: var(--gel-off);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  text-shadow: none;
+  animation: none;
+}
+
+body.inactive .segmented {
+  border-color: var(--edge-off);
+  box-shadow: none;
+}
+
+body.inactive .seg {
+  border-right-color: #b6b6b6;
+}
+
+body.inactive .seg.on {
+  color: #3f3f3f;
+  background: var(--gel-off-on);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+  text-shadow: none;
+}
+
+body.inactive .seg-cap {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+body.inactive .tag.on {
+  color: #3f3f3f;
+  border-color: #a2a2a2;
+  background: var(--gel-off-on);
+  text-shadow: none;
+}
+
+/*
+ * The clip buttons keep their size and their reflection — they are the piece of
+ * furniture you come back to — but the glass goes dull, and the one you are on
+ * is a pressed grey rather than a lit blue.
+ */
+body.inactive .aqua-button.clip {
+  color: #4a4a4a;
+  background: linear-gradient(to bottom, #f7f7f7 0%, #ededed 45%, #dfdfdf 50%, #ececec 100%);
+}
+
+body.inactive .aqua-button.clip::after {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.05));
+}
+
+body.inactive .aqua-button.clip.active {
+  color: #333;
+  border-color: #8f8f8f;
+  background: var(--gel-off-on);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.28);
+  text-shadow: none;
+}
+
+body.inactive .aqua-button.clip.done:not(.active) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 1px 1px rgba(0, 0, 0, 0.2),
+    0 0 0 2px rgba(130, 150, 130, 0.4);
+}
+
+/* The label colours still have to tell one label from another, so they are
+   drained rather than dropped. */
+body.inactive .label-tag.on,
+body.inactive .swatch,
+body.inactive .label-tag {
+  filter: saturate(0.45);
+}
+
+/* The tick boxes take the system's accent colour, which stays blue however
+   far back the window is. */
+body.inactive input[type="checkbox"],
+body.inactive input[type="radio"] {
+  accent-color: #9b9b9b;
+}
+
+body.inactive .aqua-input {
+  border-color: #a2a2a2;
+  background: #f7f7f7;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.16);
+}
+
+/* Nothing in a window that is not in front has the keyboard, so the focus ring
+   has nothing to say either. */
+body.inactive .aqua-input:focus {
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.16),
+    0 0 0 3px rgba(150, 150, 150, 0.4);
+}
+
+/* ---- inactive: waveforms and tables ---- */
+
+/*
+ * The waveforms are drawn into a canvas, so their colours are out of reach of
+ * this file; a filter over the whole picture is what is left. The trough behind
+ * them loses its blue at the same time.
+ */
+body.inactive .waveform,
+body.inactive .annot-canvas {
+  filter: saturate(0.4) opacity(0.85);
+}
+
+body.inactive .waveform,
+body.inactive .annot-scroll {
+  background: linear-gradient(to bottom, #fafafa, #eaeaea);
+  border-color: rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+body.inactive table.results th {
+  background: linear-gradient(to bottom, #f0f0f0, #e2e2e2);
+}
+
+body.inactive .annot-list table.results tr.selected td {
+  background: rgba(0, 0, 0, 0.1);
+}

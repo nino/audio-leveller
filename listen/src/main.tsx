@@ -3,11 +3,14 @@ import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { router } from "./routes";
+import { watchWindowActive } from "./windowActive";
 import "./aqua.css";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });
+
+watchWindowActive();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
