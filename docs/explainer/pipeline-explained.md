@@ -375,7 +375,7 @@ The model backend verifies its weights by SHA-256, and because a DeepFilterNet e
 
 It passed. It was also meaningless. `verifyModel` returns the *first* failure it finds, and on any machine without the weights installed the first failure is `enc.onnx: not found`. So the assertion never reached the thing it was testing. The test passed on precisely one machine in the world, the one that happened to have run `pnpm fetch-model`, and it went red the moment CI ran it.
 
-I made the test hermetic instead: build stand-in files in a temporary directory, pin them to the hashes they actually have, and, this is the load-bearing part, **assert that the intact set verifies before breaking one pin.** Without that first assertion, "fails naming `df_dec.onnx`" could still be true for a reason having nothing to do with the third file being checked. A test that only ever asserts a failure cannot tell you whether the failure is the one you meant.
+I made the test hermetic instead: build stand-in files in a temporary directory, pin them to the hashes they actually have, and, this is the important part, **assert that the intact set verifies before breaking one pin.** Without that first assertion, "fails naming `df_dec.onnx`" could still be true for a reason having nothing to do with the third file being checked. A test that only ever asserts a failure cannot tell you whether the failure is the one you meant.
 
 The general lesson is the same one the whole harness is built on, applied to itself. A green tick is evidence only if you know what would have made it red.
 
