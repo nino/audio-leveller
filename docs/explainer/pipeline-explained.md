@@ -737,7 +737,7 @@ Two stabilisers, both discovered by things going wrong:
 
 *A floor on the weighting power.* The `1/λ` weighting is the whole idea, but near-silent frames would otherwise carry effectively infinite weight and drag the fit to a filter that subtracts wildly. And because each iteration re-estimates `λ` from its own output, that failure *runs away* rather than settling. The floor sits at 1/1000 of the mean power.
 
-#### The frame size is load-bearing
+#### Frame size, and why this stage runs at four times the pipeline's
 
 Frame size turned out to matter more than anything else here, and it belongs in Part 4 as well.
 

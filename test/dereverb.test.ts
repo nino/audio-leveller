@@ -147,9 +147,9 @@ describe("dereverb (WPE)", () => {
     const result = dereverb(cloneSignal(dry).channels);
     const cleaned: Signal = { ...dry, channels: result.channels };
 
-    // Measured at 20 dB with the shipped settings. The bound is what makes the
-    // frame-size choice load-bearing: at the pipeline's usual 1024 this same
-    // recording comes back at 1 dB.
+    // Measured at 20 dB with the shipped settings. The bound is what guards the
+    // frame-size choice: at the pipeline's usual 1024 this same recording comes
+    // back at 1 dB.
     expect(siSdrDb(dry, cleaned)).toBeGreaterThan(15);
   });
 

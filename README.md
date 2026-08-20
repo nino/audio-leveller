@@ -37,7 +37,7 @@ is a cost with no benefit, so most of them can decline.
 | `compress` | Evens out level *within* a phrase, where segment levelling cannot reach. | Declines on material whose loudness range is already under 3 LU. |
 | `level` | Normalises each speech segment to a target loudness, with a true-peak limiter. | — |
 
-The order is load-bearing. De-click comes first because impulses are
+The order follows the dependencies. De-click comes first because impulses are
 out-of-distribution for any denoiser and get smeared rather than removed. EQ
 comes after the denoiser and dereverberator because both change the spectrum you
 would otherwise be fitting a curve to. The expander comes before the compressor
