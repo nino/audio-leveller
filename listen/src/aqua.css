@@ -544,6 +544,8 @@ table.results.small td {
 .annot-scroll {
   overflow-x: scroll;
   overflow-y: hidden;
+  /* Never hand a wheel gesture up to the page. */
+  overscroll-behavior: contain;
   border-radius: 4px;
   background: linear-gradient(to bottom, #f9fbff, #e7edf7);
   border: 1px solid rgba(60, 80, 120, 0.35);
