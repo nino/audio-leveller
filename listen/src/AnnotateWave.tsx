@@ -64,9 +64,10 @@ export const labelColour = (labels: string[], label: string): number[] => {
 };
 
 export const fmtTime = (s: number): string => {
-  const m = Math.floor(s / 60);
-  const r = s - m * 60;
-  return `${m}:${r.toFixed(3).padStart(6, "0")}`;
+  // Round to milliseconds *before* splitting, or 59.9996 s prints as "0:60.000".
+  const ms = Math.max(0, Math.round(s * 1000));
+  const m = Math.floor(ms / 60000);
+  return `${m}:${((ms - m * 60000) / 1000).toFixed(3).padStart(6, "0")}`;
 };
 
 const tickStep = (pps: number): number => {
@@ -139,6 +140,8 @@ export const AnnotateWave = forwardRef<WaveHandle, Props>(function AnnotateWave(
   const scrollTo = useCallback((left: number) => {
     const el = scroller.current;
     if (!el) return;
+    // Drop any scroll a zoom had queued; this one supersedes it.
+    wantScroll.current = null;
     el.scrollLeft = Math.max(0, left);
     setScrollLeft(el.scrollLeft);
   }, []);
@@ -152,11 +155,18 @@ export const AnnotateWave = forwardRef<WaveHandle, Props>(function AnnotateWave(
         scrollTo(t * pps - width / 2);
       },
       zoomBy(factor) {
-        const t = position >= viewStart && position <= viewEnd ? position : (viewStart + viewEnd) / 2;
-        zoomAt(factor, t, (t - viewStart) * pps);
+        const el = scroller.current;
+        const cur = ppsLive.current;
+        if (!el || cur <= 0) return;
+        // Live values for the same reason the wheel handler uses them.
+        const left = wantScroll.current ?? el.scrollLeft;
+        const vs = left / cur, ve = vs + width / cur;
+        const t = position >= vs && position <= ve ? position : (vs + ve) / 2;
+        zoomAt(factor, t, (t - vs) * cur);
       },
       fit() {
         wantScroll.current = 0;
+        ppsLive.current = minPps;
         setPps(minPps);
       },
     }),
@@ -168,12 +178,25 @@ export const AnnotateWave = forwardRef<WaveHandle, Props>(function AnnotateWave(
     const el = scroller.current;
     if (!el) return;
     const onWheel = (e: WheelEvent): void => {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) && !e.ctrlKey) return;
+      // Always take the event. Letting a horizontal-dominant wheel through
+      // meant the browser scrolled the *page* instead, because this box has
+      // nothing to scroll vertically and the gesture chained to an ancestor —
+      // and a trackpad "zoom" flick regularly has a frame or two where deltaX
+      // wins. Horizontal scrolling is then applied by hand.
       e.preventDefault();
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && !e.ctrlKey) {
+        el.scrollLeft += e.deltaX;
+        setScrollLeft(el.scrollLeft);
+        return;
+      }
       const rect = el.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const cur = ppsLive.current;
-      const t = (el.scrollLeft + x) / cur;
+      // Anchor on the scroll position this zoom *will* have, not the one the
+      // DOM still has: wheel events arrive faster than React re-renders, so
+      // el.scrollLeft can be a step behind ppsLive and the view jumps.
+      const left = wantScroll.current ?? el.scrollLeft;
+      const t = (left + x) / cur;
       zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)), t, x);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -290,6 +313,24 @@ export const AnnotateWave = forwardRef<WaveHandle, Props>(function AnnotateWave(
       g.strokeStyle = "rgba(40,60,90,0.8)";
       g.lineWidth = 1;
       g.stroke();
+
+      // Zoomed in past a slice of a pitch period per column, the min/max range
+      // within a column collapses towards nothing and the bars become a
+      // hairline on the centre line — which on quiet material (a breath, which
+      // is the whole point of this editor) is indistinguishable from silence.
+      // The samples are there; what was missing is that neighbouring columns
+      // were never joined, so the trace showed each column's vanishing range
+      // instead of the waveform's shape. Join them.
+      if (spp < 32) {
+        g.beginPath();
+        for (let x = 0; x < w; x++) {
+          const v = Math.max(-1, Math.min(1, ((min[x] + max[x]) / 2) * gain));
+          const y = mid - v * half;
+          if (x === 0) g.moveTo(x + 0.5, y);
+          else g.lineTo(x + 0.5, y);
+        }
+        g.stroke();
+      }
     }
 
     // Playhead
