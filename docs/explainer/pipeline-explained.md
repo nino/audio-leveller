@@ -400,7 +400,7 @@ And `--wav` matters. The harness does not replace listening; it tells you where 
 
 #### Three samples that are simply wrong
 
-Digital dropouts, vinyl ticks, a bad cable connection, a mouth click at the start of a word. Three or four samples that are simply wrong. Your normal tools are useless: a compressor cannot catch something three samples long, and an EQ cannot remove it because it is broadband by construction: a sharp transient occupies every frequency at once. What you actually want is what iZotope RX's De-click does: find the damaged samples and *replace them with what should have been there*.
+Digital dropouts, vinyl ticks, a bad cable connection. Three or four samples that are simply wrong. Your normal tools are useless: a compressor cannot catch something three samples long, and an EQ cannot remove it because it is broadband by construction: a sharp transient occupies every frequency at once. What you actually want is what iZotope RX's De-click does: find the damaged samples and *replace them with what should have been there*.
 
 #### Speech is predictable, and a click is not
 
@@ -422,7 +422,11 @@ Why should speech obey such a model? Because of what the vocal tract physically 
 
 #### Fitting the model
 
-You want the coefficients that minimise the total squared prediction error over the window. Setting the derivatives to zero gives a system of equations whose entries are the signal's **autocorrelation** — the signal correlated with time-shifted copies of itself:
+First, what "the window" is, because everything below depends on it. The model is not fitted once to the file. The de-clicker walks each channel in blocks of **10 ms** and fits a fresh set of coefficients to every block — an hour of stereo audio produces something like seven hundred thousand models, not one. That is the whole point. A single model of an entire file would describe nothing, because the thing it is estimating, the formant structure of an instant, changes completely every few tens of milliseconds. (10 ms is also rather shorter than the 20–50 ms that AR speech modelling conventionally uses, and the reason for that is the glottal pulse problem two sections down.)
+
+Two details that matter later. Each fit sees its block plus `p` samples on either side, so the model is not starved of context at the block edges. And channels are fitted and repaired independently, because damage usually hits one side only, and a joint model would let the intact channel steer the repair of the broken one.
+
+With that settled: you want the coefficients that minimise the total squared prediction error over the window. Setting the derivatives to zero gives a system of equations whose entries are the signal's **autocorrelation** — the signal correlated with time-shifted copies of itself:
 
 ```
 r[m] = Σ_i x[i]·x[i−m]
@@ -516,6 +520,8 @@ And the repair runs **twice**. The first pass uses the model that did the detect
 #### The trade-offs
 
 De-click is conservative by design: three refusal mechanisms, the pulse-train veto, an under-corrected repair, and a false-positive rate held near zero on clean material at the cost of missing quiet clicks. That is the right bias for a tool that runs automatically on material nobody is going to audition frame by frame, and the veto sharpens the bias deliberately, since a click quiet enough to be vetoed is a click quiet enough to be masked. Results on the corpus: `segmentLufsError` on the `clicky` case 7.93 → 0.32 LU, SI-SDR −20.7 → +29.3 dB, worst repair −1.2 dB against local peaks with the bound at +2.
+
+One thing this stage deliberately is not: a *mouth* de-clicker. A lip smack or tongue click is a real acoustic event a few milliseconds long, not three broken samples, and three of the mechanisms above reject it independently — the 2 ms burst cap drops it outright, the 5% block-density guard drops it if it fragments into shorter runs, and the pulse-train veto drops it because it sits within 20 ms of speech louder than itself. None of that is a tuning accident. Every one of those guards is there to stop the stage rewriting real audio, and a mouth click looks like real audio to all of them, because it is. Removing mouth noise needs a detector built on different evidence, and it is listed under what has not been attempted.
 
 One standing instruction, written into the source: **judge this stage on real recordings.** It is the one place in the project where the synthetic corpus is known to point the wrong way.
 
