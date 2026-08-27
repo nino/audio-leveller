@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Props {
-  buffer: AudioBuffer | null;
+  /** Sample snapshot, taken at decode time (see Trial.tsx) — never a live AudioBuffer. */
+  data: Float32Array | null;
   position: number;
   duration: number;
   region: [number, number] | null;
@@ -10,12 +11,9 @@ interface Props {
 }
 
 /** Waveform overview: click to seek, drag to set a loop region. */
-export function Waveform({ buffer, position, duration, region, onSeek, onRegion }: Props) {
+export function Waveform({ data, position, duration, region, onSeek, onRegion }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
-  // Snapshot the samples once per clip: after playback starts, the live
-  // AudioBuffer's getChannelData is not a reliable data source (see peaks.ts).
-  const data = useMemo(() => (buffer ? Float32Array.from(buffer.getChannelData(0)) : null), [buffer]);
 
   useEffect(() => {
     const el = canvas.current;

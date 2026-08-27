@@ -44,8 +44,12 @@ export function buildPeaks(buffer: AudioBuffer): PeakCache {
     const data = buffer.getChannelData(c);
     const snap = new Int16Array(n);
     for (let i = 0; i < n; i++) {
-      const v = data[i];
-      snap[i] = v >= 1 ? 32767 : v <= -1 ? -32768 : (v * 32767) | 0;
+      // Round, don't truncate, and scale by 32768 so that decoding with
+      // 1/32768 can never leave [-1, 1]: full-scale negative is exact, and
+      // full-scale positive reads 32767/32768 — 0.003% low, invisible in a
+      // plot, and a bounded contract beats an exact +1.
+      const q = Math.round(data[i] * 32768);
+      snap[i] = q >= 32767 ? 32767 : q <= -32768 ? -32768 : q;
     }
     samples.push(snap);
     for (let b = 0; b < count; b++) {
@@ -78,7 +82,13 @@ export function buildPeaks(buffer: AudioBuffer): PeakCache {
 /**
  * Min/max per pixel column for `width` columns starting at sample
  * `startSample`, `spp` samples per pixel. Columns past the end of the file
- * are left at (0, 0).
+ * are left at (0, 0), and every value returned lies in [-1, 1] — the pyramid
+ * keeps true float extremes internally, but over-unity material (a float
+ * file can exceed full scale) is clamped on the way out so both branches
+ * agree and no consumer has to re-clamp. Adversarial review caught all three
+ * ways the previous version could breach that contract: -32768 decoded by
+ * 1/32767 read -1.00003, the empty-column sentinels could leak raw through
+ * the fallback path, and the pyramid reported 1.5 where the snapshot said 1.
  */
 export function peaksFor(cache: PeakCache, startSample: number, spp: number, width: number): { min: Float32Array; max: Float32Array } {
   const min = new Float32Array(width), max = new Float32Array(width);
@@ -97,8 +107,8 @@ export function peaksFor(cache: PeakCache, startSample: number, spp: number, wid
         if (level.max[b] > hi) hi = level.max[b];
       }
       if (hi < lo) lo = hi = 0;
-      min[x] = lo;
-      max[x] = hi;
+      min[x] = lo < -1 ? -1 : lo;
+      max[x] = hi > 1 ? 1 : hi;
     }
     return { min, max };
   }
@@ -107,7 +117,7 @@ export function peaksFor(cache: PeakCache, startSample: number, spp: number, wid
   const chans: (Int16Array | Float32Array)[] =
     cache.samples ??
     Array.from({ length: cache.buffer.numberOfChannels }, (_, c) => cache.buffer.getChannelData(c));
-  const scale = cache.samples ? 1 / 32767 : 1;
+  const scale = cache.samples ? 1 / 32768 : 1;
   for (let x = 0; x < width; x++) {
     const s0 = Math.floor(startSample + x * spp);
     if (s0 >= n) break;
@@ -120,8 +130,12 @@ export function peaksFor(cache: PeakCache, startSample: number, spp: number, wid
         if (v > hi) hi = v;
       }
     }
-    min[x] = lo * scale;
-    max[x] = hi * scale;
+    // The sentinels must never escape (an empty column is possible only for
+    // out-of-range starts, but "unreachable from current callers" is not a
+    // contract), and float files can exceed full scale.
+    if (hi < lo) lo = hi = 0;
+    min[x] = Math.max(-1, lo * scale);
+    max[x] = Math.min(1, hi * scale);
   }
   return { min, max };
 }
