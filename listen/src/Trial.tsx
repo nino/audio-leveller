@@ -81,6 +81,15 @@ function TrialView({ session, trialIndex, listener, initial, onSaved, go, toResu
   const urls = useMemo(() => trial.clips.map((c) => api.clipUrl(session.name, c.file)), [session.name, trial]);
   const player = usePlayer(urls);
   const { state } = player;
+  // Snapshot every clip's samples as soon as they are decoded. Waveform used
+  // to do this lazily per clip, which reopened the purge window peaks.ts
+  // closes: a clip first viewed minutes into a session could already have had
+  // its AudioBuffer storage reclaimed. Clips here are seconds long, so plain
+  // float copies are fine.
+  const waveData = useMemo(
+    () => player.buffers.map((b) => Float32Array.from(b.getChannelData(0))),
+    [player.buffers],
+  );
 
   const [results, setResults] = useState<Results>(initial);
   const latest = useRef(results);
@@ -177,7 +186,7 @@ function TrialView({ session, trialIndex, listener, initial, onSaved, go, toResu
       <section className="panel glass">
         {state.error && <p className="error">{state.error}</p>}
         <Waveform
-          buffer={player.buffers[selectedClip] ?? null}
+          data={waveData[selectedClip] ?? null}
           position={state.position}
           duration={state.duration}
           region={state.region}
