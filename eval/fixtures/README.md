@@ -3,6 +3,18 @@
 Drop real `.wav` recordings in this directory and `pnpm eval` will pick them up
 automatically, one case per file, named `fixture:<filename>`.
 
+A pinned set can be fetched rather than hunted for:
+
+```bash
+pnpm fetch-fixtures
+```
+
+That reads `eval/references/manifest.json`, downloads each file, and verifies it
+against a checksum tracked in the repository — see `eval/references/README.md`.
+Reference masters from that manifest land in `eval/references/` instead, because
+anything sitting in *this* directory gets processed, and mastering somebody
+else's master produces numbers that mean nothing.
+
 Each file also produces two **denoiser** cases, `fixture:<name>:spectral` and
 `fixture:<name>:onnx`. Those add broadband noise at 20 dB SNR to the first 60
 seconds and score the result against the recording itself — which supplies the

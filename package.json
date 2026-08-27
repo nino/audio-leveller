@@ -18,6 +18,7 @@
     "dist": "pnpm build && electron-builder",
     "eval": "pnpm build && node dist/eval/run.js",
     "fetch-model": "pnpm build && node scripts/fetch-model.mjs",
+    "fetch-fixtures": "node scripts/fetch-fixtures.mjs",
     "listen": "vite --config listen/vite.config.ts",
     "listen:session": "pnpm build && node dist/listen/build-session.js",
     "listen:typecheck": "tsc -p listen/tsconfig.json --noEmit"

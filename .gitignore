@@ -6,9 +6,13 @@ release/
 scratch/
 *.processed.wav
 
-# Evaluation fixtures are local-only (large, and often not ours to share).
+# Evaluation fixtures and reference masters are local-only (large, and often
+# not ours to share). What is tracked is the manifest that pins their hashes.
 eval/fixtures/*
 !eval/fixtures/README.md
+eval/references/*
+!eval/references/README.md
+!eval/references/manifest.json
 
 # Local listening-test material (large WAVs, never committed). Session specs
 # are small and document the experiment, so they are tracked.
