@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface Props {
   buffer: AudioBuffer | null;
@@ -13,6 +13,9 @@ interface Props {
 export function Waveform({ buffer, position, duration, region, onSeek, onRegion }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
+  // Snapshot the samples once per clip: after playback starts, the live
+  // AudioBuffer's getChannelData is not a reliable data source (see peaks.ts).
+  const data = useMemo(() => (buffer ? Float32Array.from(buffer.getChannelData(0)) : null), [buffer]);
 
   useEffect(() => {
     const el = canvas.current;
@@ -32,8 +35,7 @@ export function Waveform({ buffer, position, duration, region, onSeek, onRegion 
       g.fillRect((sel[0] / duration) * w, 0, ((sel[1] - sel[0]) / duration) * w, h);
     }
 
-    if (buffer) {
-      const data = buffer.getChannelData(0);
+    if (data) {
       const step = Math.max(1, Math.floor(data.length / w));
       g.beginPath();
       for (let x = 0; x < w; x++) {
@@ -57,7 +59,7 @@ export function Waveform({ buffer, position, duration, region, onSeek, onRegion 
       g.fillStyle = "rgba(220, 40, 40, 0.9)";
       g.fillRect(x - 0.5, 0, 1.5, h);
     }
-  }, [buffer, position, duration, region, drag]);
+  }, [data, position, duration, region, drag]);
 
   const posAt = (e: React.MouseEvent): number => {
     const r = canvas.current!.getBoundingClientRect();

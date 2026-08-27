@@ -297,6 +297,24 @@ export const AnnotateWave = forwardRef<WaveHandle, Props>(function AnnotateWave(
       const sr = peaks.buffer.sampleRate;
       const spp = sr / pps;
       const { min, max } = peaksFor(peaks, viewStart * sr, spp, w);
+      // What this frame was actually drawn from. Cheap, and it turns a
+      // screenshot of a misbehaving view into a diagnosis: which branch of
+      // peaksFor ran (pyramid above 256 samples/px, raw samples below), and
+      // the largest value it handed the renderer. If the wave looks wrong but
+      // pk matches the material, the data was right and the drawing was not —
+      // and vice versa.
+      let drawnPeak = 0;
+      for (let x = 0; x < w; x++) {
+        const m = Math.max(Math.abs(min[x]), Math.abs(max[x]));
+        if (m > drawnPeak) drawnPeak = m;
+      }
+      g.font = "9px Monaco, Menlo, monospace";
+      g.fillStyle = "rgba(85, 95, 115, 0.75)";
+      g.fillText(
+        `${spp.toFixed(0)} smp/px ${spp >= 256 ? "pyr" : "raw"} @${sr} · pk ${drawnPeak.toFixed(3)} · ×${gain}`,
+        4,
+        h - 4,
+      );
       const top = RULER + laneH, mid = top + (h - top) / 2, half = (h - top) / 2 - 2;
       g.strokeStyle = "rgba(0,0,0,0.12)";
       g.beginPath();
