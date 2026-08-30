@@ -229,6 +229,11 @@ export default defineConfig({
   root: import.meta.dirname,
   plugins: [react(), api()],
   server: { port: 5199, open: true },
-  build: { outDir: join(ROOT, "dist", "listen-app"), emptyOutDir: true },
+  // Vite's default target downlevels for browsers this app will never meet: it
+  // is opened locally, in a current Chromium, by the one person running the
+  // test. `esnext` ships the syntax as written. Unlike the same word in a
+  // tsconfig, this only decides what gets transformed – it cannot promise an
+  // API that is not there – so it costs nothing to leave the code alone.
+  build: { outDir: join(ROOT, "dist", "listen-app"), emptyOutDir: true, target: "esnext" },
 });
 
