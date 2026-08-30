@@ -410,7 +410,60 @@ pnpm eval           # run the evaluation corpus (see below)
 pnpm fetch-model    # download and verify the DeepFilterNet3 weights
 pnpm listen         # open the blind listening-test app (see below)
 pnpm dist           # package a distributable (electron-builder)
+pnpm icon           # rebuild build/icon.icns from the SVG artwork
 ```
+
+`pnpm dist` writes to `release/`, separate from the TypeScript output in
+`dist/` — the packaged app copies `dist/`, so the two directories cannot be the
+same one without the app swallowing its own build products.
+
+### The icon
+
+`build/icon.svg` is the artwork: the window's own materials — brushed
+aluminium, a recessed glass readout, three dials, one sweep of Aqua sheen —
+drawn on Apple's icon squircle at the exact grid it masks app icons to, so
+macOS does not draw a plain rounded card underneath it. The readout is the app
+in one picture: speech arriving ragged, leaving on the target lines.
+
+`build/icon-small.svg` is the same object redrawn for the 16 and 32 point
+slots, where thirty-seven bars and a grain pattern collapse into grey mush.
+`pnpm icon` renders both and assembles `build/icon.icns`; it wants
+`rsvg-convert` (`brew install librsvg`) or Inkscape, which nothing else in the
+project does — the `.icns` is committed, so a build never runs it.
+
+### Signed releases
+
+`.github/workflows/release.yml` builds the Apple Silicon DMG, signs it with a
+Developer ID certificate, notarises both the app and the disk image, and
+staples the tickets. A stapled DMG opens on someone else's Mac with no
+Gatekeeper warning and no network round-trip.
+
+Only arm64 is built. `onnxruntime-node` downloads binaries for the host
+architecture at install time, so the machine that builds decides which ONNX
+runtime ends up in the bundle, and cross-building Intel would mean fetching
+that dependency for a platform the runner is not.
+
+Five repository secrets, under Settings → Secrets and variables → Actions:
+
+| secret | what it is |
+| ------ | ---------- |
+| `MACOS_CERTIFICATE_P12` | The Developer ID Application certificate *and its private key*, exported from Keychain Access as `.p12`, then base64-encoded: `base64 -i cert.p12 \| pbcopy`. |
+| `MACOS_CERTIFICATE_PASSWORD` | The password set during that export. |
+| `APPLE_API_KEY_P8` | The whole contents of the `.p8` App Store Connect key, `-----BEGIN PRIVATE KEY-----` line included. Created under App Store Connect → Users and Access → Integrations → App Store Connect API, and downloadable exactly once. |
+| `APPLE_API_KEY_ID` | The ten-character key ID shown next to that key. |
+| `APPLE_API_ISSUER_ID` | The issuer UUID shown above the key list. |
+
+Cutting a release is a version bump and a tag — the workflow refuses to build
+if the two disagree:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The DMG is attached to a GitHub release named after the tag. Running the
+workflow by hand from the Actions tab does everything except publish, leaving
+the DMG as a run artifact, which is how to test a change to the signing setup
+without spending a version number.
 
 ### Tuning
 
