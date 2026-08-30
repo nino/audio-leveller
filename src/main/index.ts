@@ -48,8 +48,8 @@ function createWindow(): void {
   win.on("blur", () => sendFocus(false));
   win.webContents.on("did-finish-load", () => sendFocus(win.isFocused()));
 
-  win.webContents.on("console-message", (_e, _level, message, line, source) => {
-    console.log(`[renderer] ${message} (${source}:${line})`);
+  win.webContents.on("console-message", ({ message, lineNumber, sourceId }) => {
+    console.log(`[renderer] ${message} (${sourceId}:${lineNumber})`);
   });
   win.webContents.on("preload-error", (_e, path, error) => {
     console.error(`[preload-error] ${path}: ${error.message}`);

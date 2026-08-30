@@ -10,20 +10,25 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Nothing here writes back to the repository – both jobs only read the code
+# they were handed – so the runners get a token that can do no more than that.
+permissions:
+  contents: read
+
 jobs:
   node:
     name: Typecheck, tests, evaluation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Version comes from the `packageManager` field in package.json, so CI
       # and a developer's machine cannot drift apart.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       # Electron is a devDependency but nothing here launches the app, and its
@@ -58,7 +63,7 @@ jobs:
     name: REAPER script
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The ReaScript port is a separate implementation of the levelling maths,
       # and its test re-levels a synthetic signal and checks it lands on target.

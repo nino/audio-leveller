@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ES2021",
-    "lib": ["ES2021", "DOM", "DOM.Iterable"],
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
@@ -14,5 +14,5 @@
     "isolatedModules": true,
     "types": ["node"]
   },
-  "include": ["src", "vite.config.ts", "../src/listen/types.ts"]
+  "include": ["src", "vite.config.mts", "../src/listen/types.ts"]
 }

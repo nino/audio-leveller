@@ -29,13 +29,13 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       # Unlike CI, this install must be the real thing: the Electron binary and
@@ -175,7 +175,7 @@ jobs:
           xcrun stapler validate "${dmgs[0]}"
           spctl --assess --type open --context context:primary-signature -vv "${dmgs[0]}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: audio-leveller-macos-arm64
           path: release/*.dmg

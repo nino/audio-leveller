@@ -17,7 +17,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { annotationsFileFor, annotationsToCsv, parseAnnotationFile } from "../src/listen/annotations";
 import type { AnnotationFile } from "../src/listen/types";
 
-const ROOT = resolve(__dirname, "..");
+const ROOT = resolve(import.meta.dirname, "..");
 const SESSIONS = join(ROOT, "listening", "sessions");
 /** WAVs to mark up (breaths, clicks, ...) live here, with their `.annotations.json` sidecars. */
 const ANNOTATE = join(ROOT, "listening", "annotate");
@@ -226,7 +226,7 @@ function api(): Plugin {
 }
 
 export default defineConfig({
-  root: __dirname,
+  root: import.meta.dirname,
   plugins: [react(), api()],
   server: { port: 5199, open: true },
   build: { outDir: join(ROOT, "dist", "listen-app"), emptyOutDir: true },
