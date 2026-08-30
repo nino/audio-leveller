@@ -19,6 +19,7 @@
     "eval": "pnpm build && node dist/eval/run.js",
     "fetch-model": "pnpm build && node scripts/fetch-model.mjs",
     "fetch-fixtures": "node scripts/fetch-fixtures.mjs",
+    "icon": "node scripts/make-icon.mjs",
     "listen": "vite --config listen/vite.config.ts",
     "listen:session": "pnpm build && node dist/listen/build-session.js",
     "listen:typecheck": "tsc -p listen/tsconfig.json --noEmit"
@@ -47,13 +48,27 @@
   "build": {
     "appId": "com.ninoan.audioleveller",
     "productName": "Audio Leveller",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**/*",
-      "package.json"
+      "package.json",
+      "!dist/mac*{,/**/*}",
+      "!dist/*.{dmg,blockmap,yml,yaml}",
+      "!**/onnxruntime-node/bin/napi-v*/{win32,linux}/**"
     ],
     "mac": {
       "category": "public.app-category.music",
-      "target": "dmg"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64"]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "notarize": true
     }
   },
   "optionalDependencies": {

@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Source artwork for the app icon.
+
+  The body is Apple's icon squircle exactly — an 824 square inset 100 in a 1024
+  canvas, corner radius 185.4 at 60% smoothing — because macOS masks app icons
+  to that shape, and artwork that ignores it gets a plain rounded card drawn
+  underneath instead.
+
+  Inside it, the window's own materials: brushed aluminium, a recessed glass
+  readout, three dials, and one sweep of Aqua sheen across the whole face. The
+  readout is the app's job in one picture — speech arriving ragged on the left,
+  leaving on the target lines to the right.
+
+  Regenerate build/icon.icns with `pnpm icon` after editing this file.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <path id="body" d="M396.64 100 L627.36 100 c103.834 0 155.751 0 195.41 20.207 a185.4 185.4 0 0 1 81.023 81.023 c20.207 39.659 20.207 91.576 20.207 195.41 L924 627.36 c0 103.834 0 155.751 -20.207 195.41 a185.4 185.4 0 0 1 -81.023 81.023 c-39.659 20.207 -91.576 20.207 -195.41 20.207 L396.64 924 c-103.834 0 -155.751 0 -195.41 -20.207 a185.4 185.4 0 0 1 -81.023 -81.023 c-20.207 -39.659 -20.207 -91.576 -20.207 -195.41 L100 396.64 c0 -103.834 0 -155.751 20.207 -195.41 a185.4 185.4 0 0 1 81.023 -81.023 c39.659 -20.207 91.576 -20.207 195.41 -20.207 Z"/>
+
+    <linearGradient id="metal" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fdfdfd"/>
+      <stop offset="0.14" stop-color="#e9e9e9"/>
+      <stop offset="0.48" stop-color="#cdcdcd"/>
+      <stop offset="0.84" stop-color="#adadad"/>
+      <stop offset="1" stop-color="#c4c4c4"/>
+    </linearGradient>
+
+    <pattern id="grain" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect y="0" width="4" height="1" fill="#ffffff" opacity="0.26"/>
+      <rect y="2" width="4" height="1" fill="#000000" opacity="0.06"/>
+    </pattern>
+
+    <linearGradient id="glass" x1="0" y1="200.0" x2="0" y2="608.0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#071c48"/>
+      <stop offset="0.34" stop-color="#123f8c"/>
+      <stop offset="0.74" stop-color="#1f60c4"/>
+      <stop offset="1" stop-color="#2d72dc"/>
+    </linearGradient>
+
+    <radialGradient id="vignette" cx="0.5" cy="0.44" r="0.7">
+      <stop offset="0.5" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000014" stop-opacity="0.45"/>
+    </radialGradient>
+
+    <linearGradient id="gloss" x1="0" y1="100" x2="0" y2="566" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.74"/>
+      <stop offset="0.46" stop-color="#ffffff" stop-opacity="0.30"/>
+      <stop offset="0.86" stop-color="#ffffff" stop-opacity="0.13"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.10"/>
+    </linearGradient>
+
+    <linearGradient id="dialRing" x1="0" y1="-72" x2="0" y2="72" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fcfcfc"/>
+      <stop offset="0.5" stop-color="#d2d2d2"/>
+      <stop offset="1" stop-color="#a2a2a2"/>
+    </linearGradient>
+    <linearGradient id="dialCap" x1="0" y1="-57" x2="0" y2="57" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f2f2f2"/>
+      <stop offset="0.55" stop-color="#d8d8d8"/>
+      <stop offset="1" stop-color="#aeaeae"/>
+    </linearGradient>
+
+    <clipPath id="bodyClip"><use href="#body"/></clipPath>
+    <clipPath id="screenClip"><rect x="176" y="200.0" width="672" height="408.0" rx="40"/></clipPath>
+
+    <filter id="cast" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <filter id="recess" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+    <filter id="dialShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+
+    <g id="dial">
+      <circle r="72" fill="url(#dialRing)" stroke="#8b8b8b" stroke-width="3"/>
+      <circle r="57" fill="url(#dialCap)" stroke="#9b9b9b" stroke-width="2"/>
+      <path d="M-31 -24 A40 40 0 0 1 31 -24" fill="none" stroke="#ffffff" stroke-width="11"
+            stroke-linecap="round" opacity="0.6"/>
+    </g>
+  </defs>
+
+  <use href="#body" transform="translate(0,20)" fill="#000000" opacity="0.28" filter="url(#cast)"/>
+
+  <g clip-path="url(#bodyClip)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#metal)"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#grain)"/>
+  </g>
+
+  <g clip-path="url(#screenClip)">
+    <rect x="176" y="200.0" width="672" height="408.0" fill="url(#glass)"/>
+
+    <rect x="176" y="304" width="672" height="8" fill="#9ccbff" opacity="0.5"/>
+    <rect x="176" y="496" width="672" height="8" fill="#9ccbff" opacity="0.5"/>
+
+    <g fill="#ffffff">
+      <rect x="224.0" y="390.4" width="9.0" height="27.2" rx="4.5"/>
+      <rect x="239.8" y="352.4" width="9.0" height="103.2" rx="4.5"/>
+      <rect x="255.5" y="288.6" width="9.0" height="230.9" rx="4.5"/>
+      <rect x="271.2" y="246.0" width="9.0" height="316.0" rx="4.5"/>
+      <rect x="287.0" y="314.4" width="9.0" height="179.2" rx="4.5"/>
+      <rect x="302.8" y="264.2" width="9.0" height="279.5" rx="4.5"/>
+      <rect x="318.5" y="358.5" width="9.0" height="91.0" rx="4.5"/>
+      <rect x="334.2" y="385.8" width="9.0" height="36.3" rx="4.5"/>
+      <rect x="350.0" y="391.9" width="9.0" height="24.2" rx="4.5"/>
+      <rect x="365.8" y="328.1" width="9.0" height="151.8" rx="4.5"/>
+      <rect x="381.5" y="276.4" width="9.0" height="255.2" rx="4.5"/>
+      <rect x="397.2" y="250.6" width="9.0" height="306.9" rx="4.5"/>
+      <rect x="413.0" y="309.8" width="9.0" height="188.3" rx="4.5"/>
+      <rect x="428.8" y="367.6" width="9.0" height="72.8" rx="4.5"/>
+      <rect x="444.5" y="388.9" width="9.0" height="30.2" rx="4.5"/>
+      <rect x="460.2" y="331.1" width="9.0" height="145.8" rx="4.5"/>
+      <rect x="476.0" y="258.2" width="9.0" height="291.7" rx="4.5"/>
+      <rect x="491.8" y="300.7" width="9.0" height="206.6" rx="4.5"/>
+      <rect x="507.5" y="300.7" width="9.0" height="206.6" rx="4.5"/>
+      <rect x="523.2" y="306.0" width="9.0" height="195.9" rx="4.5"/>
+      <rect x="539.0" y="301.1" width="9.0" height="205.8" rx="4.5"/>
+      <rect x="554.8" y="306.1" width="9.0" height="195.8" rx="4.5"/>
+      <rect x="570.5" y="313.8" width="9.0" height="180.5" rx="4.5"/>
+      <rect x="586.2" y="298.4" width="9.0" height="211.2" rx="4.5"/>
+      <rect x="602.0" y="310.9" width="9.0" height="186.2" rx="4.5"/>
+      <rect x="617.8" y="303.2" width="9.0" height="201.6" rx="4.5"/>
+      <rect x="633.5" y="315.7" width="9.0" height="176.6" rx="4.5"/>
+      <rect x="649.2" y="305.1" width="9.0" height="197.8" rx="4.5"/>
+      <rect x="665.0" y="300.3" width="9.0" height="207.4" rx="4.5"/>
+      <rect x="680.8" y="311.8" width="9.0" height="184.3" rx="4.5"/>
+      <rect x="696.5" y="307.0" width="9.0" height="193.9" rx="4.5"/>
+      <rect x="712.2" y="314.7" width="9.0" height="178.6" rx="4.5"/>
+      <rect x="728.0" y="299.4" width="9.0" height="209.3" rx="4.5"/>
+      <rect x="743.8" y="309.9" width="9.0" height="188.2" rx="4.5"/>
+      <rect x="759.5" y="304.2" width="9.0" height="199.7" rx="4.5"/>
+      <rect x="775.2" y="316.6" width="9.0" height="174.7" rx="4.5"/>
+      <rect x="791.0" y="302.2" width="9.0" height="203.5" rx="4.5"/>
+    </g>
+
+    <rect x="176" y="200.0" width="672" height="408.0" fill="url(#vignette)"/>
+    <rect x="160" y="184.0" width="704" height="440.0" rx="54" fill="none" stroke="#000000"
+          stroke-width="26" opacity="0.5" filter="url(#recess)"/>
+  </g>
+  <rect x="176" y="200.0" width="672" height="408.0" rx="40" fill="none" stroke="#5d6b85" stroke-width="4"/>
+  <rect x="171" y="195.0" width="682" height="418.0" rx="45" fill="none" stroke="#ffffff" stroke-width="5" opacity="0.6"/>
+
+  <g clip-path="url(#bodyClip)">
+    <g transform="translate(300,766)"><circle cy="6" r="72" fill="#000000" opacity="0.24" filter="url(#dialShadow)"/><use href="#dial"/><rect transform="rotate(-42)" x="-5" y="-49" width="10" height="30" rx="5" fill="#4a4a4a"/></g>
+    <g transform="translate(512,766)"><circle cy="6" r="72" fill="#000000" opacity="0.24" filter="url(#dialShadow)"/><use href="#dial"/><rect transform="rotate(14)" x="-5" y="-49" width="10" height="30" rx="5" fill="#4a4a4a"/></g>
+    <g transform="translate(724,766)"><circle cy="6" r="72" fill="#000000" opacity="0.24" filter="url(#dialShadow)"/><use href="#dial"/><rect transform="rotate(58)" x="-5" y="-49" width="10" height="30" rx="5" fill="#4a4a4a"/></g>
+  </g>
+
+  <!-- one sweep of light across metal and glass alike -->
+  <g clip-path="url(#bodyClip)">
+    <path d="M100 100 H924 V430 Q718 566 512 566 Q306 566 100 430 Z" fill="url(#gloss)"/>
+  </g>
+
+  <!-- the lit inner bevel, then the contact edge outside it -->
+  <use href="#body" fill="none" stroke="#ffffff" stroke-width="16" opacity="0.5" clip-path="url(#bodyClip)"/>
+  <use href="#body" fill="none" stroke="#6f6f73" stroke-width="4" opacity="0.5"/>
+</svg>
