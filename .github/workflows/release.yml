@@ -170,10 +170,23 @@ jobs:
           fi
 
           # Both tickets: the one stapled to the app, and the one stapled to the
-          # disk image around it.
+          # disk image around it. For the DMG this is the whole check available.
+          # spctl wants a signature on the disk image, and electron-builder
+          # leaves disk images unsigned on purpose — its own schema says signing
+          # them "will lead to unwanted errors in combination with notarization
+          # requirements" — so asking spctl about the DMG only ever gets back
+          # "no usable signature", ticket or no ticket.
           xcrun stapler validate "${apps[0]}"
           xcrun stapler validate "${dmgs[0]}"
-          spctl --assess --type open --context context:primary-signature -vv "${dmgs[0]}"
+
+          # What Gatekeeper actually does when someone runs the app they dragged
+          # out of that disk image.
+          assessment=$(spctl --assess --type exec -vv "${apps[0]}" 2>&1)
+          echo "$assessment"
+          if ! echo "$assessment" | grep -q "source=Notarized Developer ID"; then
+            echo "::error::Gatekeeper does not see a notarised Developer ID app"
+            exit 1
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
