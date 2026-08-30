@@ -136,10 +136,10 @@ async function exportAnnotationsCsv(): Promise<string> {
 }
 
 /**
- * `/api/annotate` — list files
- * `/api/annotate/export.csv` — every annotation of every file
- * `/api/annotate/<file>/audio` — the WAV
- * `/api/annotate/<file>/annotations` — GET (404 until saved) / PUT the sidecar
+ * `/api/annotate` – list files
+ * `/api/annotate/export.csv` – every annotation of every file
+ * `/api/annotate/<file>/audio` – the WAV
+ * `/api/annotate/<file>/annotations` – GET (404 until saved) / PUT the sidecar
  */
 async function annotateApi(req: IncomingMessage, res: ServerResponse, parts: string[]): Promise<void> {
   if (parts.length === 1) return send(res, 200, await listAnnotatable());

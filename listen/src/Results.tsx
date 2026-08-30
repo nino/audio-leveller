@@ -91,7 +91,7 @@ export function ResultsPage() {
       {!revealed ? (
         <div className="panel glass reveal">
           <p>
-            The key is sealed. Revealing shows which variant each blind clip was — do it once you have
+            The key is sealed. Revealing shows which variant each blind clip was – do it once you have
             finished scoring, because it is hard to un-know.
           </p>
           <button className="aqua-button primary" onClick={() => setRevealed(true)}>
@@ -130,7 +130,7 @@ export function ResultsPage() {
                     </td>
                     <td>{st.n}</td>
                     {scaleQs.map((q) => (
-                      <td key={q.id}>{st.scores[q.id]?.length ? mean(st.scores[q.id]).toFixed(2) : "—"}</td>
+                      <td key={q.id}>{st.scores[q.id]?.length ? mean(st.scores[q.id]).toFixed(2) : "–"}</td>
                     ))}
                     {pickQ && <td>{st.picks}</td>}
                     <td className="hint small">
@@ -153,7 +153,7 @@ export function ResultsPage() {
               return (
                 <div key={t.id} className="trial-block">
                   <div className="q-label">
-                    {t.id} — {t.title}
+                    {t.id} – {t.title}
                     {pickQ && tr?.trial[pickQ.id] && (
                       <span className="hint">
                         {" "}
@@ -173,7 +173,7 @@ export function ResultsPage() {
                             </td>
                             <td>{map[c.label]}</td>
                             {scaleQs.map((q) => (
-                              <td key={q.id}>{a[q.id] ?? "—"}</td>
+                              <td key={q.id}>{a[q.id] ?? "–"}</td>
                             ))}
                             <td className="hint">{((a.artefacts as string[] | undefined) ?? []).join(", ")}</td>
                             <td className="hint">{(a.notes as string | undefined) ?? ""}</td>

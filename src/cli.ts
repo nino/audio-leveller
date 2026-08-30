@@ -3,8 +3,8 @@
  *
  *   node dist/cli.js <input.wav> [output.wav] [options]
  *
- * Handy for batch use, for eyeballing what the pipeline decided, and — via
- * `--bypass` plus `--report` — for comparing a stage against itself when
+ * Handy for batch use, for eyeballing what the pipeline decided, and – via
+ * `--bypass` plus `--report` – for comparing a stage against itself when
  * tuning by ear.
  */
 
@@ -130,7 +130,7 @@ function printReport(
 
   console.log("\nChain:");
   for (const stage of report.stages) {
-    if (!stage.enabled) console.log(`  ${stage.name}  — bypassed`);
+    if (!stage.enabled) console.log(`  ${stage.name}  – bypassed`);
     else console.log(`  ${stage.name}  (${stage.elapsedMs.toFixed(0)} ms)`);
   }
 

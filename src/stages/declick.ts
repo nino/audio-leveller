@@ -3,8 +3,8 @@
  *
  * Sits first in the chain, and the ordering is earning its keep twice over:
  * clicks are out-of-distribution impulses for the AI denoiser (which smears
- * them into chirps instead of removing them), and — as the eval corpus
- * showed — a click landing in a pause can lift it over the silence threshold
+ * them into chirps instead of removing them), and – as the eval corpus
+ * showed – a click landing in a pause can lift it over the silence threshold
  * and merge two speech segments, so de-clicking also repairs the leveller's
  * segmentation.
  *

@@ -166,7 +166,7 @@ export async function buildSession(spec: SessionSpec, specDir: string, outRoot: 
       if (peakDb > -0.1) {
         throw new Error(
           `Clip ${trialId}/${variantId} peaks at ${peakDb.toFixed(1)} dBTP after matching to ` +
-            `${loudnessLufs} LUFS — lower loudnessLufs so nothing clips`,
+            `${loudnessLufs} LUFS – lower loudnessLufs so nothing clips`,
         );
       }
       const label = LETTERS[i];

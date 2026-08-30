@@ -188,7 +188,7 @@ function sampleWriter(
   /**
    * Scale by the same power of two the reader divides by, then clamp to the
    * format's range. Signed PCM is asymmetric (-32768..32767), so scaling the
-   * write side by 32767 instead — as is tempting — would make every decoded
+   * write side by 32767 instead – as is tempting – would make every decoded
    * sample come back one LSB short and a decode/encode round trip lossy.
    * Only true full scale is clamped, which is inherent to the format.
    */

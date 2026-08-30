@@ -22,7 +22,7 @@ function arProcess(n: number, a1: number, a2: number, seed: number): Float32Arra
   return out;
 }
 
-/** A decaying sinusoid — the shape a real resonance actually makes. */
+/** A decaying sinusoid – the shape a real resonance actually makes. */
 function resonance(n: number, freq: number, sampleRate: number, decay: number): Float32Array {
   const out = new Float32Array(n);
   for (let i = 0; i < n; i++) {
@@ -73,7 +73,7 @@ describe("levinson", () => {
     expect(a[2]).toBeCloseTo(a2, 1);
   });
 
-  it("produces a stable model — all reflection coefficients inside the unit circle", () => {
+  it("produces a stable model – all reflection coefficients inside the unit circle", () => {
     const signal = arProcess(8000, -1.9, 0.95, 7);
     const a = fitAr(signal, 0, signal.length, 24);
     expect(a.every((v) => Number.isFinite(v))).toBe(true);

@@ -1,7 +1,7 @@
 /**
  * Stage registry. Stages register themselves by name so a chain can be
- * described as data — a list of names and params from a CLI flag, a config
- * file or the UI — rather than as imports wired up in code.
+ * described as data – a list of names and params from a CLI flag, a config
+ * file or the UI – rather than as imports wired up in code.
  */
 
 import type { Stage } from "./types";

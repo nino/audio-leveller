@@ -2,8 +2,8 @@
  * De-clicker: find impulsive damage and rebuild it from its surroundings.
  *
  * Detection runs on the *linear-prediction residual*. A short window of speech
- * is well described by an AR model (see `lpc.ts`), so a click — which owes
- * nothing to the samples around it — leaves a spike in the residual far larger
+ * is well described by an AR model (see `lpc.ts`), so a click – which owes
+ * nothing to the samples around it – leaves a spike in the residual far larger
  * than anything speech produces.
  *
  * The awkward part of that idea, and the reason naive AR de-clickers smear
@@ -38,7 +38,7 @@ export interface DeclickOptions {
    * re-estimated per block.
    *
    * Short matters more than it looks. Voiced speech is driven by a glottal
-   * pulse every pitch period — impulsive excitation, five to fifteen
+   * pulse every pitch period – impulsive excitation, five to fifteen
    * milliseconds apart, which is exactly what an impulsive-outlier detector
    * fires on. Over a 50 ms block those pulses are a minority of the samples and
    * sit above the median, so the threshold lets them through as "clicks" and
@@ -63,18 +63,18 @@ export interface DeclickOptions {
    *  interpolated samples per burst, in material the model fits well. */
   dilateSamples: number;
   /** Discard a whole analysis block's detections when they cover more than
-   *  this fraction of it. Clicks are rare by definition — a block where the
+   *  this fraction of it. Clicks are rare by definition – a block where the
    *  residual is over threshold this often is a transient the model doesn't
    *  fit (a door slam, dense crackle), and interpolating chunks of it would
    *  rewrite real audio. */
   maxBlockDensity: number;
   /** Abort the whole stage if detection covers more than this fraction of the
-   *  file — that means the threshold is wrong for this material, and doing
+   *  file – that means the threshold is wrong for this material, and doing
    *  nothing is much safer than rewriting it. */
   maxRepairFraction: number;
   /**
    * Pulse-train veto. Voiced speech is excited by a glottal pulse every pitch
-   * period, and in the LPC residual those pulses *are* impulsive outliers —
+   * period, and in the LPC residual those pulses *are* impulsive outliers –
    * a robust per-block threshold sits between them and flags them, and on
    * real speech that comes to ~20 "clicks" a second, every one of them a
    * repair that replaces a real pulse with interpolated mush. Short blocks
@@ -260,7 +260,7 @@ function detect(
     }
 
     // Density guard: clicks are rare. A block peppered with over-threshold
-    // runs is a transient the model doesn't fit, not a cluster of clicks —
+    // runs is a transient the model doesn't fit, not a cluster of clicks –
     // drop all of it rather than interpolating chunks of real audio.
     const flagged = blockDetections.reduce((sum, d) => sum + (d.end - d.start), 0);
     if (flagged <= options.maxBlockDensity * (to - from)) {
@@ -273,8 +273,8 @@ function detect(
   // of "neighbour", because each alone has a blind spot:
   //
   //  - other candidates (runs where forward and backward residual agree),
-  //    which glottal pulses are — but only the cycles that crossed threshold;
-  //  - the raw residual envelope, which sees every cycle — but a click
+  //    which glottal pulses are – but only the cycles that crossed threshold;
+  //  - the raw residual envelope, which sees every cycle – but a click
   //    corrupts the AR model of its own block and inflates that block's
   //    residual everywhere, so bins from the candidate's own block are
   //    ignored, otherwise the click would hide behind its own pollution.
@@ -319,7 +319,7 @@ function detect(
  *
  * The order matters. Merging *with* a length cap would carve a long dense
  * event (a door slam, a burst of crackle-like noise) into many maximum-length
- * "clicks" and repair them all — rewriting something that was never a click.
+ * "clicks" and repair them all – rewriting something that was never a click.
  * Merging first lets the event show its real extent, and the length filter
  * then discards it whole.
  */
@@ -401,7 +401,7 @@ export function declick(
       let ok = model ? interpolateGap(samples, start, end, model) : false;
 
       // Refinement pass. The first repair used the model that did the
-      // detecting, which was fitted on a block *containing the click* — in
+      // detecting, which was fitted on a block *containing the click* – in
       // quiet audio the click dominates that block's autocorrelation utterly
       // (three samples at click amplitude carry orders of magnitude more
       // energy than 50 ms of noise floor), so the model describes the click,

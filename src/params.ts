@@ -1,7 +1,7 @@
 /**
  * The parameters the UI exposes, and the presets that set them.
  *
- * Every stage has more parameters than are worth putting in front of someone —
+ * Every stage has more parameters than are worth putting in front of someone –
  * FFT sizes, iteration counts, detector time constants that only make sense
  * next to the code that reads them. What is listed here is the subset that
  * changes how the result *sounds*, with the range each one is sane over. The
@@ -9,7 +9,7 @@
  * this file cannot drift away from the code it describes.
  *
  * Presets are plain parameter overrides on top of those defaults, which keeps
- * "what a preset is" honest — there is no hidden second path through the
+ * "what a preset is" honest – there is no hidden second path through the
  * pipeline, only a different set of numbers.
  */
 
@@ -55,7 +55,7 @@ export interface StageParamGroup {
   params: ParamSpec[];
 }
 
-/** Parameter overrides, keyed by stage name — the shape `buildChain` takes. */
+/** Parameter overrides, keyed by stage name – the shape `buildChain` takes. */
 export type ParamOverrides = Record<string, Record<string, unknown>>;
 
 export interface Preset {
@@ -204,7 +204,7 @@ export function stageParamDefaults(): ParamOverrides {
 /**
  * Presets.
  *
- * `Nino` is the chain as tuned — an empty override set, deliberately, so that
+ * `Nino` is the chain as tuned – an empty override set, deliberately, so that
  * "the default preset" and "the defaults" cannot come apart.
  *
  * `ACX` targets Audible's submission requirements: RMS between -23 and -18 dB,
@@ -217,7 +217,7 @@ export function stageParamDefaults(): ParamOverrides {
 export const PRESETS: Preset[] = [
   {
     name: "Nino",
-    description: "The chain as tuned — spoken word, warm, -18 LUFS.",
+    description: "The chain as tuned – spoken word, warm, -18 LUFS.",
     bypass: [],
     params: {},
   },

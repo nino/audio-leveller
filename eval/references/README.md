@@ -9,7 +9,7 @@ pnpm fetch-fixtures
 The audio itself is not in the repository. It is hundreds of megabytes and it is
 someone's actual voice, so what is tracked is the manifest: a URL and a SHA-256
 per file. A fixture whose bytes can change without anyone noticing is worthless
-as a regression baseline — "it sounded better before" is not something you can
+as a regression baseline – "it sounded better before" is not something you can
 check against a moving target. The fetcher refuses to install anything whose
 hash does not match, and refuses to overwrite a local file that has drifted.
 
@@ -34,10 +34,10 @@ numbers would mean nothing.
 A 19-minute excerpt from a solo audiobook narration, in four versions: the raw
 edit that the chain is given, Auphonic's master, a hand-built REAPER master, and
 this chain's own output from before the de-clicker's pulse-train veto. One
-voice, close-miked in an untreated room — the material this tool actually
+voice, close-miked in an untreated room – the material this tool actually
 exists to master, which is why it is the set worth pinning.
 
-Auphonic's is the one to beat — it was preferred over both the DAW master and
+Auphonic's is the one to beat – it was preferred over both the DAW master and
 ours in blind listening. The pre-veto output is kept as a floor rather than a
 target: it is the audible record of the de-clicker repairing roughly nineteen
 glottal pulses a second, and it cannot be regenerated now that the bug is
@@ -47,8 +47,8 @@ fixed.
 
 Nothing in the harness reads the references automatically. Comparing our output
 to a reference master needs a metric that says something meaningful about two
-different masters of the same source — spectral distance, loudness and dynamics
-statistics, or a perceptual measure — and choosing one is its own piece of work.
+different masters of the same source – spectral distance, loudness and dynamics
+statistics, or a perceptual measure – and choosing one is its own piece of work.
 For now the value is that the files are pinned, so a future comparison has a
 fixed thing to compare against, and the blind listening-test app can build
 sessions from them by hand.

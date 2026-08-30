@@ -671,7 +671,7 @@ table.results.small td {
  * nearly all of its grain, and the window's shadow draws in as it settles back.
  *
  * Here the front-most window is the browser's, so `body.inactive` is set from
- * the page's own focus and blur — see `windowActive.ts`. The pinstriped desktop
+ * the page's own focus and blur – see `windowActive.ts`. The pinstriped desktop
  * behind the window does not change: a desktop never cared which window was in
  * front. Content text keeps its colour; only the chrome and the controls go
  * quiet, and the error red stays red.
@@ -801,8 +801,8 @@ body.inactive .tag.on {
 }
 
 /*
- * The clip buttons keep their size and their reflection — they are the piece of
- * furniture you come back to — but the glass goes dull, and the one you are on
+ * The clip buttons keep their size and their reflection – they are the piece of
+ * furniture you come back to – but the glass goes dull, and the one you are on
  * is a pressed grey rather than a lit blue.
  */
 body.inactive .aqua-button.clip {

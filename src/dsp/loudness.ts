@@ -122,7 +122,7 @@ export function integratedLoudness(
  * The spread between a recording's quiet and loud passages, measured on 3-second
  * short-term blocks: the 10th to 95th percentile of the blocks that survive a
  * relative gate 20 LU below the 95th percentile. It answers the question
- * integrated loudness cannot — whether a programme sitting on target does so
+ * integrated loudness cannot – whether a programme sitting on target does so
  * evenly or by averaging a shout and a mumble.
  *
  * It is what a compressor is for, and therefore what tells a compressor whether

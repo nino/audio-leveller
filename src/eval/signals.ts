@@ -1,7 +1,7 @@
 /**
  * Deterministic synthetic material for the evaluation harness.
  *
- * These are not speech — they are speech-*shaped*: a glottal-ish harmonic
+ * These are not speech – they are speech-*shaped*: a glottal-ish harmonic
  * stack with formant resonances, a syllable-rate envelope and pauses between
  * talk spurts. That is enough structure for the things the pipeline actually
  * measures (loudness gating, silence detection, noise floor, impulses) while
@@ -56,7 +56,7 @@ function normaliseTo(samples: Float32Array, sampleRate: number, targetLufs: numb
  *
  * The spurt moves between these, which matters more than it looks. A single
  * fixed vowel leaves a ~13 dB valley between F1 and F2 in the long-term
- * average — deep enough that an injected resonance sitting in it reads as
+ * average – deep enough that an injected resonance sitting in it reads as
  * filling a hole rather than as a peak, and any spectral stage evaluated
  * against it learns the wrong lesson. Real speech averages over vowels whose
  * F1 spans 270-730 Hz and F2 840-2290 Hz, which is exactly why measured
@@ -91,7 +91,7 @@ function vowelCascade(vowel: number[], sampleRate: number) {
  * An additive harmonic stack was the obvious approach and the wrong one: any
  * finite number of harmonics puts a cliff in the spectrum (16 harmonics of a
  * 110 Hz voice ends at 1.8 kHz), and everything above it is silence dressed up
- * as signal — useless for judging anything spectral. A glottal pulse train
+ * as signal – useless for judging anything spectral. A glottal pulse train
  * through formant resonators produces energy all the way to Nyquist, from the
  * same mechanism real speech uses, at a fraction of the cost.
  */
@@ -105,7 +105,7 @@ function talkSpurt(seconds: number, sampleRate: number, f0: number, seed: number
 
   // Prosody. Without this the harmonics sit at exactly the same frequencies for
   // the whole file, and the long-term average spectrum resolves a deep comb
-  // instead of a spectral envelope — an artefact no real voice produces, and
+  // instead of a spectral envelope – an artefact no real voice produces, and
   // one that would send any spectral stage chasing the pitch rather than the
   // room. Real speech moves: pitch declines across an utterance, rises and
   // falls with intonation, and jitters cycle to cycle.
@@ -157,7 +157,7 @@ function talkSpurt(seconds: number, sampleRate: number, f0: number, seed: number
 
   // Vocal-tract colouring, moving between vowels. Each vowel filters the whole
   // source once, then the spurt is assembled from chunks of the results with
-  // short crossfades — cheaper than a time-varying filter and free of the
+  // short crossfades – cheaper than a time-varying filter and free of the
   // transients that switching coefficients mid-stream would introduce.
   const vowelTracks = VOWELS.map((vowel) => applyCascade(out, vowelCascade(vowel, sampleRate)));
   const chunk = Math.max(1, Math.round(0.18 * sampleRate));
@@ -195,7 +195,7 @@ function talkSpurt(seconds: number, sampleRate: number, f0: number, seed: number
 
   // Bring the spurt to a sane working level before anything measures it. The
   // cascade's absolute output depends on formant bandwidths and the radiation
-  // difference, and lands far below the -70 LUFS absolute gate — which would
+  // difference, and lands far below the -70 LUFS absolute gate – which would
   // make the loudness measurement return -Infinity and the caller's
   // normalisation silently do nothing.
   let energy = 0;
@@ -329,7 +329,7 @@ export interface ClickedSignal {
 }
 
 /**
- * Scatter impulsive clicks through a signal — the digital-dropout kind, a
+ * Scatter impulsive clicks through a signal – the digital-dropout kind, a
  * couple of samples wide with a sharp bipolar shape.
  */
 export function addClicks(signal: Signal, options: ClickOptions): ClickedSignal {
@@ -393,7 +393,7 @@ export const DEFAULT_RIR_OPTIONS: RirOptions = {
  * a frequency-dependent decay (high frequencies die first). This models the
  * decay envelope and the direct-to-reverberant ratio, which are what a
  * dereverberator has to work against, and is honest about being a model rather
- * than a measurement — a measured RIR would be better material once real
+ * than a measurement – a measured RIR would be better material once real
  * fixtures exist.
  */
 export function syntheticRir(

@@ -44,7 +44,7 @@ function resampleSignal(signal: Signal, toRate: number): Signal {
 /**
  * Decide what rate the chain runs at. Undefined means "whatever the source
  * is". Mixed requirements are rejected rather than silently resampled between
- * every stage — no stage needs that yet, and guessing would hide the cost.
+ * every stage – no stage needs that yet, and guessing would hide the cost.
  */
 function workingRate(specs: StageSpec[], sourceRate: number): number {
   const required = new Set<number>();
@@ -150,7 +150,7 @@ export function runPipeline(input: Signal, options: PipelineOptions): PipelineRe
     durationSec: sourceRate > 0 ? input.length / sourceRate : 0,
     resampled: rate !== sourceRate,
     input: sourceAnalysis.measure(),
-    // A fully bypassed chain hands back the same signal — don't measure twice.
+    // A fully bypassed chain hands back the same signal – don't measure twice.
     output: (outputSignal === source ? sourceAnalysis : new Analyzer(outputSignal)).measure(),
     stages: stageReports,
     extras: Object.keys(outputExtras),

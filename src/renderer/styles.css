@@ -1,5 +1,5 @@
 /*
- * Aqua, circa 10.2 — the same look as the listening app in `listen/`:
+ * Aqua, circa 10.2 – the same look as the listening app in `listen/`:
  * brushed metal, gel buttons, glass panels.
  *
  * The vocabulary is deliberately shared with `listen/src/aqua.css`, so the two
@@ -77,8 +77,8 @@ body {
 
 /*
  * The window's own title strip, drawn in place of the system's: the main
- * process asks for a hidden title bar, so everything in here — the name, the
- * traffic lights — belongs to the page. It is the drag region for the window.
+ * process asks for a hidden title bar, so everything in here – the name, the
+ * traffic lights – belongs to the page. It is the drag region for the window.
  */
 .titlebar {
   flex: none;
@@ -95,7 +95,7 @@ body {
 
 /*
  * The traffic lights, gel as they were in 10.2 rather than the flat circles the
- * system draws now — the same three buttons as `listen/src/aqua.css`, but these
+ * system draws now – the same three buttons as `listen/src/aqua.css`, but these
  * ones work: each drives the window from the main process. They are outside the
  * drag region, or a click would start a drag instead.
  */
@@ -657,7 +657,7 @@ table.segments th {
 /*
  * Aqua drew an inactive window flat. The gel went out of the buttons, the blue
  * went grey, the glow and the throb stopped, and the metal lost nearly all of
- * its grain. The window stays perfectly legible — it is still your document —
+ * its grain. The window stays perfectly legible – it is still your document –
  * but nothing in it asks for a click any more.
  *
  * `body.inactive` comes from the main process, which watches the window's focus
@@ -810,7 +810,7 @@ body.inactive ::-webkit-scrollbar-thumb {
 
 /* ---- inactive: the status panel ---- */
 
-/* The stripes stay — they say the work goes on while you are elsewhere. */
+/* The stripes stay – they say the work goes on while you are elsewhere. */
 body.inactive .bar {
   border-color: #a4a4a4;
 }

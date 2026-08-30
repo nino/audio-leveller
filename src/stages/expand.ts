@@ -1,5 +1,5 @@
 /**
- * Downward expansion as a pipeline stage — the quiet gets quieter.
+ * Downward expansion as a pipeline stage – the quiet gets quieter.
  *
  * The complement to the denoiser rather than a replacement for it. A denoiser
  * works on the spectrum and removes noise that is *there while the speech is*;
@@ -13,7 +13,7 @@
  * under the programme. Those are the defaults here, with one deliberate
  * departure: the attenuation is capped. An uncapped expander is a gate, and a
  * recording gated to digital silence between words sounds broken in a way the
- * noise never did — the room vanishes and reappears with every syllable, which
+ * noise never did – the room vanishes and reappears with every syllable, which
  * is exactly what the room-tone bed elsewhere in this project exists to avoid.
  *
  * It runs after the tone stages and before the compressor, in that order for a
@@ -23,7 +23,7 @@
  * Expanding first leaves those numbers intact: it only attenuates well below
  * the programme, far under the relative gate the loudness measurement applies,
  * so the compressor downstream sees the threshold it would have chosen on its
- * own. Compressing first does not — it pulls the programme down while leaving
+ * own. Compressing first does not – it pulls the programme down while leaving
  * the floor exactly where it was, narrowing the very distance this stage reads
  * before choosing a threshold, and can flip its skip decision outright.
  */
@@ -49,9 +49,9 @@ export interface ExpandParams {
    * than a gate.
    */
   rangeDb: number;
-  /** Time constant while the gain falls — the floor being pushed down, in ms. */
+  /** Time constant while the gain falls – the floor being pushed down, in ms. */
   closeMs: number;
-  /** Time constant while the gain recovers — a word starting, in ms. */
+  /** Time constant while the gain recovers – a word starting, in ms. */
   openMs: number;
   /**
    * Programme-to-floor distance, in dB, above which the stage declines.
@@ -94,7 +94,7 @@ export interface ExpandStageReport {
   skipped: boolean;
 }
 
-/** Mean loudness across the pause regions — the noise floor, measured. */
+/** Mean loudness across the pause regions – the noise floor, measured. */
 function pauseLoudness(signal: Signal, pauses: { start: number; end: number }[]): number {
   if (pauses.length === 0) return -Infinity;
   const filtered = preFilter(signal.channels, signal.sampleRate);

@@ -2,7 +2,7 @@
  * Linear prediction: fitting an all-pole model to a short window of audio,
  * and using it to reconstruct samples that were destroyed.
  *
- * Speech is well described over 20-50 ms by an autoregressive model — each
+ * Speech is well described over 20-50 ms by an autoregressive model – each
  * sample is roughly a fixed linear combination of the ones before it, because
  * that is what a resonant vocal tract does. Two things follow, and the
  * de-clicker uses both:
@@ -63,7 +63,7 @@ export function levinson(r: Float64Array, order: number): Float64Array {
 
     const reflection = -acc / error;
     // Reflection coefficients outside (-1, 1) mean the recursion has gone
-    // unstable — usually a degenerate window. Stop with what we have.
+    // unstable – usually a degenerate window. Stop with what we have.
     if (!Number.isFinite(reflection) || Math.abs(reflection) >= 1) break;
 
     for (let j = 1; j < i; j++) temp[j] = a[j] + reflection * a[i - j];

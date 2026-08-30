@@ -8,7 +8,7 @@
  * changes the spectrum you'd otherwise be fitting a curve to), the expander
  * before the compressor (both set their thresholds from the programme loudness
  * of whatever they are handed, and the expander only moves material far below
- * the gate that measurement applies, so it leaves that number alone — whereas
+ * the gate that measurement applies, so it leaves that number alone – whereas
  * compressing first pulls the programme down onto a floor the compressor never
  * touches, shifting both the expander's threshold and its decision about
  * whether to act at all), and levelling last so the loudness target is exact

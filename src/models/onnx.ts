@@ -1,8 +1,8 @@
 /**
  * The model backend: DeepFilterNet3 speech enhancement through ONNX Runtime.
  *
- * The DSP half — transform, ERB filterbank, feature normalisation, mask
- * application, deep filtering, resynthesis — lives in `deepfilternet.ts`,
+ * The DSP half – transform, ERB filterbank, feature normalisation, mask
+ * application, deep filtering, resynthesis – lives in `deepfilternet.ts`,
  * which has no ONNX dependency and is tested without weights. This file is the
  * part that needs the runtime: finding the weights, refusing to run
  * unverified ones, creating sessions, and feeding frames through the graphs.
@@ -14,8 +14,8 @@
  *
  * ## Why the registry describes a set of files
  *
- * DeepFilterNet3's ONNX export is not one model. It is three graphs — an
- * encoder and two decoders — and a `config.ini` stating the transform they
+ * DeepFilterNet3's ONNX export is not one model. It is three graphs – an
+ * encoder and two decoders – and a `config.ini` stating the transform they
  * were trained through. There is no single-file export upstream, so a registry
  * entry describes a directory of files, each pinned separately. Hashing a
  * tarball would have been less code and worth less: it would not have caught a
@@ -25,7 +25,7 @@
  *
  * `onnxruntime-node`'s public API is promise-based, but every stage in this
  * pipeline is a synchronous pure function, and making one stage async would
- * turn the whole chain, the worker and the CLI async for no gain — the work is
+ * turn the whole chain, the worker and the CLI async for no gain – the work is
  * CPU-bound and single-threaded either way. The native binding underneath is
  * itself synchronous ("a simple synchronized inference session object wrap",
  * in its own words) and the promises in the wrapper are cosmetic, so this
@@ -84,7 +84,7 @@ export interface ModelSpec {
  *
  * The hashes are of the files inside `models/DeepFilterNet3_onnx.tar.gz` in
  * the upstream repository, which is where the project's own author publishes
- * them — deliberately not one of the several community mirrors, which carry
+ * them – deliberately not one of the several community mirrors, which carry
  * the same bytes but not the same provenance.
  */
 export const MODELS: ModelSpec[] = [
@@ -104,8 +104,8 @@ export const MODELS: ModelSpec[] = [
         name: "df_dec.onnx",
         sha256: "23114ce3b0f6464b763ee62f7bb8aab6b2a129a21eabd5bcfe59413db05f278a",
       },
-      // Not read at runtime — the values it states are compiled into
-      // DFN3_CONFIG — but pinned so a mismatched export cannot be mistaken
+      // Not read at runtime – the values it states are compiled into
+      // DFN3_CONFIG – but pinned so a mismatched export cannot be mistaken
       // for the one those constants were derived from.
       config: {
         name: "config.ini",
@@ -165,7 +165,7 @@ export function verifyChecksum(file: ModelFile, path: string): ChecksumResult {
 }
 
 /**
- * Verify every file of a model. A model is all of its files or none of them —
+ * Verify every file of a model. A model is all of its files or none of them –
  * an encoder that matches paired with a decoder that does not is not a
  * partially usable model, it is an unknown one.
  */
@@ -347,7 +347,7 @@ export const onnxBackend: DenoiseBackend = {
    * remove. This model decides frame by frame: on a real recording measuring
    * 38.5 dB it leaves 54 % of frames untouched outright, and forcing it to run
    * costs 0.00 dB of programme loudness and returns 42.8 dB SI-SDR against the
-   * original — where the classical backend on the same material returns 28.4.
+   * original – where the classical backend on the same material returns 28.4.
    * At 45 dB a recording like that gets 6.5 dB of reduction rather than none,
    * and a genuinely pristine one still gets nothing.
    *

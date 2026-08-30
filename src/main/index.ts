@@ -37,7 +37,7 @@ function createWindow(): void {
   if (process.platform === "darwin") win.setWindowButtonVisibility(false);
 
   // Aqua flattens and mutes a window that is not in front. The renderer paints
-  // all of its own chrome, so it needs to be told which way round it is — and
+  // all of its own chrome, so it needs to be told which way round it is – and
   // told at once, because a window can open behind another one.
   const sendFocus = (active: boolean): void => {
     if (!win.webContents.isDestroyed()) win.webContents.send("window-active", active);

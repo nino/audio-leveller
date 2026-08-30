@@ -78,7 +78,7 @@ export interface SessionSpec {
   loudnessLufs?: number;
   /**
    * What "loudness" means for matching. `integrated` (BS.1770 gated) is the
-   * broadcast answer but lets a peakier clip's loud words stand out — clips
+   * broadcast answer but lets a peakier clip's loud words stand out – clips
    * with different dynamics can share an integrated value and still sound
    * unequal. `shortTermMax` matches the loudest 3 s window (so nothing is
    * ever louder than the others), `momentaryMax` the loudest 400 ms.

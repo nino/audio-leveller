@@ -6,13 +6,13 @@
  * it removes what is *stationary*, which covers hiss, hum, fan and traffic,
  * and it cannot invent detail because it only ever attenuates. A trained model
  * (DeepFilterNet and its relatives) knows what speech looks like and removes
- * non-stationary noise the classical method cannot touch — at the cost of
+ * non-stationary noise the classical method cannot touch – at the cost of
  * being able to hallucinate plausible speech detail that was never there.
  *
  * So the interface is deliberately narrow and both live behind it: the
  * classical backend is always present and always works, the model backend is
  * better when it is available, and the stage records which one ran. That
- * matters for a local tool — a user without the weights should still get a
+ * matters for a local tool – a user without the weights should still get a
  * working denoiser rather than a stage that silently does nothing.
  */
 

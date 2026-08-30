@@ -1,5 +1,5 @@
 /**
- * This app draws its own window — title bar, traffic lights and all — so it has
+ * This app draws its own window – title bar, traffic lights and all – so it has
  * to know when that window is no longer the front one and go quiet, the way an
  * Aqua window did. What is frontmost here is the browser's window, so the page
  * takes its cue from its own focus and blur.

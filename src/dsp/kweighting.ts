@@ -8,7 +8,7 @@
  *
  * The coefficients are derived analytically for an arbitrary sample rate
  * using the same formulation as libebur128, so measurements are correct at
- * 44.1 kHz, 48 kHz, 96 kHz, etc. — not just the 48 kHz values printed in
+ * 44.1 kHz, 48 kHz, 96 kHz, etc. – not just the 48 kHz values printed in
  * the standard.
  */
 

@@ -184,7 +184,7 @@ describe("denoise", () => {
     expect(Array.from(a.channels[0])).toEqual(Array.from(b.channels[0]));
   });
 
-  it("suppresses musical noise — the residual stays smooth across frequency", () => {
+  it("suppresses musical noise – the residual stays smooth across frequency", () => {
     // Musical noise is isolated surviving bins. Measured here as the spread of
     // per-bin levels in a pause after processing: a field of holes and spikes
     // has a much larger spread than the smooth hiss it replaced.
@@ -216,7 +216,7 @@ describe("denoise", () => {
       return Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length);
     };
 
-    // Some increase is inherent — attenuating selectively is the job — but the
+    // Some increase is inherent – attenuating selectively is the job – but the
     // residual must not become dramatically spikier than the input noise.
     expect(spread(framesOf(result.channels[0]))).toBeLessThan(
       spread(framesOf(noisy.channels[0])) * 2,
@@ -267,7 +267,7 @@ describe("backends", () => {
     // Built on a temporary directory rather than against whatever happens to
     // sit in ~/.audio-leveller. `verifyModel` reports the *first* file that
     // fails, so asserting that it names the third one only means anything if
-    // the ones before it genuinely verify — on a machine with no weights
+    // the ones before it genuinely verify – on a machine with no weights
     // installed this passed for the wrong reason, and in CI it failed.
     const spec = MODELS[0];
     expect(Object.keys(spec.files).length).toBeGreaterThan(1);
@@ -289,7 +289,7 @@ describe("backends", () => {
         };
       }
 
-      // The intact set verifies — which is what gives the next assertion force.
+      // The intact set verifies – which is what gives the next assertion force.
       expect(verifyModel({ ...spec, files }).ok).toBe(true);
 
       const broken = {

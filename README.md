@@ -1,19 +1,19 @@
 # Audio Leveller
 
 A local, [Auphonic](https://auphonic.com)-style audio processing pipeline for
-spoken word — everything runs on your machine, nothing is uploaded. Drag a
+spoken word – everything runs on your machine, nothing is uploaded. Drag a
 `.wav` file onto the window and it writes the processed result next to it.
 
 ![The Audio Leveller window: a drop zone for the .wav file, the preset switch, and the eight stages of the chain listed in order.](docs/screenshot.png)
 
 It writes two files next to the input:
 
-- **`<name>_processed.wav`** — the recording through the whole chain: clicks
+- **`<name>_processed.wav`** – the recording through the whole chain: clicks
   repaired, steady noise attenuated, late reverberation suppressed, room and
   microphone colouration corrected, resonances and sibilance tamed, and every
   speech segment normalised to **−18 LUFS** with smooth gain ramps across the
   silences in between.
-- **`<name>_roomtone.wav`** — a seamless **room-tone bed** built from the
+- **`<name>_roomtone.wav`** – a seamless **room-tone bed** built from the
   cleanest bits of the silences (see below).
 
 There is a long-form explainer in
@@ -25,19 +25,19 @@ not in signal processing. It is also built as an
 ## The chain
 
 Eight stages, in order. Each decides for itself whether it has anything to do
-and says so in the report — a stage that acts on material needing no treatment
+and says so in the report – a stage that acts on material needing no treatment
 is a cost with no benefit, so most of them can decline.
 
 | stage | what it does | when it declines |
 | ----- | ------------ | ---------------- |
-| `declick` | Finds impulsive damage on the linear-prediction residual and rebuilds it by AR interpolation. | Refuses entirely if detection covers more than 2% of the file — the threshold is wrong for that material. |
-| `denoise` | Attenuates background noise — DeepFilterNet3 when its weights are installed, Wiener suppression otherwise. | Scales itself back as the source gets cleaner, to nothing at a 35 dB noise floor; and throws away any backend's output that costs more than 3 dB of programme loudness. |
+| `declick` | Finds impulsive damage on the linear-prediction residual and rebuilds it by AR interpolation. | Refuses entirely if detection covers more than 2% of the file – the threshold is wrong for that material. |
+| `denoise` | Attenuates background noise – DeepFilterNet3 when its weights are installed, Wiener suppression otherwise. | Scales itself back as the source gets cleaner, to nothing at a 35 dB noise floor; and throws away any backend's output that costs more than 3 dB of programme loudness. |
 | `dereverb` | Suppresses late reverberation by weighted prediction error. | Passes dry material through untouched, judged by a blind decay measurement. |
 | `eq` | Corrects room and microphone colouration from the long-term average spectrum, then applies a fixed tonal voicing. | Places no corrective bands when the spectrum is already even; the voicing is a taste and always applies unless set to `neutral`. |
-| `dyneq` | Suppresses resonances and sibilance while they occur — this is also the de-esser. | Cannot decline (it is per-frame by nature), so its transparency is measured instead. |
+| `dyneq` | Suppresses resonances and sibilance while they occur – this is also the de-esser. | Cannot decline (it is per-frame by nature), so its transparency is measured instead. |
 | `expand` | Pushes the floor down between words, where nothing is masking it. | Passes through untouched when the floor already sits more than 50 dB below the programme. |
 | `compress` | Evens out level *within* a phrase, where segment levelling cannot reach. | Declines on material whose loudness range is already under 3 LU. |
-| `level` | Normalises each speech segment to a target loudness, with a true-peak limiter. | — |
+| `level` | Normalises each speech segment to a target loudness, with a true-peak limiter. | – |
 
 The order is load-bearing. De-click comes first because impulses are
 out-of-distribution for any denoiser and get smeared rather than removed. EQ
@@ -45,7 +45,7 @@ comes after the denoiser and dereverberator because both change the spectrum you
 would otherwise be fitting a curve to. The expander comes before the compressor
 because both set their thresholds from the programme loudness of whatever they
 are handed, and the expander only moves material far below the gate that
-measurement applies, so it leaves that number alone — whereas compressing first
+measurement applies, so it leaves that number alone – whereas compressing first
 pulls the programme down onto a floor the compressor never touches, shifting
 both the expander's threshold and its decision about whether to act at all.
 Levelling is last so the loudness target is measured on the audio
@@ -55,8 +55,8 @@ compressor actually produced.
 ## De-click
 
 Detection runs on the linear-prediction residual: over a few tens of
-milliseconds speech is well described by an all-pole (AR) model, and a click —
-which owes nothing to the samples around it — leaves a spike in the prediction
+milliseconds speech is well described by an all-pole (AR) model, and a click –
+which owes nothing to the samples around it – leaves a spike in the prediction
 error far larger than anything speech produces. Three details carry the
 quality (see `src/dsp/declick.ts`):
 
@@ -65,7 +65,7 @@ quality (see `src/dsp/declick.ts`):
   "repairs") ~32 samples of good audio per click. Requiring the *backward*
   residual to agree isolates exactly the damaged samples.
 - **Robust statistics.** The threshold is set from the median absolute
-  deviation of the residual, not its standard deviation — the clicks
+  deviation of the residual, not its standard deviation – the clicks
   themselves would inflate a standard deviation and hide behind it. Blocks
   where detections are *dense* are skipped entirely (clicks are rare by
   definition; a dense block is a transient the model doesn't fit), and the
@@ -73,7 +73,7 @@ quality (see `src/dsp/declick.ts`):
   it.
 - **Repair, then refit, then repair again.** Gaps are rebuilt by least-squares
   AR interpolation (Janssen), which reconstructs the resonance rather than
-  bridging the hole. The first repair uses the model that did the detecting —
+  bridging the hole. The first repair uses the model that did the detecting –
   fitted on a block *containing the click*, which in quiet audio describes the
   click more than the audio. So the model is refitted on the repaired
   neighbourhood and the gap interpolated once more.
@@ -88,11 +88,11 @@ surviving click +40.
 Two kinds of denoiser are worth having and they are not interchangeable, so
 both sit behind one interface and the report says which ran.
 
-- **`spectral`** — Wiener suppression with a decision-directed SNR estimate.
+- **`spectral`** – Wiener suppression with a decision-directed SNR estimate.
   No weights, no native dependency, always available, and it cannot invent
   detail because it only ever attenuates. This is the default and what every
   baseline number is measured against.
-- **`onnx`** — DeepFilterNet3 through ONNX Runtime. Better on real speech, and
+- **`onnx`** – DeepFilterNet3 through ONNX Runtime. Better on real speech, and
   only present if you ask for it.
 
 ```bash
@@ -100,9 +100,9 @@ pnpm fetch-model
 ```
 
 That downloads the ONNX export from
-[the upstream repository](https://github.com/Rikorose/DeepFilterNet) — the
+[the upstream repository](https://github.com/Rikorose/DeepFilterNet) – the
 project's own author, deliberately not one of the community mirrors that carry
-the same bytes without the same provenance — checks the archive against a
+the same bytes without the same provenance – checks the archive against a
 pinned SHA-256, and checks every file it extracts against its own. Weights are
 never bundled: they are large, they carry their own licences, and a local-first
 tool should let you decide what to download. `onnxruntime-node` is an *optional*
@@ -112,7 +112,7 @@ exactly what is missing and runs the classical backend.
 
 ### What the model is, and what had to be written around it
 
-The export is not a denoiser. It is three graphs — an encoder and two decoders —
+The export is not a denoiser. It is three graphs – an encoder and two decoders –
 that consume normalised spectral features and emit an ERB gain mask plus complex
 deep-filter taps. The 960-point transform (not a power of two, so
 `createFftPlan` exists), the ERB filterbank, the running feature normalisation,
@@ -125,8 +125,8 @@ the obvious guess:
 - **There is no recurrent state on the graph boundary.** The GRUs are inside the
   graph and unroll over whatever time axis they are handed, so this is not a
   frame-at-a-time runner threading hidden state. It feeds long spans. The graph
-  is also exactly causal — verified by growing the future context and watching
-  the output not move — so splitting a file only restarts hidden state, which a
+  is also exactly causal – verified by growing the future context and watching
+  the output not move – so splitting a file only restarts hidden state, which a
   discarded warm-up prefix covers.
 
 - **The lookahead is the caller's job.** The PyTorch model shifts its own input
@@ -141,7 +141,7 @@ the obvious guess:
   and a speech destroyer. The training graph keeps the masked spectrum only for
   bins the deep filter does not cover (`spec_e[..., nb_df:, :] = spec_m[..., nb_df:, :]`),
   so the network was never given a reason to emit sensible gains below that
-  boundary — and it does not: on clean speech the bands below bin 96 come back
+  boundary – and it does not: on clean speech the bands below bin 96 come back
   at about 0.25, a flat −12 dB, while the bands above sit near unity. libDF gets
   away with masking the whole spectrum because the deep filter then overwrites
   the low bins, but its `apply_stages` has a branch where the mask runs and the
@@ -163,7 +163,7 @@ alone, scored against the clean recording:
 
 | backend | noise removed | SI-SDR | programme loudness |
 | ------- | ------------- | ------ | ------------------ |
-| none (input) | — | 21.20 dB | — |
+| none (input) | – | 21.20 dB | – |
 | `spectral` | 10.7 dB | 21.03 dB (**−0.2**) | −0.20 dB |
 | `onnx` | 8.2 dB | 26.22 dB (**+5.0**) | −0.05 dB |
 
@@ -173,7 +173,7 @@ Forced onto already-clean real speech with the taper disabled, the model scores
 42.8 dB SI-SDR and costs 0.00 dB of programme loudness.
 
 And the bad one: **on this project's synthetic corpus the model destroys the
-programme.** Given `noisy-20db` it attenuates the voice by 10 dB — it reads a
+programme.** Given `noisy-20db` it attenuates the voice by 10 dB – it reads a
 harmonic stack with formants as noise, because that is what it is. This is not
 evidence the port is wrong; it is evidence that a corpus built to evaluate a
 spectral suppressor cannot evaluate a trained model. A suppressor asks only what
@@ -193,7 +193,7 @@ Two things follow, and both are in the code rather than in this paragraph:
 
 Known limitation: the model runs at **48 kHz only**. At any other rate the
 backend declines with a reason and the classical one takes over, rather than
-resampling into and out of 48 kHz inside the stage — two conversions to reach a
+resampling into and out of 48 kHz inside the stage – two conversions to reach a
 denoiser is not obviously better than the classical one that needs neither, and
 that is not a trade this corpus can settle.
 
@@ -202,7 +202,7 @@ that is not a trade this corpus can settle.
 Segment levelling fixes the difference between a passage recorded close and one
 recorded far away. It does nothing about the difference between the start and
 the end of a single sentence, and that is where most of the unevenness in speech
-actually lives — which is the gap between a recording that has been *levelled*
+actually lives – which is the gap between a recording that has been *levelled*
 and one that sounds *mastered*.
 
 The `compress` and `expand` stages close it, and their numbers were measured
@@ -212,10 +212,10 @@ aligned to the sample (correlation 0.991) and differenced:
 | what it does | measured | ours |
 | ------------ | -------- | ---- |
 | loudness target | −18.00 LUFS | configurable, −23 default |
-| ceiling | −1 dBFS **sample** peak, overshooting to −0.72 dBTP | −1 dBTP true peak — stricter |
+| ceiling | −1 dBFS **sample** peak, overshooting to −0.72 dBTP | −1 dBTP true peak – stricter |
 | compression | ~1.7:1 above ≈2 dB under programme loudness | same |
 | compressor timing | 33 ms fall, 168 ms rise | same |
-| gain moved *within* one utterance | 4.51 dB | — |
+| gain moved *within* one utterance | 4.51 dB | – |
 | gain moved *between* utterances | 3.27 dB | the leveller's job |
 | expansion | ~2.8:1 from ≈27 dB under programme | same, capped at 12 dB |
 | loudness range | 5.00 → 3.38 LU | 4.98 → 3.80 LU through the whole chain |
@@ -223,7 +223,7 @@ aligned to the sample (correlation 0.991) and differenced:
 Two deliberate departures. **The expander is capped** where the reference is
 not: at 43 dB below its programme that service attenuates by about 40 dB, which
 is a gate, and a recording gated to digital silence between words sounds broken
-in a way the noise never did — the room vanishes and reappears with every
+in a way the noise never did – the room vanishes and reappears with every
 syllable, which is what the room-tone bed elsewhere here exists to avoid. And
 **the compressor has no make-up gain**, because the level stage runs afterwards
 and normalises to an exact target; make-up gain would be a number the leveller
@@ -242,17 +242,17 @@ Recovering that service's tone curve took two passes, and the first was wrong in
 a way worth recording. Measured on the loudest frames, its 5–6.5 kHz region
 reads about −3 dB, which looks exactly like a de-harshing dip. Measured only on
 frames where *that band* sits 25 dB above its own noise floor, the same region
-reads −0.2 dB. The dip was its per-band noise suppression, not its EQ — even a
+reads −0.2 dB. The dip was its per-band noise suppression, not its EQ – even a
 loud vowel has little genuine 6 kHz content, so most frames have that band near
 the floor where the suppressor is working. Baking it in would have made every
 recording duller for no reason anyone could hear.
 
 What survives that correction is very gentle: about **+1 dB under 130 Hz** and
 about **−1 dB across 2.5–5 kHz**, and nothing else outside ±0.6 dB. Which is the
-finding — that service's "sound" is almost entirely its dynamics and its
+finding – that service's "sound" is almost entirely its dynamics and its
 per-band suppression, not its tone. The voicing is on by default because it is
 what this project is trying to sound like and because ±1 dB is small enough to
-leave the corrective fit doing the substantive work — not because it is where
+leave the corrective fit doing the substantive work – not because it is where
 the character comes from.
 
 The corpus keeps the two apart the same way the stage does: `clean-eq` and
@@ -269,7 +269,7 @@ possible. See `src/pipeline/`.
 Three things the runner does deliberately:
 
 - **Analysis follows the audio.** Each stage is handed an `Analyzer` over the
-  signal *as it arrives*, not over the original file — a stage that changes the
+  signal *as it arrives*, not over the original file – a stage that changes the
   spectrum invalidates any measurement taken before it. Analyzers memoise, so
   K-weighting a long file happens once per distinct signal rather than once per
   question. Stages that genuinely need the untouched original get it separately
@@ -279,7 +279,7 @@ Three things the runner does deliberately:
   canonical 48 kHz, a stage declares `requiredSampleRate` only if it needs one
   (the AI stages will; the leveller doesn't, since its K-weighting coefficients
   are derived analytically per rate). Conversion happens once in and once out,
-  and only when some enabled stage actually asks for it — so a 44.1 kHz file
+  and only when some enabled stage actually asks for it – so a 44.1 kHz file
   through a rate-agnostic chain is never resampled at all, and a fully bypassed
   chain is **byte-identical** to its input.
 
@@ -290,7 +290,7 @@ Three things the runner does deliberately:
 
 ## How the leveller works
 
-1. **Loudness measurement — ITU-R BS.1770 / EBU R128.** Audio is K-weighted
+1. **Loudness measurement – ITU-R BS.1770 / EBU R128.** Audio is K-weighted
    (a high-shelf "head" filter + a ~38 Hz RLB high-pass, coefficients derived
    analytically for the file's sample rate) and measured as gated integrated
    loudness: 400 ms blocks at 75 % overlap, an absolute −70 LUFS gate and a
@@ -314,7 +314,7 @@ Three things the runner does deliberately:
    silence regions. See `src/dsp/silence.ts`.
 
 3. **Segmentation & gain.** Segment boundaries are the file edges plus every
-   silence *midpoint* — so a segment runs from the middle of one silence to the
+   silence *midpoint* – so a segment runs from the middle of one silence to the
    middle of the next. Each segment's integrated loudness gives a target gain
    `−23 − measured` dB.
 
@@ -329,7 +329,7 @@ Three things the runner does deliberately:
    extracted. Room tone is the *quietest steady* part of a silence, so the
    cleanliness score is loudness-first (a breath is simply louder than the
    floor), with extra penalties for clicks (detected as a ~10 ms block whose
-   peak towers over the *median* block peak — robust to noise's natural
+   peak towers over the *median* block peak – robust to noise's natural
    peakiness) and swells (high short-window RMS variation); silences much
    louder than the cleanest are dropped entirely. The winning clips are
    concatenated with equal-power
@@ -358,7 +358,7 @@ Drag a `.wav` onto the window. Supported formats: 8/16/24/32-bit PCM and
 
 Under the drop target the window shows the chain itself: every stage with a
 checkbox that bypasses it, a disclosure triangle that opens its parameters, and
-— once a file has been through — a note saying what that stage actually decided.
+– once a file has been through – a note saying what that stage actually decided.
 **Re-render** runs the same file again with whatever is set now, which is the
 tuning loop the CLI does with `--bypass` and `--report`, done by ear.
 
@@ -366,10 +366,10 @@ Two presets sit above the chain:
 
 | preset | what it is |
 | ------ | ---------- |
-| `Nino` | the chain as tuned — spoken word, warm voicing, −18 LUFS. The defaults, with no overrides, so this preset cannot drift away from them. |
+| `Nino` | the chain as tuned – spoken word, warm voicing, −18 LUFS. The defaults, with no overrides, so this preset cannot drift away from them. |
 | `ACX`  | Audible/ACX submission: −20 LUFS (mid-window for their −23…−18 dB RMS rule), a −3.5 dBTP ceiling, neutral voicing, and both floor stages pushed harder to clear the −60 dB noise-floor requirement. |
 
-A preset is only a set of parameter overrides — there is no second path through
+A preset is only a set of parameter overrides – there is no second path through
 the pipeline. Changing anything marks the edited parameters in amber and leaves
 the preset selected as the base you started from; **Revert** puts it back.
 
@@ -380,7 +380,7 @@ pnpm build
 node dist/cli.js input.wav [output.wav] [options]
 ```
 
-Prints what the chain did — input/output loudness and peak, which stages ran
+Prints what the chain did – input/output loudness and peak, which stages ran
 and how long each took, then the leveller's own report (silence threshold, each
 segment's measured loudness and applied gain, room-tone summary).
 
@@ -402,7 +402,7 @@ on and off, compare the reports, and listen to the two outputs.
 ## Development
 
 CI runs the same three checks on every pull request, plus the REAPER script's
-own test — `.github/workflows/ci.yml`.
+own test – `.github/workflows/ci.yml`.
 
 ```bash
 pnpm test           # run the Vitest suite
@@ -444,14 +444,14 @@ Room-tone options are nested under `roomtone`:
 
 The metrics in the evaluation harness say whether the chain did what it was
 told; only ears say whether it *sounds* right. `listen/` is a small blind
-A/B app for that — a Vite + React front end with an Aqua-era face, and a tiny
+A/B app for that – a Vite + React front end with an Aqua-era face, and a tiny
 API served by the Vite dev server so there is nothing else to run.
 
 The workflow:
 
-1. **Make candidates.** Full-length renders of whatever you want to compare —
+1. **Make candidates.** Full-length renders of whatever you want to compare –
    the CLI with different `--target` or `--bypass`, an Auphonic export, a
-   DAW bounce, a stage dump — anywhere on disk. Nothing large is committed;
+   DAW bounce, a stage dump – anywhere on disk. Nothing large is committed;
    `listening/` is gitignored except for `listening/specs/`.
 2. **Write a spec** (`listening/specs/<name>.json`): named variants, one or
    more time windows, and trials of 2–5 variants each. See
@@ -487,7 +487,7 @@ breath-reduction stage can be trained on and scored against. Drop WAVs into
 `listening/annotate/` (gitignored) and open one: the whole file is drawn from
 a multi-resolution peak cache, so a 20-minute recording zooms and scrolls
 smoothly. Drag on the wave to select, then press a label's letter (`b`
-breath, `c` click, `p` plosive, `m` mouth-noise, `o` other — the first letter
+breath, `c` click, `p` plosive, `m` mouth-noise, `o` other – the first letter
 of each label in the configurable set) or `⏎` to make a region; drag a
 region's edges to resize it, its body to move it; `⌫` deletes, `⇥`/`⇧⇥` step
 through regions, `u` toggles sure/maybe, `space` plays (looping the
@@ -546,13 +546,13 @@ pnpm eval --baseline eval/baseline.json     # what moved since the baseline
 pnpm eval --wav /tmp/out                    # dump each case's input and output to listen to
 ```
 
-The corpus is synthetic and seeded — speech-*shaped* material (harmonic stack,
+The corpus is synthetic and seeded – speech-*shaped* material (harmonic stack,
 formant resonances, syllable-rate envelope, pauses) degraded in known ways, so
 a number that changes always means the code changed. Real recordings dropped
 into `eval/fixtures/` are picked up automatically as extra cases; see the README
 there.
 
-Cases needing something this machine lacks — the model weights — are reported as
+Cases needing something this machine lacks – the model weights – are reported as
 **skipped** rather than dropped, because a check nobody ran must not look like
 one that passed. The denoiser is pinned to a named backend in every case, so the
 numbers do not depend on what happens to be sitting in `~/.audio-leveller`.
@@ -560,7 +560,7 @@ numbers do not depend on what happens to be sitting in `~/.audio-leveller`.
 A limit worth stating plainly: **a synthetic corpus cannot evaluate a trained
 model.** Speech-shaped material is enough for a spectral suppressor, which asks
 only what is stationary, and not enough for a model that asks whether it is
-hearing a voice — DeepFilterNet3's answer about this corpus is no, and it
+hearing a voice – DeepFilterNet3's answer about this corpus is no, and it
 removes the programme. So the model's quality bounds live on the fixture cases,
 which need a real recording, and the synthetic cases assert only what must hold
 whatever the material: that the stage catches a backend doing this and throws
@@ -573,7 +573,7 @@ Each case states **bounds with reasons**, not snapshots of current behaviour, an
 | ------ | --------------- |
 | `segmentLufsError` | did every speech segment land on target |
 | `outputPeakDbfs` | did the limiter ceiling hold |
-| `segmentSnrGainDb` | **the transparency check** — did a stage move speech and noise apart |
+| `segmentSnrGainDb` | **the transparency check** – did a stage move speech and noise apart |
 | `snrGainDb` | the whole-file version: what levelling *costs* in noise |
 | `siSdrGainDb` | did the chain damage the signal relative to a clean reference |
 | `outputClickResidualDb` | how *audible* the worst surviving click is: residual peak vs the local peaks around it (±10 ms) |
@@ -588,7 +588,7 @@ lies to you:
 
 - **`segmentSnrGainDb` is local, `snrGainDb` is not.** Pulling segments toward a
   common level genuinely shrinks whole-file programme-to-floor distance, because
-  boosting a quiet passage boosts its noise with it — so that figure is a
+  boosting a quiet passage boosts its noise with it – so that figure is a
   diagnostic, not a bound. Measured *within* a segment, where a single gain
   applies, SNR is invariant, and that is the one worth asserting on. It is also
   the number a denoiser has to move.
@@ -597,7 +597,7 @@ lies to you:
 
 Findings worth carrying forward:
 
-- **Clicks were breaking segmentation, not just ears** — phase 1 measured ~8 LU
+- **Clicks were breaking segmentation, not just ears** – phase 1 measured ~8 LU
   of segment-levelling error on the `clicky` case, because a click landing in a
   pause lifted it over the silence threshold and merged two segments at
   different levels. With de-click ahead of the leveller (phase 2), that error
@@ -613,7 +613,7 @@ Findings worth carrying forward:
   The click-audibility metric was rewritten twice: whole-file-RMS normalisation
   punished good repairs in loud speech and forgave bad ones in silence, and
   local-RMS still sat crest-factor above a perfect repair. It now compares the
-  residual peak against the local peaks (±10 ms) — like for like. At a pause
+  residual peak against the local peaks (±10 ms) – like for like. At a pause
   site even a perfect repair scores ~0 dB on this measure, because the residual
   is the noise realisation that was under the click, which nothing can know.
 
@@ -625,11 +625,11 @@ replacement rather than a loudness tool are still to come.
 | Phase | Status | Deliverable |
 | ----- | ------ | ----------- |
 | **0** | ✅ done | Pipeline skeleton: stage contract, memoised analysis, lazy resampling, progress, JSON report. Leveller ported to a stage, no behaviour change. |
-| **1** | ✅ done | Evaluation harness — seeded synthetic corpus, bounds with stated reasons, baseline comparison. Real fixtures picked up from `eval/fixtures/`. |
+| **1** | ✅ done | Evaluation harness – seeded synthetic corpus, bounds with stated reasons, baseline comparison. Real fixtures picked up from `eval/fixtures/`. |
 | **2** | ✅ done | De-click: two-sided AR residual detection, MAD threshold, Janssen interpolation with a refit pass. `segmentLufsError` on `clicky` went 7.93 → 0.32 LU, SI-SDR −20.7 → +29.3 dB, worst repair −1.2 dB against local peaks. |
 | **3** | ✅ done | Corrective EQ fitted to the long-term average spectrum (gain-limited bells, cut-biased, boosts gated on noise), rumble high-pass, and a true-peak limiter replacing the sample-peak one. `spectralFlatteningDb` on `boxy` +4.35 dB, +1.22 dB on clean material. |
-| **4** | ✅ done | Noise reduction with a pluggable backend. The classical spectral suppressor is built, tested and default: +11.8 dB of segment SNR on a 20 dB-noise source, scaled back automatically on clean ones. DeepFilterNet3 now runs through ONNX Runtime when its weights are installed — +5.0 dB SI-SDR on real noisy speech where the classical backend manages −0.2 — with a programme-loss guard that discards any backend's output when it starts removing the voice instead of the noise. |
-| **5** | ✅ done | Dereverb by weighted prediction error (WPE). The model options in the original plan were unreachable, so the classical one got built — and it earns its place on merit: it cannot invent speech, only subtract a linear prediction. Modest, honestly: ~12% off the decay, +1.3 dB SI-SDR. Engages only on genuinely reverberant material. |
+| **4** | ✅ done | Noise reduction with a pluggable backend. The classical spectral suppressor is built, tested and default: +11.8 dB of segment SNR on a 20 dB-noise source, scaled back automatically on clean ones. DeepFilterNet3 now runs through ONNX Runtime when its weights are installed – +5.0 dB SI-SDR on real noisy speech where the classical backend manages −0.2 – with a programme-loss guard that discards any backend's output when it starts removing the voice instead of the noise. |
+| **5** | ✅ done | Dereverb by weighted prediction error (WPE). The model options in the original plan were unreachable, so the classical one got built – and it earns its place on merit: it cannot invent speech, only subtract a linear prediction. Modest, honestly: ~12% off the decay, +1.3 dB SI-SDR. Engages only on genuinely reverberant material. |
 | **6** | ✅ done | Dynamic EQ: per-bin suppression of whatever protrudes above the spectrum's own local envelope, with attack/release smoothing. Doubles as the de-esser via extra sensitivity in the sibilance band. +5.1 dB SI-SDR on a ringing resonance, ~5% of cells touched on clean speech. |
 | **7** | ✅ done | Chain inspector in the app: every stage says what it actually did, and can be toggled off and re-rendered for A/B. |
 | **8** | ✅ done | Compressor and downward expander, both fitted to a measured before/after pair from a commercial service rather than to taste, plus an optional voicing curve on the EQ. Loudness range 4.98 → 3.80 LU through the chain, against that service's 3.38. |
@@ -639,11 +639,11 @@ replacement rather than a loudness tool are still to come.
 - **The room-tone bed still admits breaths.** Clips are scored loudness-first
   with penalties for clicks and swells, and a breath defeats all three: only
   moderately louder than the floor, broadband rather than impulsive, and long
-  enough to read as a steady level. It needs a spectral-shape term — a breath
+  enough to read as a steady level. It needs a spectral-shape term – a breath
   is noise, but tilted differently from room tone. The synthetic corpus has no
   breaths in it, which is why this survived the harness.
   ([#2](https://github.com/nino/audio-leveller/issues/2))
-- **Dereverb is slow and modest** — roughly 0.6× real time, solving a dense
+- **Dereverb is slow and modest** – roughly 0.6× real time, solving a dense
   complex system per frequency bin per iteration, for about 12% off the decay.
   Single-channel dereverberation is a weak tool and the stage correctly
   declines on dry material.
@@ -654,13 +654,13 @@ actual voice is the point. They will default to conservative settings.
 
 ## REAPER script
 
-The REAPER script deliberately does not track the pipeline — no ONNX, no heavy
+The REAPER script deliberately does not track the pipeline – no ONNX, no heavy
 DSP in ReaScript. It stays a level-only tool.
 
 `reaper/audio_leveller.lua` is a native, non-destructive port for REAPER: it
 writes a **take volume envelope** that levels each segment to −23 LUFS instead
 of rendering a new file, and reads audio through REAPER's decoder so it works
 with any supported format. The leveling maths are a validated port of the DSP
-core — `lua reaper/test_dsp.lua` (or `pnpm test:reaper`) re-levels a synthetic
+core – `lua reaper/test_dsp.lua` (or `pnpm test:reaper`) re-levels a synthetic
 signal and checks it lands at −23 LUFS, matching the Node tool to ~0.1 dB. See
 `reaper/README.md` for install/usage and the REAPER-side checklist.

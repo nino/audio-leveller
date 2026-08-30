@@ -5,7 +5,7 @@
  * *worse*, not just better. A harness that only measures improvement will
  * happily report that a denoiser which eats consonants is working perfectly.
  *
- * The one to watch as the chain grows is `snrGainDb` — programme-to-floor
+ * The one to watch as the chain grows is `snrGainDb` – programme-to-floor
  * distance, in minus out. A pure gain change (what the leveller does) moves
  * the programme and the floor together and must leave it at 0. A denoiser has
  * to move it positive. Anything that moves it negative is amplifying noise.
@@ -76,7 +76,7 @@ export function siSdrDb(reference: Signal, estimate: Signal): number {
 }
 
 /**
- * The gain-aligned difference between two signals — what a stage actually
+ * The gain-aligned difference between two signals – what a stage actually
  * changed, with any overall level change divided out.
  */
 function residual(reference: Signal, estimate: Signal): Float32Array {
@@ -107,7 +107,7 @@ function residual(reference: Signal, estimate: Signal): Float32Array {
  *   - Normalising by local RMS still had a false floor: AR interpolation
  *     necessarily replaces the *unpredictable* part of the signal (fricative
  *     noise, floor noise) with a different realisation, so in a pause the
- *     residual is the floor noise itself — and a peak measured against an RMS
+ *     residual is the floor noise itself – and a peak measured against an RMS
  *     sits crest-factor above it even when the repair is perfect.
  *
  * Peak against peak is like for like: a residual spike that stays below the
@@ -164,7 +164,7 @@ export function impulsiveResidualDb(
 /**
  * Worst per-segment deviation from the target loudness, in LU. This is the
  * leveller's actual job, measured on the output over the segment boundaries
- * the generator knows about — not on the boundaries the leveller guessed.
+ * the generator knows about – not on the boundaries the leveller guessed.
  */
 export function segmentLufsError(
   signal: Signal,
@@ -205,7 +205,7 @@ function median(values: number[]): number {
  * the pause leading into it, median across segments.
  *
  * This is the transparency metric, and it needs to be local. The whole-file
- * `snrGainDb` moves under the leveller for a legitimate reason — boosting a
+ * `snrGainDb` moves under the leveller for a legitimate reason – boosting a
  * quiet passage boosts its noise floor too, so the distance between programme
  * and floor genuinely shrinks when segments are pulled together. That is worth
  * reporting but it is not a defect.
@@ -213,7 +213,7 @@ function median(values: number[]): number {
  * Within one segment the leveller applies a single gain, and the gain ramp has
  * essentially reached that segment's value by the end of the pause before it.
  * So speech-minus-noise measured this way is invariant to levelling, and any
- * movement is a stage genuinely changing the noise relative to the speech —
+ * movement is a stage genuinely changing the noise relative to the speech –
  * which is exactly what a denoiser must do, and what nothing else may do.
  */
 export function segmentSnrDb(signal: Signal, segments: SpeechSegment[]): number {
@@ -255,7 +255,7 @@ export function segmentSnrDb(signal: Signal, segments: SpeechSegment[]): number 
 
 /**
  * Worst deviation of the speech spectrum from its own broadly-smoothed shape,
- * in dB — how coloured the material is. The corrective EQ exists to bring this
+ * in dB – how coloured the material is. The corrective EQ exists to bring this
  * down; nothing else in the chain should move it much.
  */
 export function spectralDeviationDb(
@@ -294,7 +294,7 @@ export function changeDb(before: Signal, after: Signal): number {
 
 export interface References {
   /**
-   * The undegraded signal, scored against the raw input — the "before" number.
+   * The undegraded signal, scored against the raw input – the "before" number.
    */
   forInput: Signal;
   /**
@@ -321,7 +321,7 @@ export interface MetricInputs {
 }
 
 /**
- * Everything measurable about one case. Keys are stable — the runner compares
+ * Everything measurable about one case. Keys are stable – the runner compares
  * them against a stored baseline, so renaming one is a breaking change.
  */
 export function computeMetrics(inputs: MetricInputs): Metrics {
@@ -378,7 +378,7 @@ export function computeMetrics(inputs: MetricInputs): Metrics {
     // added some.
     metrics.spectralFlatteningDb = inDeviation - outDeviation;
 
-    // The local version, which levelling leaves alone — see `segmentSnrDb`.
+    // The local version, which levelling leaves alone – see `segmentSnrDb`.
     const inSegSnr = segmentSnrDb(input, segments);
     const outSegSnr = segmentSnrDb(output, segments);
     metrics.inputSegmentSnrDb = inSegSnr;

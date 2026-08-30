@@ -3,7 +3,7 @@
  *
  *   pnpm fetch-model [id]        (default: every model in the registry)
  *
- * Weights are not bundled — they are large and carry their own licences — so
+ * Weights are not bundled – they are large and carry their own licences – so
  * this exists to make fetching them one reproducible step rather than a page
  * of instructions. It refuses to install anything whose hash does not match
  * what `src/models/onnx.ts` pins: first the archive as a whole, then every

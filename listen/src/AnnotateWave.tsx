@@ -1,5 +1,5 @@
 /**
- * Zoomable, scrollable waveform with draggable regions — the canvas half of
+ * Zoomable, scrollable waveform with draggable regions – the canvas half of
  * the annotation editor. The view lives in a real horizontally-scrolling box
  * (so the trackpad and the scrollbar just work) with the canvas stuck to its
  * left edge; wheel over the wave zooms around the pointer.
@@ -180,7 +180,7 @@ export const AnnotateWave = forwardRef<WaveHandle, Props>(function AnnotateWave(
     const onWheel = (e: WheelEvent): void => {
       // Always take the event. Letting a horizontal-dominant wheel through
       // meant the browser scrolled the *page* instead, because this box has
-      // nothing to scroll vertically and the gesture chained to an ancestor —
+      // nothing to scroll vertically and the gesture chained to an ancestor –
       // and a trackpad "zoom" flick regularly has a frame or two where deltaX
       // wins. Horizontal scrolling is then applied by hand.
       e.preventDefault();
@@ -301,7 +301,7 @@ export const AnnotateWave = forwardRef<WaveHandle, Props>(function AnnotateWave(
       // screenshot of a misbehaving view into a diagnosis: which branch of
       // peaksFor ran (pyramid above 256 samples/px, raw samples below), and
       // the largest value it handed the renderer. If the wave looks wrong but
-      // pk matches the material, the data was right and the drawing was not —
+      // pk matches the material, the data was right and the drawing was not –
       // and vice versa.
       let drawnPeak = 0;
       for (let x = 0; x < w; x++) {
@@ -334,7 +334,7 @@ export const AnnotateWave = forwardRef<WaveHandle, Props>(function AnnotateWave(
 
       // Zoomed in past a slice of a pitch period per column, the min/max range
       // within a column collapses towards nothing and the bars become a
-      // hairline on the centre line — which on quiet material (a breath, which
+      // hairline on the centre line – which on quiet material (a breath, which
       // is the whole point of this editor) is indistinguishable from silence.
       // The samples are there; what was missing is that neighbouring columns
       // were never joined, so the trace showed each column's vanishing range

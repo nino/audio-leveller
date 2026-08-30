@@ -153,7 +153,7 @@ describe("dereverb (WPE)", () => {
     expect(siSdrDb(dry, cleaned)).toBeGreaterThan(15);
   });
 
-  it("leaves the direct sound alone — a zero delay would cancel the voice", () => {
+  it("leaves the direct sound alone – a zero delay would cancel the voice", () => {
     // With delay 0 the filter is allowed to predict the current frame from the
     // immediately preceding one, which is mostly the speech itself. This test
     // pins down *why* the delay exists.

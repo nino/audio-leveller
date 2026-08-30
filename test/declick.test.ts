@@ -119,7 +119,7 @@ describe("declick detection", () => {
   it("ignores events too long to be clicks", () => {
     const { signal } = speech();
     const damaged = Float32Array.from(signal.channels[0]);
-    // A 20 ms burst — a door slam, not a click.
+    // A 20 ms burst – a door slam, not a click.
     const start = sr;
     const next = rng(17);
     for (let i = start; i < start + sr * 0.02; i++) damaged[i] += (next() * 2 - 1) * 0.5;
@@ -136,7 +136,7 @@ describe("declick pulse-train veto", () => {
   /**
    * A bare pulse train through a resonator: the most impulsive "voice"
    * possible, every pulse a textbook outlier in the LPC residual. Without the
-   * veto the detector repairs all of them; with it, none — and a click that
+   * veto the detector repairs all of them; with it, none – and a click that
    * towers over the pulses is still caught.
    */
   function pulseTrain(seconds: number, f0: number): Float32Array {
@@ -147,7 +147,7 @@ describe("declick pulse-train veto", () => {
     const noise = rng(7);
     for (let i = 0; i < n; i++) {
       // A little aspiration noise, so the residual has a scale to threshold
-      // against — an exactly-zero floor is treated as "nothing to measure".
+      // against – an exactly-zero floor is treated as "nothing to measure".
       out[i] = (noise() - 0.5) * 0.03;
       if (i >= next) {
         out[i] += 1;
@@ -174,7 +174,7 @@ describe("declick pulse-train veto", () => {
     const vetoed = declick([train], sr);
     expect(bare.bursts.length).toBeGreaterThan(50);
     expect(vetoed.bursts.length).toBe(0);
-    // `vetoed` counts raw candidates, `bursts` are post-merge — so at least.
+    // `vetoed` counts raw candidates, `bursts` are post-merge – so at least.
     expect(vetoed.vetoed).toBeGreaterThanOrEqual(bare.bursts.length);
   });
 

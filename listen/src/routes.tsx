@@ -63,7 +63,7 @@ function SessionsPage() {
       {sessions.error && <p className="error">{String(sessions.error)}</p>}
       {sessions.data && sessions.data.length === 0 && <p className="hint">No sessions yet.</p>}
       <p className="hint">
-        Also: <Link to="/annotate">annotate audio</Link> — mark breaths, clicks and plosives on real recordings.
+        Also: <Link to="/annotate">annotate audio</Link> – mark breaths, clicks and plosives on real recordings.
       </p>
       <ul className="session-list">
         {sessions.data?.map((s) => {

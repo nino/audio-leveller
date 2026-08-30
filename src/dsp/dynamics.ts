@@ -3,8 +3,8 @@
  * smoothed over time.
  *
  * A compressor and a downward expander are the same machine pointed in
- * opposite directions — measure the level, look up a gain on a static curve,
- * smooth that gain, apply it — so both live here and differ only in the curve
+ * opposite directions – measure the level, look up a gain on a static curve,
+ * smooth that gain, apply it – so both live here and differ only in the curve
  * and the two time constants. Keeping the machine shared means the envelope
  * detector, the smoother and the multi-channel behaviour are written and
  * tested once.
@@ -42,7 +42,7 @@ export interface DynamicsTiming {
   upMs: number;
   /**
    * Envelope detector window, in ms. Short enough to follow syllables, long
-   * enough not to track individual pitch periods — at 100 Hz a window under
+   * enough not to track individual pitch periods – at 100 Hz a window under
    * 10 ms would ripple at the fundamental and modulate the gain with it.
    */
   detectorMs: number;
@@ -102,7 +102,7 @@ function detectorLevels(
  * Apply a static gain curve with attack/release smoothing.
  *
  * The detector is delay-free with respect to the output, so a transient
- * arrives before the gain has finished moving — that is what an attack time
+ * arrives before the gain has finished moving – that is what an attack time
  * means, and pre-delaying the signal to hide it would turn the compressor into
  * a limiter. The true-peak limiter in the level stage is the thing that
  * catches what gets through, and it runs last for exactly this reason.
@@ -167,7 +167,7 @@ export interface CompressorCurveOptions {
    * Width of the soft knee, in dB, centred on the threshold.
    *
    * A hard knee makes the gain a kinked function of level, and speech spends
-   * most of its time near the threshold — so the kink is audible as the gain
+   * most of its time near the threshold – so the kink is audible as the gain
    * flicking on and off across it. The reference processor's own curve bends
    * over roughly 10 dB rather than turning a corner.
    */
@@ -209,7 +209,7 @@ export interface ExpanderCurveOptions {
 }
 
 /**
- * Downward expansion below a threshold — the quiet gets quieter.
+ * Downward expansion below a threshold – the quiet gets quieter.
  *
  * `rangeDb` is what keeps this from being a gate. An expander with unlimited
  * range drives the gaps between words to digital silence, and a recording

@@ -1,7 +1,7 @@
 /**
  * Gapless A/B/C player. Every clip of a trial is decoded up front; one shared
  * playhead runs across them, so switching clips mid-word keeps the position
- * exactly — the only way to hear small differences.
+ * exactly – the only way to hear small differences.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";

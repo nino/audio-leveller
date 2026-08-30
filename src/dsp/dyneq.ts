@@ -1,7 +1,7 @@
 /**
  * Dynamic EQ: suppress resonances only while they are resonating.
  *
- * The static EQ in `eq.ts` corrects colouration that is present throughout —
+ * The static EQ in `eq.ts` corrects colouration that is present throughout –
  * a room mode, a microphone's character. What it cannot fix is the kind that
  * comes and goes: a vowel that rings on one note, a sibilant that spikes at
  * 7 kHz, a plosive that booms. Those need a filter that reacts.
@@ -9,8 +9,8 @@
  * The rule here is the one behind the "spectral smoothing" plugins: for each
  * frame, compare the spectrum against a *smoothed version of itself*, and pull
  * down whatever protrudes. Anything narrow and loud relative to its own
- * neighbourhood is a resonance almost by definition, while the broad shape —
- * which is the voice — passes through untouched. It needs no threshold in dB,
+ * neighbourhood is a resonance almost by definition, while the broad shape –
+ * which is the voice – passes through untouched. It needs no threshold in dB,
  * which is what makes it work across voices and levels without tuning.
  *
  * Three things keep it from sounding processed:
@@ -40,7 +40,7 @@ export interface DynEqOptions {
    *
    * Without it the reference is too narrow at the bottom to be a reference at
    * all. Half an octave at 400 Hz spans 336-476 Hz, which for a 110 Hz voice
-   * holds barely one harmonic — so every harmonic reads as a peak above its own
+   * holds barely one harmonic – so every harmonic reads as a peak above its own
    * neighbourhood, and the stage attenuates the voice's harmonic structure
    * rather than any resonance. Measured before this existed: 92% of all
    * time-frequency cells were being attenuated on perfectly clean speech.
@@ -52,7 +52,7 @@ export interface DynEqOptions {
    * Higher than it looks like it should be, because the reference it is
    * compared against is biased low. The envelope is the dB-mean of a
    * neighbourhood of magnitudes, and the dB-mean of a fluctuating spectrum sits
-   * well below its typical value — so with a "reasonable" 6 dB threshold, 92%
+   * well below its typical value – so with a "reasonable" 6 dB threshold, 92%
    * of all time-frequency cells in clean speech read as protruding. Sweeping
    * against both a clean recording and one with a sustained resonance: at 12 dB
    * the stage touches 5% of cells and still delivers the same +4.9 dB SI-SDR on
@@ -123,7 +123,7 @@ function smoothingWindows(
     let loHz = freq > 0 ? freq / half : 0;
     let hiHz = freq > 0 ? freq * half : binHz * 2;
     // Widen to the Hz floor where the octave window is too narrow to hold
-    // several harmonics — see `minSmoothingHz`.
+    // several harmonics – see `minSmoothingHz`.
     if (hiHz - loHz < minWidthHz) {
       loHz = freq - minWidthHz / 2;
       hiHz = freq + minWidthHz / 2;
@@ -166,7 +166,7 @@ function thresholdCurve(
  * Suppress dynamic resonances across every channel.
  *
  * Channels are processed independently, which is right for damage but does mean
- * a resonance present in both will be attenuated in both — the desired outcome,
+ * a resonance present in both will be attenuated in both – the desired outcome,
  * since it is the same resonance.
  */
 export function dynamicEq(
@@ -208,8 +208,8 @@ export function dynamicEq(
       magnitudes(frame, mags);
 
       // Each bin's level in dB, computed once. The envelope below reads every
-      // bin roughly 84 times — once per neighbouring bin whose smoothing
-      // window covers it — and computing the logarithm inside that loop meant
+      // bin roughly 84 times – once per neighbouring bin whose smoothing
+      // window covers it – and computing the logarithm inside that loop meant
       // 443 million `Math.log10` calls for a minute of audio, which was 93% of
       // this stage's entire runtime. Hoisting it changes nothing about the
       // result: the same expression, evaluated once instead of 84 times.
@@ -225,7 +225,7 @@ export function dynamicEq(
 
       for (let k = 0; k < bins; k++) {
         // The reference: this bin's own neighbourhood, averaged in dB. A dB
-        // average is deliberate — averaging in power would let the peak lift
+        // average is deliberate – averaging in power would let the peak lift
         // its own reference and hide from the comparison.
         const from = lo[k];
         const to = hi[k];
@@ -241,7 +241,7 @@ export function dynamicEq(
         const coefficient = targetDb[k] < state[k] ? attack : release;
         state[k] = targetDb[k] + (state[k] - targetDb[k]) * coefficient;
         // Most bins are untouched and hold exactly zero, where the gain is
-        // exactly one — worth a branch to skip a few million `Math.pow` calls.
+        // exactly one – worth a branch to skip a few million `Math.pow` calls.
         gains[k] = state[k] === 0 ? 1 : Math.pow(10, state[k] / 20);
 
         totalCells++;
