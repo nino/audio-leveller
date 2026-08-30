@@ -7,6 +7,9 @@
  *   - onProgress: subscribe to per-stage progress while a file is running
  *   - windowCommand / onWindowActive: the title bar's traffic lights, which are
  *     drawn by the renderer and so have to ask for what they do
+ *
+ * It also marks the document off macOS, where the system draws a title bar of
+ * its own and the renderer's must not be drawn as well.
  */
 
 import { contextBridge, ipcRenderer, webUtils } from "electron";
@@ -55,3 +58,25 @@ const api = {
 export type LevellerApi = typeof api;
 
 contextBridge.exposeInMainWorld("leveller", api);
+
+/*
+ * The renderer paints a 10.2 title bar, which is only correct where the main
+ * process hid the real one – that is, on macOS. Everywhere else the system
+ * draws its own, and the painted strip would sit below it as a second,
+ * non-functional-looking copy, with its buttons on the side Windows does not
+ * put them. So mark the document and let the stylesheet drop it.
+ *
+ * This belongs in the preload rather than the renderer because the preload
+ * runs before the page does: the class is in place before the first paint, so
+ * the strip is never briefly visible. The renderer's own module is deferred
+ * and would sometimes hide it a frame too late.
+ */
+function markWindowFrame(): void {
+  document.documentElement.classList.toggle("native-frame", process.platform !== "darwin");
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", markWindowFrame, { once: true });
+} else {
+  markWindowFrame();
+}

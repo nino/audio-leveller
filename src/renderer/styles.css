@@ -76,9 +76,14 @@ body {
 }
 
 /*
- * The window's own title strip, drawn in place of the system's: the main
- * process asks for a hidden title bar, so everything in here – the name, the
- * traffic lights – belongs to the page. It is the drag region for the window.
+ * The window's own title strip, drawn in place of the system's: on macOS the
+ * main process asks for a hidden title bar, so everything in here – the name,
+ * the traffic lights – belongs to the page. It is the drag region for the
+ * window.
+ *
+ * Only on macOS, though. Elsewhere the system draws a real title bar and this
+ * one is dropped (see `.native-frame` at the end of the file), so nothing here
+ * is reachable off darwin.
  */
 .titlebar {
   flex: none;
@@ -844,4 +849,18 @@ body.inactive .status .done {
 body.inactive .param.changed > .name,
 body.inactive .preset-note .edited {
   color: #7b6a4a;
+}
+
+/*
+ * Off macOS the system draws the title bar itself, and the main process leaves
+ * it alone. The painted one would then be a second strip below the real one,
+ * with gel lights on the left where Windows puts its buttons on the right – so
+ * drop it and let the content have the height. The preload sets this class
+ * before the first paint, so the strip does not flash on the way out.
+ *
+ * Everything else stays: the metal, the panels and the unfocused dimming are
+ * the look of the app, not an impersonation of the host's chrome.
+ */
+.native-frame .titlebar {
+  display: none;
 }

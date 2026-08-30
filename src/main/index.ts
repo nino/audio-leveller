@@ -25,7 +25,9 @@ function createWindow(): void {
     // The renderer draws the title bar, the traffic lights included: the modern
     // buttons are flat circles, and this window is a 10.2 one, where they were
     // gel. So hide the real ones and let the renderer's own lights drive the
-    // window over IPC. Off macOS there are no such buttons to hide.
+    // window over IPC. Off macOS there are no such buttons to hide, the system
+    // draws a real title bar instead, and the renderer drops its painted one so
+    // the window does not end up wearing two.
     titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
