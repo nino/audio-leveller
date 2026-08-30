@@ -4,6 +4,8 @@ A local, [Auphonic](https://auphonic.com)-style audio processing pipeline for
 spoken word — everything runs on your machine, nothing is uploaded. Drag a
 `.wav` file onto the window and it writes the processed result next to it.
 
+![The Audio Leveller window: a drop zone for the .wav file, the preset switch, and the eight stages of the chain listed in order.](docs/screenshot.png)
+
 It writes two files next to the input:
 
 - **`<name>_processed.wav`** — the recording through the whole chain: clicks
