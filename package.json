@@ -43,7 +43,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
-    "vitest": "^2.1.8"
+    "vitest": "^3.2.6"
   },
   "build": {
     "appId": "com.ninoan.audioleveller",
