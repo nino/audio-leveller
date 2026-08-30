@@ -443,6 +443,15 @@ architecture at install time, so the machine that builds decides which ONNX
 runtime ends up in the bundle, and cross-building Intel would mean fetching
 that dependency for a platform the runner is not.
 
+The workflow imports the certificate into a keychain of its own rather than
+letting electron-builder do it. electron-builder passes the `.p12` password to
+`security set-key-partition-list`, which wants the keychain's password —
+harmless on older systems, fatal on macOS 26, and unchanged in electron-builder
+26. With `CSC_LINK` unset it skips that path and searches `CSC_KEYCHAIN`
+instead. The same bug is why signing locally works best with no `CSC_LINK` at
+all: the certificate is already in your login keychain, and electron-builder
+will find it there.
+
 Five repository secrets, under Settings → Secrets and variables → Actions:
 
 | secret | what it is |
