@@ -59,7 +59,7 @@ describe("buildRoomTone", () => {
   });
 
   it("avoids a subtle click when choosing the cleanest window", () => {
-    // A low-level click (~4× the floor) — the kind that a plain crest-factor
+    // A low-level click (~4× the floor) – the kind that a plain crest-factor
     // check over a 1 s window misses because it barely moves the RMS.
     const sig = silence(4, sr, 0.005);
     const clickAt = Math.round(1.0 * sr);

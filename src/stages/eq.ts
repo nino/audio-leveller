@@ -6,7 +6,7 @@
  * and before the leveller, so the loudness target is measured on the audio
  * that actually gets written.
  *
- * The stage measures the LTAS over *speech* only and the pauses separately —
+ * The stage measures the LTAS over *speech* only and the pauses separately –
  * the second one gates boosts, so the EQ never buys timbre with noise. See
  * `ltas.ts` and `eq.ts` for the reasoning behind the target curve and the
  * constraint set.
@@ -44,7 +44,7 @@ export interface EqParams extends EqFitOptions {
    * is a taste, not a measurement, and it is applied last so it survives
    * whatever the fitter decided.
    *
-   * `warm` is measured rather than invented — see {@link VOICINGS}.
+   * `warm` is measured rather than invented – see {@link VOICINGS}.
    */
   voicing: VoicingName;
 }
@@ -60,13 +60,13 @@ export type VoicingName = "neutral" | "warm";
  * loudest frames its 5-6.5 kHz region reads about -3 dB, which looks like a
  * de-harshing dip. Measured only on frames where *that band* sits 25 dB above
  * its own noise floor, the same region reads -0.2 dB. The dip was its
- * per-band noise suppression, not its EQ — even a loud vowel has little
+ * per-band noise suppression, not its EQ – even a loud vowel has little
  * genuine 6 kHz content, so most frames have that band near the floor where
  * the suppressor is working. Baking it in would have made every recording
  * duller for no reason anyone could hear.
  *
  * What survives that correction is very gentle indeed: about +1 dB under
- * 130 Hz and about -1 dB across 2.5-5 kHz. Which is the finding — that
+ * 130 Hz and about -1 dB across 2.5-5 kHz. Which is the finding – that
  * service's "sound" is almost entirely its dynamics, not its tone. This curve
  * is offered because it is what was asked for and it is real, not because it
  * is where the character comes from.
@@ -165,7 +165,7 @@ export const eqStage: Stage<EqParams, EqStageReport> = {
     };
 
     // Too little speech to characterise. Fitting to a couple of frames would
-    // be fitting to an accident, so decline — and decline the voicing too,
+    // be fitting to an accident, so decline – and decline the voicing too,
     // since a file with no speech in it is not one to impose a voice on.
     if (!speechLtas) return { signal, report: empty };
 

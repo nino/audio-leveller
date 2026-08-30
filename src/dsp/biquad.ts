@@ -3,7 +3,7 @@
  *
  * The K-weighting filters in `kweighting.ts` predate this file and keep their
  * own analytically-derived coefficients; this is the general toolkit the EQ
- * stages draw on. Application reuses `applyBiquad` from there — same
+ * stages draw on. Application reuses `applyBiquad` from there – same
  * `BiquadCoefficients` shape, normalised so a0 = 1.
  */
 

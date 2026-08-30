@@ -2,7 +2,7 @@
  * The leveller as a pipeline stage.
  *
  * This wraps the existing `levelAudio` DSP unchanged: same segmentation, same
- * envelope, same limiter, same room-tone bed — the bed is now returned as a
+ * envelope, same limiter, same room-tone bed – the bed is now returned as a
  * named extra output instead of a second return value.
  *
  * The stage declares no `requiredSampleRate`: the K-weighting coefficients are

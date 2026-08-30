@@ -235,7 +235,7 @@ function TrialView({ session, trialIndex, listener, initial, onSaved, go, toResu
       <section className="panel metal-inset">
         <h2>
           Clip {clip.label}
-          <span className="hint"> — rate what you hear in this clip</span>
+          <span className="hint"> – rate what you hear in this clip</span>
         </h2>
         {session.clipQuestions.map((q) => (
           <div className="question" key={q.id}>
@@ -288,7 +288,7 @@ function TrialView({ session, trialIndex, listener, initial, onSaved, go, toResu
 
       <section className="panel metal-inset">
         <h2>
-          The whole set <span className="hint">— {answeredClips}/{trial.clips.length} clips rated</span>
+          The whole set <span className="hint">– {answeredClips}/{trial.clips.length} clips rated</span>
         </h2>
         {session.trialQuestions.map((q) => (
           <div className="question" key={q.id}>

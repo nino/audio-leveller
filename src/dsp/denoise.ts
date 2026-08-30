@@ -44,7 +44,7 @@ import type { SampleRange } from "./ltas";
 export interface DenoiseOptions {
   /**
    * How far the noise floor may be pushed down, in dB. Also the per-bin gain
-   * floor — see the note above on why those are the same number.
+   * floor – see the note above on why those are the same number.
    */
   reductionDb: number;
   frameSize: number;
@@ -101,7 +101,7 @@ function frameInRanges(
  * Frames the minimum-statistics fallback will look at.
  *
  * It wants the quietest fifth of frames per bin, which means holding a value
- * per bin per frame — 513 x 241,219 x 8 bytes, very nearly a gigabyte, on a
+ * per bin per frame – 513 x 241,219 x 8 bytes, very nearly a gigabyte, on a
  * twenty-minute recording. A noise floor is a stationary property, so it is
  * estimated just as well from a few thousand frames spread across the file as
  * from every one of them, and the count that was used is reported either way.
@@ -117,7 +117,7 @@ function subsampleStride(total: number): number {
 /**
  * Estimate the noise spectrum.
  *
- * From detected pauses when there are any — that is a direct measurement of
+ * From detected pauses when there are any – that is a direct measurement of
  * the thing we want to remove. Otherwise fall back to minimum statistics: per
  * bin, the mean of the quietest fifth of frames. That is more fragile (in
  * continuous speech the quietest frames still contain speech) which is why it
@@ -221,7 +221,7 @@ export interface DenoiseResult {
   profile: NoiseProfile;
   /** Mean gain applied to noise-dominated bins, in dB (negative). */
   meanNoiseGainDb: number;
-  /** Mean gain applied to speech-dominated bins, in dB — should be near 0. */
+  /** Mean gain applied to speech-dominated bins, in dB – should be near 0. */
   meanSpeechGainDb: number;
 }
 

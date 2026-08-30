@@ -21,11 +21,11 @@ export interface PeakCache {
   /**
    * Our own snapshot of the channel data, taken at build time. Draw paths
    * must read this, never `buffer.getChannelData()`: a decoded AudioBuffer's
-   * storage is reclaimable — under memory pressure Chrome can purge it
+   * storage is reclaimable – under memory pressure Chrome can purge it
    * page-by-page (playback stays correct; the audio thread holds its own
    * copy), and getChannelData then returns partly zeroed data. Seen in
    * practice as the wave "getting quieter" below 256 samples/px over a long
-   * annotating session, while the pyramid — ordinary JS memory — stayed
+   * annotating session, while the pyramid – ordinary JS memory – stayed
    * right. 16-bit is deliberate: it halves the snapshot so the fix does not
    * feed the very memory pressure that triggers the bug, and 1/32768 is far
    * below anything a waveform plot can show.
@@ -46,7 +46,7 @@ export function buildPeaks(buffer: AudioBuffer): PeakCache {
     for (let i = 0; i < n; i++) {
       // Round, don't truncate, and scale by 32768 so that decoding with
       // 1/32768 can never leave [-1, 1]: full-scale negative is exact, and
-      // full-scale positive reads 32767/32768 — 0.003% low, invisible in a
+      // full-scale positive reads 32767/32768 – 0.003% low, invisible in a
       // plot, and a bounded contract beats an exact +1.
       const q = Math.round(data[i] * 32768);
       snap[i] = q >= 32767 ? 32767 : q <= -32768 ? -32768 : q;
@@ -82,7 +82,7 @@ export function buildPeaks(buffer: AudioBuffer): PeakCache {
 /**
  * Min/max per pixel column for `width` columns starting at sample
  * `startSample`, `spp` samples per pixel. Columns past the end of the file
- * are left at (0, 0), and every value returned lies in [-1, 1] — the pyramid
+ * are left at (0, 0), and every value returned lies in [-1, 1] – the pyramid
  * keeps true float extremes internally, but over-unity material (a float
  * file can exceed full scale) is clamped on the way out so both branches
  * agree and no consumer has to re-clamp. Adversarial review caught all three

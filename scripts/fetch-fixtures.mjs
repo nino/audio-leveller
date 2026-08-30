@@ -3,8 +3,8 @@
  *
  *   pnpm fetch-fixtures [set-id]     (default: every set in the manifest)
  *
- * The audio is not in the repository — it is hundreds of megabytes and it is
- * someone's actual voice — so what lives here instead is a manifest of URLs
+ * The audio is not in the repository – it is hundreds of megabytes and it is
+ * someone's actual voice – so what lives here instead is a manifest of URLs
  * and SHA-256 checksums. That is the whole point of the exercise: a fixture
  * whose bytes can drift silently is worthless as a regression baseline, and
  * "it sounded better on my machine" is not a result anyone can check. If a
@@ -74,7 +74,7 @@ async function fetchFile(set, file) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
 
-  // Stream to a scratch name, verify, then rename — so an interrupted or
+  // Stream to a scratch name, verify, then rename – so an interrupted or
   // corrupt download never appears at the real path where the harness would
   // pick it up as a fixture.
   const scratch = `${target}.partial`;

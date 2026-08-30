@@ -422,7 +422,7 @@ function Editor({ file, initial, onSaved }: EditorProps) {
           {selected ? (
             <>
               <h2>
-                Region <span className="hint">— {fmtTime(selected.start)} – {fmtTime(selected.end)} ({((selected.end - selected.start) * 1000).toFixed(0)} ms)</span>
+                Region <span className="hint">– {fmtTime(selected.start)} – {fmtTime(selected.end)} ({((selected.end - selected.start) * 1000).toFixed(0)} ms)</span>
               </h2>
               <div className="question">
                 <div className="q-label">Confidence</div>

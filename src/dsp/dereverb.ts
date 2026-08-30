@@ -2,8 +2,8 @@
  * Dereverberation by weighted prediction error (WPE).
  *
  * Reverberation is the room convolving the voice with its own impulse
- * response. The *late* part of that response — everything past the first few
- * tens of milliseconds — is what makes a recording sound distant, and it has a
+ * response. The *late* part of that response – everything past the first few
+ * tens of milliseconds – is what makes a recording sound distant, and it has a
  * property worth exploiting: it is a linear function of the signal's own past.
  * So for each frequency bin, predict the current frame from frames a short
  * delay back, and subtract what the prediction accounts for. What is left is
@@ -20,7 +20,7 @@
  * ever subtracts a linear prediction, so its failure mode is leaving
  * reverberation behind, not fabricating detail that was never spoken. For a
  * podcast where the speaker's actual voice is the product, that is the right
- * trade — and it needs no weights, so it runs everywhere.
+ * trade – and it needs no weights, so it runs everywhere.
  *
  * The prediction delay is what protects the direct sound: without it the filter
  * would happily predict (and therefore cancel) the speech itself.
@@ -33,7 +33,7 @@ export interface DereverbOptions {
   taps: number;
   /**
    * Frames to skip before the prediction starts. This is what keeps the direct
-   * sound and early reflections intact — they carry the intelligibility, and a
+   * sound and early reflections intact – they carry the intelligibility, and a
    * filter allowed to predict them would cancel the voice along with the room.
    */
   delay: number;
@@ -47,7 +47,7 @@ export interface DereverbOptions {
 
 /**
  * Defaults chosen by sweeping frame size, delay and tap count against both a
- * reverberant recording and a dry one — because the failure that matters is
+ * reverberant recording and a dry one – because the failure that matters is
  * damage to material that never needed treating.
  *
  * The frame size is four times the pipeline's usual 1024, and that is the
@@ -55,7 +55,7 @@ export interface DereverbOptions {
  * prediction delay, and speech violates that badly at short delays: at 1024/256
  * a delay of two frames reaches back 10 ms, about one pitch period for a male
  * voice, so the filter predicts the voice's own harmonic structure and
- * subtracts it. Measured: dry speech came back at 1 dB SI-SDR — destroyed. At
+ * subtracts it. Measured: dry speech came back at 1 dB SI-SDR – destroyed. At
  * 4096/1024 with a delay of three frames the filter reaches back 64 ms, past
  * the pitch period and past the vocal tract's ringing, and only the room's tail
  * is left to predict. The same dry recording comes back at 20 dB.
@@ -187,7 +187,7 @@ function dereverbBin(
   // Floor the weighting power well above zero. The 1/power weighting is the
   // whole idea, but near-silent frames would otherwise carry effectively
   // infinite weight and drag the fit to a filter that subtracts far more than
-  // the room put in — and because each iteration re-estimates power from its
+  // the room put in – and because each iteration re-estimates power from its
   // own output, that runs away rather than settling.
   const floor = meanPower * 1e-3;
   const matrix = new Float64Array(2 * taps * taps);
@@ -209,7 +209,7 @@ function dereverbBin(
 
       // The tap history, read once. The double loop below is 20x20, and
       // reading `re(t - delay - j)` inside it meant 840 accessor calls per
-      // frame — each one an array-of-arrays indirection through a closure — to
+      // frame – each one an array-of-arrays indirection through a closure – to
       // fetch the same twenty complex numbers over and over.
       for (let i = 0; i < taps; i++) {
         const ti = t - delay - i;
@@ -223,7 +223,7 @@ function dereverbBin(
         const ire = historyRe[i];
         const iim = historyIm[i];
 
-        // R is Hermitian — R[j][i] is the conjugate of R[i][j] — so only the
+        // R is Hermitian – R[j][i] is the conjugate of R[i][j] – so only the
         // upper triangle is computed and the rest mirrored. That is exact
         // rather than approximate: IEEE multiplication commutes and negation
         // is lossless, so the mirrored entry is the same bits the full loop

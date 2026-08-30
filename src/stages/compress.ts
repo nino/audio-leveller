@@ -14,7 +14,7 @@
  * 2 dB under the programme loudness, at a slope corresponding to roughly
  * 1.7:1, and its gain trajectory fits a first-order smoother with a 33 ms fall
  * and a 168 ms rise. Within one continuous utterance its gain moves a median
- * of 4.5 dB, against 3.3 dB between utterances — so more than half of what it
+ * of 4.5 dB, against 3.3 dB between utterances – so more than half of what it
  * does is inside a phrase, where a segment leveller cannot reach.
  *
  * Placed after the tone-shaping stages, so it compresses the corrected
@@ -31,7 +31,7 @@ export interface CompressParams {
    * Threshold, in dB relative to the programme's integrated loudness.
    *
    * Relative rather than absolute so it means the same thing on a quiet
-   * recording as on a hot one — an absolute dBFS threshold would compress a
+   * recording as on a hot one – an absolute dBFS threshold would compress a
    * loud file hard and miss a quiet one entirely. The measured reference sits
    * about 2 dB below its own programme loudness, which puts the knee in the
    * middle of ordinary speech rather than only on its peaks.
@@ -72,7 +72,7 @@ export interface CompressStageReport {
   /** Detector threshold actually used, in dBFS. */
   thresholdDbfs: number;
   ratio: number;
-  /** Loudness range before and after, in LU — what the stage is for. */
+  /** Loudness range before and after, in LU – what the stage is for. */
   loudnessRangeBeforeLu: number;
   loudnessRangeAfterLu: number;
   /** Largest attenuation applied, in dB. */

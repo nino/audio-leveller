@@ -9,7 +9,7 @@
  *
  * The filter is precomputed once into a table indexed by distance from the
  * output position (in sinc zero-crossings) and linearly interpolated between
- * table entries. That keeps memory fixed regardless of the rate ratio — a
+ * table entries. That keeps memory fixed regardless of the rate ratio – a
  * polyphase bank would need `toRate / gcd` phases, which explodes for
  * pathological pairs like 44101 → 48000.
  */

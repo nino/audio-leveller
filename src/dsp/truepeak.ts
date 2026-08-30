@@ -4,7 +4,7 @@
  * A sample peak is not the peak. Between two samples the reconstructed
  * waveform an actual DAC produces can overshoot both of them, and a signal
  * measuring -1 dBFS sample-peak can reach +0.5 dBTP on the way out of a
- * converter — or clip inside a lossy encoder, which reconstructs the same
+ * converter – or clip inside a lossy encoder, which reconstructs the same
  * inter-sample content. The standard's answer is to oversample by at least 4x
  * through a band-limited interpolator and take the peak of that.
  *
@@ -79,7 +79,7 @@ export function truePeakDbfs(channels: Float32Array[]): number {
  * Per-sample envelope of the 4x-oversampled peak: for each input sample, the
  * largest interpolated magnitude in its neighbourhood, across all channels.
  *
- * This is what a true-peak limiter needs — the sample-domain gain curve has to
+ * This is what a true-peak limiter needs – the sample-domain gain curve has to
  * respond to overshoots that live *between* the samples it can actually touch.
  */
 export function truePeakEnvelope(channels: Float32Array[]): Float32Array {

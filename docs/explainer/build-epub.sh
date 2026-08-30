@@ -5,7 +5,7 @@
 #   docs/explainer/build-epub.sh
 #
 # Requires pandoc (built and checked against 3.1.3). The output is committed
-# alongside the source, so anyone can read it without a toolchain — which only
+# alongside the source, so anyone can read it without a toolchain – which only
 # works if a rebuild that changes nothing produces a byte-identical file.
 # Two things make that true: the identifier is pinned in metadata.yaml rather
 # than minted per run, and SOURCE_DATE_EPOCH pins the timestamps pandoc stamps
@@ -17,7 +17,7 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 command -v pandoc >/dev/null || {
-  echo "pandoc not found — see https://pandoc.org/installing.html" >&2
+  echo "pandoc not found – see https://pandoc.org/installing.html" >&2
   exit 1
 }
 

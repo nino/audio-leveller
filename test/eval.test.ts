@@ -51,7 +51,7 @@ function scaled(signal: Signal, gain: number): Signal {
 
 describe("synthetic signals", () => {
   it("is deterministic across runs", () => {
-    // Deliberately bypasses the cache — two independent builds must agree.
+    // Deliberately bypasses the cache – two independent builds must agree.
     const build = () =>
       syntheticSpeech({
         sampleRate: sr,
@@ -149,10 +149,10 @@ describe("metrics", () => {
     expect(siSdrDb(signal, cloneSignal(signal))).toBe(Infinity);
   });
 
-  it("is scale-invariant — the whole point of using SI-SDR here", () => {
+  it("is scale-invariant – the whole point of using SI-SDR here", () => {
     // The leveller changes overall gain by design; the metric must not
     // interpret that as damage. Gains that aren't powers of two leave float32
-    // rounding behind, so this lands around 150 dB rather than at infinity —
+    // rounding behind, so this lands around 150 dB rather than at infinity –
     // still far below anything audible (float32 tops out near 144 dB).
     const { signal } = speech();
     for (const gain of [0.1, 0.5, 2, 8]) {
@@ -263,7 +263,7 @@ describe("case corpus", () => {
     );
     // Metrics the runner lifts out of stage reports rather than measuring from
     // the audio. A stage's own account of what it did belongs in the corpus
-    // alongside the measurements — the denoiser reporting that it cost 10 dB of
+    // alongside the measurements – the denoiser reporting that it cost 10 dB of
     // programme is the same finding as the audio being 10 dB quieter, caught a
     // layer earlier.
     for (const key of [

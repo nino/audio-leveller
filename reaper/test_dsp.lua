@@ -4,7 +4,7 @@
   Run:  lua reaper/test_dsp.lua
 
   Builds a synthetic signal (loud tone | silence | quiet tone), runs the
-  analyser, applies the resulting gain envelope, and re-measures each segment —
+  analyser, applies the resulting gain envelope, and re-measures each segment –
   each should land near the -23 LUFS target. Also sanity-checks the gain signs.
 ]]
 
@@ -102,7 +102,7 @@ for _, s in ipairs(split.segments) do if s.isSpeech and s.gainDb > 1e-6 then any
 check("no boosts needed (envelope only cuts)", not anyBoost)
 
 -- Classification: a segment ~30 dB below the program is room, not speech, and
--- must not be boosted up — it inherits a neighbour's (cut) gain instead.
+-- must not be boosted up – it inherits a neighbour's (cut) gain instead.
 print("")
 local sigC = concat(
   sine(300, 3, 0.5), noise(1.5, 0.0002),

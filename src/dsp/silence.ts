@@ -41,7 +41,7 @@ export interface SilenceRegion {
   start: number;
   /** One past the last sample of the silence (exclusive). */
   end: number;
-  /** Midpoint sample — the segment boundary. */
+  /** Midpoint sample – the segment boundary. */
   mid: number;
 }
 

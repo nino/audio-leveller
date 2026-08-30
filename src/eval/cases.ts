@@ -3,7 +3,7 @@
  *
  * Each case pairs a synthetic input with expectations that make the run pass
  * or fail. Expectations are bounds with a stated reason, not snapshots of
- * whatever the code currently does — a bound you can't justify in a sentence
+ * whatever the code currently does – a bound you can't justify in a sentence
  * is a bound that will be quietly relaxed the first time it fails.
  *
  * Cases carrying a `reference` (the undegraded signal) get SI-SDR scored
@@ -64,7 +64,7 @@ export interface EvalCase {
   expectations: Expectation[];
   /**
    * Why this case cannot run here, or null when it can. A case that needs
-   * model weights reports them missing and is skipped rather than failing —
+   * model weights reports them missing and is skipped rather than failing –
    * but it says so in the output, because a silently absent check is worse
    * than a missing one.
    */
@@ -116,12 +116,12 @@ function programme(
  * expired when the expander joined the chain: an expander deliberately
  * attenuates the quiet parts, and the quiet parts inside a segment are the gaps
  * between words, so it moves this number by design. Widening it is a
- * consequence of the chain changing, not of the bound being inconvenient — and
+ * consequence of the chain changing, not of the bound being inconvenient – and
  * the two jobs the old bound was doing have been separated rather than dropped.
  *
  * Note this is the *segment-local* SNR, not the whole-file `snrGainDb`. The
- * whole-file figure legitimately drops when segments are pulled together —
- * boosting a quiet passage boosts its noise with it — so bounding that one
+ * whole-file figure legitimately drops when segments are pulled together –
+ * boosting a quiet passage boosts its noise with it – so bounding that one
  * would be asserting something false about what levelling does.
  */
 const SNR_EXPANDED: Expectation = {
@@ -132,12 +132,12 @@ const SNR_EXPANDED: Expectation = {
     "on clean material the expander is the only stage that moves this, so the " +
     "bound is a statement about the expander: it must engage on a floor this " +
     "close to the programme, and it must stay inside its own range cap. The " +
-    "upper bound is that cap plus the little the leveller contributes — past " +
+    "upper bound is that cap plus the little the leveller contributes – past " +
     "14 dB means rangeDb has stopped holding, which is the difference between " +
     "an expander and a gate. The other job this bound used to do, checking " +
     "that the denoiser backs off on clean sources, now lives on `clean-denoise` " +
     "and `clean-denoise-onnx`, where it is asserted as bit-identity through the " +
-    "denoise stage alone — a stronger check than an SNR window ever was",
+    "denoise stage alone – a stronger check than an SNR window ever was",
 };
 
 /**
@@ -145,8 +145,8 @@ const SNR_EXPANDED: Expectation = {
  *
  * On the full chain this number is now the denoiser and the expander together,
  * which is why the windows sit higher than the denoiser alone would justify.
- * The two are separable in the report — `floorReductionDb` is the expander's
- * alone — and the denoiser is bounded unconfounded on the fixture cases.
+ * The two are separable in the report – `floorReductionDb` is the expander's
+ * alone – and the denoiser is bounded unconfounded on the fixture cases.
  */
 function snrImproved(minDb: number, maxDb: number, note: string): Expectation {
   return {
@@ -171,7 +171,7 @@ const UNDER_CEILING: Expectation = {
 /**
  * The ceiling that actually matters. Between two samples the waveform a
  * converter reconstructs can overshoot both of them, so a sample-peak ceiling
- * of -1 dBFS routinely passes material that hits -0.3 dBTP on the way out —
+ * of -1 dBFS routinely passes material that hits -0.3 dBTP on the way out –
  * and lossy encoders, which reconstruct the same inter-sample content, clip on
  * it. The limiter detects on the 4x-oversampled envelope so this holds too.
  */
@@ -192,7 +192,7 @@ const ON_TARGET: Expectation = {
 /**
  * Cases that exercise the model backend rather than the classical one.
  *
- * They are skipped, loudly, when the weights are absent — which is the normal
+ * They are skipped, loudly, when the weights are absent – which is the normal
  * state of a fresh checkout and of CI, since nothing here bundles a 9 MB
  * model. `pnpm fetch-model` makes them run.
  *
@@ -202,7 +202,7 @@ const ON_TARGET: Expectation = {
  * and a syllable-rate envelope. That is enough to evaluate a spectral
  * suppressor, which knows nothing about speech and only asks what is
  * stationary. It is not enough to evaluate a trained model, which asks whether
- * what it is hearing is a voice — and DeepFilterNet3's answer on this material
+ * what it is hearing is a voice – and DeepFilterNet3's answer on this material
  * is no. Given `noisy-20db` it removes the programme rather than the noise,
  * pulling gated loudness down by 10 dB. On real speech at the same SNR the
  * same code moves loudness by 0.07 dB and gains 4.97 dB of SI-SDR.
@@ -220,7 +220,7 @@ function denoiseModelCases(): EvalCase[] {
   return [
     {
       name: "ood-denoise-onnx",
-      description: "Material the model misreads — the stage must reject its output",
+      description: "Material the model misreads – the stage must reject its output",
       chain: chainWith(onnx, { only: ["denoise"] }),
       unavailableReason,
       build: () => {
@@ -239,7 +239,7 @@ function denoiseModelCases(): EvalCase[] {
           because:
             "this is the guard case, and it is asserted on synthetic speech " +
             "precisely because the model does not recognise it. Handed material " +
-            "it misreads, DeepFilterNet3 attenuates the voice by 10 dB — bounded " +
+            "it misreads, DeepFilterNet3 attenuates the voice by 10 dB – bounded " +
             "only by the requested reduction, which is the difference between a " +
             "quiet render and an empty one. The stage measures the programme " +
             "loudness it cost and discards a backend's output when it exceeds " +
@@ -252,7 +252,7 @@ function denoiseModelCases(): EvalCase[] {
 
     {
       name: "clean-denoise-onnx",
-      description: "Clean speech through DeepFilterNet3 alone — the transparency check",
+      description: "Clean speech through DeepFilterNet3 alone – the transparency check",
       chain: chainWith(onnx, { only: ["denoise"] }),
       unavailableReason,
       build: () => {
@@ -266,7 +266,7 @@ function denoiseModelCases(): EvalCase[] {
           because:
             "the same bound as `clean-denoise`, reached by a different route. " +
             "This backend declares a 45 dB clean-source threshold rather than " +
-            "the stage's 35, so unlike the classical one it *does* run here — " +
+            "the stage's 35, so unlike the classical one it *does* run here – " +
             "and then costs 6.2 dB of programme loudness, because it does not " +
             "recognise synthetic speech as speech, so the guard discards it. " +
             "Bit-identical output is therefore the check that the two " +
@@ -304,7 +304,7 @@ export const CASES: EvalCase[] = [
   {
     name: "bypass-null",
     description: "The same programme with every stage bypassed",
-    // Every stage, by name from the chain itself — a new stage added to
+    // Every stage, by name from the chain itself – a new stage added to
     // DEFAULT_CHAIN is covered by this null test automatically.
     chain: buildChain({ bypass: [...DEFAULT_CHAIN] }),
     build: () => {
@@ -324,7 +324,7 @@ export const CASES: EvalCase[] = [
 
   {
     name: "level-drift",
-    description: "Segments 25 LU apart — the case the leveller exists for",
+    description: "Segments 25 LU apart – the case the leveller exists for",
     chain: chainWith(SPECTRAL),
     build: () => {
       const { signal, segments } = programme([-40, -15, -33]);
@@ -361,9 +361,9 @@ export const CASES: EvalCase[] = [
       snrImproved(
         8,
         16,
-        "The denoiser's own contribution is small — the floor sits ~31 dB down, " +
+        "The denoiser's own contribution is small – the floor sits ~31 dB down, " +
           "so its clean-source taper gives it only a few dB, which is intended " +
-          "rather than a shortfall — and the expander supplies the rest.",
+          "rather than a shortfall – and the expander supplies the rest.",
       ),
     ],
   },
@@ -396,8 +396,8 @@ export const CASES: EvalCase[] = [
         because:
           "kept as a collapse detector, not as a measure of the denoiser. It is " +
           "confounded here: the reference goes through the same chain, but the " +
-          "chain is input-dependent — the clean reference is quiet enough that " +
-          "the denoiser backs off, while the noisy input gets the full 12 dB — so " +
+          "chain is input-dependent – the clean reference is quiet enough that " +
+          "the denoiser backs off, while the noisy input gets the full 12 dB – so " +
           "the two take different paths and the score reflects that as much as " +
           "any damage. `segmentSnrGainDb` is the honest number for this stage",
       },
@@ -406,7 +406,7 @@ export const CASES: EvalCase[] = [
 
   {
     name: "noisy-6db",
-    description: "Broadband noise only 6 dB below programme — the hard case",
+    description: "Broadband noise only 6 dB below programme – the hard case",
     chain: chainWith(SPECTRAL),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25]);
@@ -458,7 +458,7 @@ export const CASES: EvalCase[] = [
         ...ON_TARGET,
         max: 1.5,
         because:
-          "phase 1 found clicks were breaking segmentation itself — a click in a " +
+          "phase 1 found clicks were breaking segmentation itself – a click in a " +
           "pause lifted it over the silence threshold and merged two segments at " +
           "different levels (~8 LU of error). With de-click ahead of the leveller " +
           "the pauses are clean again, so levelling must be back on target",
@@ -474,13 +474,13 @@ export const CASES: EvalCase[] = [
       // full chain, the output-vs-processed-reference comparison at click
       // sites is dominated by micro-differences in the leveller's silence
       // boundaries between the two renders, which segmentLufsError already
-      // bounds — not by surviving clicks.
+      // bounds – not by surviving clicks.
     ],
   },
 
   {
     name: "clicky-stage",
-    description: "The same clicks, de-click stage alone — the repair itself, unconfounded",
+    description: "The same clicks, de-click stage alone – the repair itself, unconfounded",
     chain: buildChain({ only: ["declick"] }),
     build: () => {
       const { signal } = programme([-30, -18, -25]);
@@ -488,7 +488,7 @@ export const CASES: EvalCase[] = [
       // is several times more impulsive than a real one (a Rosenberg pulse
       // stops dead at closure), so a click that would tower over a real
       // voice's excitation is barely above this voice's, and the de-clicker's
-      // pulse-train veto — correctly — leaves such a click alone. Clicks that
+      // pulse-train veto – correctly – leaves such a click alone. Clicks that
       // stand out from *this* voice the way real clicks do from a real one are
       // therefore louder; the real test of sensitivity is the fixture case.
       const { signal: clicked, positions } = addClicks(signal, {
@@ -505,7 +505,7 @@ export const CASES: EvalCase[] = [
         max: 2,
         because:
           "no repair may poke meaningfully above the peaks already present " +
-          "around it (±10 ms) — that is what makes a click audible. The bound " +
+          "around it (±10 ms) – that is what makes a click audible. The bound " +
           "sits just above the theoretical floor: at a pause site the residual " +
           "of even a perfect repair is the unknowable noise realisation that " +
           "was under the click, which lands at ~0 dB on this peak-vs-local-peak " +
@@ -539,7 +539,7 @@ export const CASES: EvalCase[] = [
 
   {
     name: "rate-44k1",
-    description: "44.1 kHz source — must not be resampled by a rate-agnostic chain",
+    description: "44.1 kHz source – must not be resampled by a rate-agnostic chain",
     chain: chainWith(SPECTRAL),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25], { sampleRate: 44100 });
@@ -557,7 +557,7 @@ export const CASES: EvalCase[] = [
   },
   {
     name: "clean-declick",
-    description: "Clean speech through de-click alone — the transparency check",
+    description: "Clean speech through de-click alone – the transparency check",
     chain: buildChain({ only: ["declick"] }),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25]);
@@ -570,8 +570,8 @@ export const CASES: EvalCase[] = [
         because:
           "most material has no clicks at all, so the cost of a de-clicker is " +
           "measured on clean audio, where it must do essentially nothing. Voiced " +
-          "speech is driven by a glottal pulse every pitch period — impulsive " +
-          "excitation that an outlier detector will happily mistake for clicks — " +
+          "speech is driven by a glottal pulse every pitch period – impulsive " +
+          "excitation that an outlier detector will happily mistake for clicks – " +
           "so this is the bound that keeps the analysis block short enough for " +
           "those pulses to set their own threshold",
       },
@@ -580,7 +580,7 @@ export const CASES: EvalCase[] = [
 
   {
     name: "clean-denoise",
-    description: "Clean speech through the classical denoiser alone — it should decline",
+    description: "Clean speech through the classical denoiser alone – it should decline",
     chain: chainWith(SPECTRAL, { only: ["denoise"] }),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25]);
@@ -604,7 +604,7 @@ export const CASES: EvalCase[] = [
 
   {
     name: "uneven",
-    description: "Speech whose level drifts within each phrase — compressor alone",
+    description: "Speech whose level drifts within each phrase – compressor alone",
     chain: buildChain({ only: ["compress"] }),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25]);
@@ -629,7 +629,7 @@ export const CASES: EvalCase[] = [
         because:
           "loudness range is what a compressor is for, so it is what the " +
           "compressor is measured on. A phrase swelling 12 dB is exactly the " +
-          "unevenness the leveller cannot reach — one gain per segment moves " +
+          "unevenness the leveller cannot reach – one gain per segment moves " +
           "with it rather than against it. Under 1 LU of reduction means the " +
           "threshold has drifted above the programme and the stage is idling",
       },
@@ -645,7 +645,7 @@ export const CASES: EvalCase[] = [
 
   {
     name: "even-compress",
-    description: "Already-even speech through the compressor — it should decline",
+    description: "Already-even speech through the compressor – it should decline",
     chain: buildChain({ only: ["compress"] }),
     build: () => {
       // Three spurts at the same level with no drift: nothing to even out.
@@ -660,7 +660,7 @@ export const CASES: EvalCase[] = [
           "compressing material that is already even costs whatever life it " +
           "has left and buys nothing, so the stage measures the loudness range " +
           "first and declines below minLoudnessRangeLu. Bit-identical output " +
-          "is the check that it does — a compressor with no off switch is a " +
+          "is the check that it does – a compressor with no off switch is a " +
           "sound, not a tool",
       },
     ],
@@ -668,13 +668,13 @@ export const CASES: EvalCase[] = [
 
   {
     name: "floor-expand",
-    description: "Audible room tone between words — expander alone",
+    description: "Audible room tone between words – expander alone",
     chain: buildChain({ only: ["expand"] }),
     build: () => {
       // A floor 30 dB down: close enough to the voice to be heard in the gaps.
       const { signal, segments } = programme([-30, -18, -25], { floorDbfs: -52 });
       // The same programme with the floor driven out of hearing. Same seed, so
-      // the speech is sample-identical and the only difference is the noise —
+      // the speech is sample-identical and the only difference is the noise –
       // which makes this a genuine clean reference rather than a copy of the
       // input, and lets SI-SDR say whether the speech survived.
       const { signal: quiet } = programme([-30, -18, -25], { floorDbfs: -100 });
@@ -695,7 +695,7 @@ export const CASES: EvalCase[] = [
         max: 14,
         because:
           "unlike every other stage measured this way, an expander is *supposed* " +
-          "to move segment-local SNR — that is its mechanism, not a side effect. " +
+          "to move segment-local SNR – that is its mechanism, not a side effect. " +
           "It attenuates the quiet parts, and the quiet parts inside a segment " +
           "are the gaps between words. The upper bound is what keeps it a bound: " +
           "rangeDb caps attenuation at 12 dB, so anything past 14 means the " +
@@ -715,7 +715,7 @@ export const CASES: EvalCase[] = [
 
   {
     name: "clean-expand",
-    description: "A recording whose floor is already deep — the expander should decline",
+    description: "A recording whose floor is already deep – the expander should decline",
     chain: buildChain({ only: ["expand"] }),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25], { floorDbfs: -85 });
@@ -736,7 +736,7 @@ export const CASES: EvalCase[] = [
 
   {
     name: "warm-voicing",
-    description: "The measured tonal curve, applied to clean speech — it must stay a whisper",
+    description: "The measured tonal curve, applied to clean speech – it must stay a whisper",
     chain: buildChain({ only: ["eq"], params: { eq: { voicing: "warm" } } }),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25]);
@@ -749,7 +749,7 @@ export const CASES: EvalCase[] = [
         because:
           "voicing is a taste rather than a correction, so the only honest " +
           "bound on it is that it stays small. The curve it applies is +1 dB " +
-          "at 95 Hz and -1.1 dB at 3.4 kHz — recovered by measurement, and " +
+          "at 95 Hz and -1.1 dB at 3.4 kHz – recovered by measurement, and " +
           "much gentler than a first pass suggested, because most of what " +
           "looked like a de-harshing dip turned out to be that service's " +
           "per-band noise suppression rather than its EQ. A voicing that " +
@@ -760,7 +760,7 @@ export const CASES: EvalCase[] = [
 
   {
     name: "clean-eq",
-    description: "Clean speech through EQ alone — an auto-EQ that always acts is not corrective",
+    description: "Clean speech through EQ alone – an auto-EQ that always acts is not corrective",
     // Voicing off: this case is about the corrective fitter, and the two are
     // separate jobs. A fixed tilt riding on top would make the number measure
     // both and bound neither. The voicing has `warm-voicing` to itself.
@@ -834,7 +834,7 @@ export const CASES: EvalCase[] = [
         ...SNR_EXPANDED,
         because:
           "limiting hard must not change speech-to-noise within a segment beyond " +
-          "what the expander is already doing — the limiter works on peaks, and " +
+          "what the expander is already doing – the limiter works on peaks, and " +
           "peaks are not where a noise floor lives, so it must contribute nothing " +
           "to this number in either direction",
       },
@@ -859,7 +859,7 @@ export const CASES: EvalCase[] = [
         min: 10,
         because:
           "the room's tail must measurably shorten. Single-channel WPE is a " +
-          "modest tool — roughly 12% off the decay here — and the bound is set " +
+          "modest tool – roughly 12% off the decay here – and the bound is set " +
           "to catch it stopping working, not to claim it transforms the recording",
       },
       {
@@ -872,7 +872,7 @@ export const CASES: EvalCase[] = [
 
   {
     name: "dry-dereverb",
-    description: "A dry recording through the dereverb stage — it should decline to act",
+    description: "A dry recording through the dereverb stage – it should decline to act",
     chain: buildChain({ only: ["dereverb"] }),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25], { floorDbfs: -75 });
@@ -924,7 +924,7 @@ export const CASES: EvalCase[] = [
 
   {
     name: "clean-dyneq",
-    description: "Clean speech through dynamic EQ alone — resonance suppression, not reshaping",
+    description: "Clean speech through dynamic EQ alone – resonance suppression, not reshaping",
     chain: buildChain({ only: ["dyneq"] }),
     build: () => {
       const { signal, segments } = programme([-30, -18, -25], { floorDbfs: -75 });
@@ -935,8 +935,8 @@ export const CASES: EvalCase[] = [
         metric: "outputSiSdrDb",
         min: 15,
         because:
-          "unlike the other spectral stages this one cannot decline to act — it " +
-          "is per-frame by nature — so its transparency has to be measured " +
+          "unlike the other spectral stages this one cannot decline to act – it " +
+          "is per-frame by nature – so its transparency has to be measured " +
           "rather than arranged. A voice with no resonances must come back " +
           "essentially intact",
       },

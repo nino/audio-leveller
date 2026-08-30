@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 interface Props {
-  /** Sample snapshot, taken at decode time (see Trial.tsx) — never a live AudioBuffer. */
+  /** Sample snapshot, taken at decode time (see Trial.tsx) – never a live AudioBuffer. */
   data: Float32Array | null;
   position: number;
   duration: number;

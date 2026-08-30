@@ -3,8 +3,8 @@
  *
  * Mirrors the manual technique: look through the silence sections, pick the
  * cleanest slice of each (no clicks, no breaths), then concatenate them with
- * little equal-power crossfades into a seamless bed. A single gain — the
- * length-weighted mean of the gains applied to the speech segments — is
+ * little equal-power crossfades into a seamless bed. A single gain – the
+ * length-weighted mean of the gains applied to the speech segments – is
  * applied so the bed sits at the same level as the processed voice.
  */
 
@@ -115,7 +115,7 @@ export function scoreRange(
   }
   const rms = Math.sqrt(sumSqAll / n);
 
-  // Effectively silent — the cleanest possible bed material.
+  // Effectively silent – the cleanest possible bed material.
   if (peakAll < 1e-4) return -140;
 
   const rmsDb = 20 * Math.log10(rms + EPS);

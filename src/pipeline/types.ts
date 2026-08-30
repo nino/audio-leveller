@@ -1,7 +1,7 @@
 /**
  * Core pipeline vocabulary.
  *
- * A {@link Signal} is bare audio — the currency every stage deals in. The
+ * A {@link Signal} is bare audio – the currency every stage deals in. The
  * bit depth and sample format of the file on disk live in the pipeline
  * result instead, so stages never have to think about encoding.
  */
@@ -31,7 +31,7 @@ export interface StageContext {
   analysis: Analyzer;
   /**
    * The untouched decoded signal (at the pipeline's working rate), for the
-   * stages that genuinely need original audio — room-tone harvesting has to
+   * stages that genuinely need original audio – room-tone harvesting has to
    * happen before a denoiser deletes the room tone.
    */
   source: Signal;

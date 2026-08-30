@@ -1,8 +1,8 @@
 /**
  * Short-time Fourier transform with weighted overlap-add (WOLA).
  *
- * Any stage that changes a signal's spectrum frame by frame — the denoiser
- * now, the dynamic EQ later — needs to get back to a waveform without seams.
+ * Any stage that changes a signal's spectrum frame by frame – the denoiser
+ * now, the dynamic EQ later – needs to get back to a waveform without seams.
  * The requirement is *perfect reconstruction*: with the spectrum left alone,
  * analysis followed by synthesis must return the input sample for sample, so
  * that any difference heard afterwards is the processing and not the transform.
@@ -10,7 +10,7 @@
  * The arrangement here is the standard one for modifying magnitudes: a
  * square-root Hann window on both analysis and synthesis, hopping a quarter of
  * the frame. Their product is a Hann window, and Hann at 75 % overlap sums to a
- * constant — so the overlap-add divides that constant out exactly. Windowing
+ * constant – so the overlap-add divides that constant out exactly. Windowing
  * only on analysis would be simpler and would ring: a modified frame no longer
  * tapers to zero at its edges, and the discontinuity lands in the output.
  */
@@ -54,7 +54,7 @@ export const binCount = (frameSize: number): number => frameSize / 2 + 1;
  * Analyse a channel into overlapping windowed spectra.
  *
  * The signal is padded by one frame at each end so the first and last samples
- * get the same overlap treatment as the middle — without it, a de-noiser's
+ * get the same overlap treatment as the middle – without it, a de-noiser's
  * first 20 ms would be attenuated by the window taper alone.
  */
 export function stft(
@@ -98,7 +98,7 @@ export function stft(
  * Rebuild a channel from (possibly modified) spectra.
  *
  * The normalisation is the sum of the squared window across overlapping hops,
- * accumulated per output sample rather than assumed constant — so the taper at
+ * accumulated per output sample rather than assumed constant – so the taper at
  * the very start and end is divided out correctly too, instead of leaving the
  * first and last frames quiet.
  */
@@ -192,7 +192,7 @@ export function stftFrameCount(length: number, options: Partial<StftOptions> = {
  * caller would modify `stft(...).frames[i]`. The output is bit-identical to
  * `istft` on the same modified frames: the accumulation order per output sample
  * is unchanged, because frames still arrive in increasing order and each sample
- * is finished — and emitted — as soon as the last frame overlapping it has been
+ * is finished – and emitted – as soon as the last frame overlapping it has been
  * added.
  */
 export function processStft(
@@ -273,7 +273,7 @@ export function processStft(
 
 /**
  * Walk a signal's spectra without resynthesising, for a pass that only
- * measures — a noise profile, a long-term average. Same bounded memory.
+ * measures – a noise profile, a long-term average. Same bounded memory.
  */
 export function scanStft(
   samples: Float32Array,

@@ -83,7 +83,7 @@ describe("leveller (end-to-end)", () => {
 
     expect(speechSegs.length).toBeGreaterThanOrEqual(1);
     expect(roomSegs.length).toBeGreaterThanOrEqual(1);
-    // Room-tone segments must not get a big boost — they ride the neighbour gain.
+    // Room-tone segments must not get a big boost – they ride the neighbour gain.
     for (const r of roomSegs) {
       expect(r.gainDb).toBeLessThan(15);
     }

@@ -1,8 +1,8 @@
 /**
  * Noise reduction as a pipeline stage.
  *
- * Sits after de-click (impulses are out-of-distribution for any denoiser —
- * classical or trained — and get smeared rather than removed) and before the
+ * Sits after de-click (impulses are out-of-distribution for any denoiser –
+ * classical or trained – and get smeared rather than removed) and before the
  * EQ, because denoising changes the spectrum the EQ would otherwise be fitting
  * a curve to.
  *
@@ -25,7 +25,7 @@ export interface DenoiseParams {
    * How far to push the noise floor down, in dB.
    *
    * Deliberately modest. Removing all of the noise is both impossible and
-   * undesirable — a recording with a natural, quiet floor sounds like a
+   * undesirable – a recording with a natural, quiet floor sounds like a
    * recording, while one scrubbed to digital silence between words sounds
    * broken, and the artefacts needed to get there are worse than the noise.
    */
@@ -39,7 +39,7 @@ export interface DenoiseParams {
    * Denoising is not free: it modifies the signal, and on material that was
    * already quiet the modification is all you get. Measured on the eval corpus,
    * running 12 dB of reduction over a recording whose floor sits 35 dB down
-   * *lowered* SI-SDR against the clean reference — the processing was the only
+   * *lowered* SI-SDR against the clean reference – the processing was the only
    * thing it changed. So the reduction is scaled by how much noise is actually
    * there: a recording at 20 dB gets the full amount, one at 35 dB gets none,
    * and in between it tapers.
@@ -50,8 +50,8 @@ export interface DenoiseParams {
    * thrown away and the input returned instead, in dB.
    *
    * A denoiser is supposed to remove what is *around* the speech. Losing a
-   * little programme loudness is legitimate — on a genuinely noisy source the
-   * noise was contributing to the measurement — but losing a lot means the
+   * little programme loudness is legitimate – on a genuinely noisy source the
+   * noise was contributing to the measurement – but losing a lot means the
    * backend has decided the speech is the noise.
    *
    * This is not hypothetical. DeepFilterNet3 does exactly that to this
@@ -60,7 +60,7 @@ export interface DenoiseParams {
    * down by 10 dB, right up against the limit the requested reduction sets.
    * On real recordings the same model moves programme loudness by under
    * 0.7 dB. So the guard costs nothing on material a model understands and
-   * turns a wrecked render into a declined stage on material it does not —
+   * turns a wrecked render into a declined stage on material it does not –
    * which matters more for a trained backend than a classical one, because a
    * trained one fails by confidently rewriting rather than by doing too little.
    */
@@ -106,7 +106,7 @@ export interface DenoiseStageReport {
   skippedEntirely: boolean;
 }
 
-/** Mean loudness across the pause regions — the noise floor, measured. */
+/** Mean loudness across the pause regions – the noise floor, measured. */
 function pauseLoudness(signal: Signal, pauses: { start: number; end: number }[]): number {
   if (pauses.length === 0) return -Infinity;
   const filtered = preFilter(signal.channels, signal.sampleRate);
@@ -214,7 +214,7 @@ export const denoiseStage: Stage<DenoiseParams, DenoiseStageReport> = {
           ...common,
           rejected:
             `the ${backend.name} backend cost ${programmeLossDb.toFixed(1)} dB of programme ` +
-            `loudness (limit ${params.maxProgrammeLossDb} dB) — it is removing the speech, ` +
+            `loudness (limit ${params.maxProgrammeLossDb} dB) – it is removing the speech, ` +
             `not the noise, so its output was discarded`,
         },
       };

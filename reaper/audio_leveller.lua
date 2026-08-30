@@ -1,11 +1,11 @@
 --[[
-  Audio Leveller for REAPER  —  non-destructive loudness leveller.
+  Audio Leveller for REAPER  –  non-destructive loudness leveller.
 
   For every selected media item it analyses the take's audio (BS.1770 / EBU
   R128 loudness), finds the silences, and writes a TAKE VOLUME ENVELOPE that
   normalises each speech segment to the target loudness (-23 LUFS by default),
   ramping the gain linearly across the silences in between. Nothing is
-  rendered or overwritten — it's all automation.
+  rendered or overwritten – it's all automation.
 
   This is a port of the standalone Audio Leveller tool. The leveling maths are
   cross-checked against that tool (see reaper/test_dsp.lua).
@@ -15,7 +15,7 @@
 
   The pure-DSP half of this file (everything above the "REAPER GLUE" banner)
   has no dependency on REAPER, so it can be loaded and unit-tested in a plain
-  Lua interpreter — when `reaper` is not defined the file just returns the
+  Lua interpreter – when `reaper` is not defined the file just returns the
   module table instead of running.
 ]]
 
@@ -79,7 +79,7 @@ local function percentile(values, p)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────
--- K-weighting (ITU-R BS.1770) biquad coefficients — derived per sample rate.
+-- K-weighting (ITU-R BS.1770) biquad coefficients – derived per sample rate.
 -- ─────────────────────────────────────────────────────────────────────────
 local function shelvingFilter(fs)
   local f0, G, Q = 1681.9744509555319, 3.9998438533940324, 0.7071752369554193
@@ -328,7 +328,7 @@ end
 local function runInReaper()
   -- Set to true to only print the analysis to the console (no envelope written).
   local DRY_RUN = false
-  -- "Take: Toggle take volume envelope" — verify this ID in your REAPER via the
+  -- "Take: Toggle take volume envelope" – verify this ID in your REAPER via the
   -- Action list if the envelope isn't created (search that exact name).
   local TOGGLE_TAKE_VOL_ENV = 40693
 
@@ -371,7 +371,7 @@ local function runInReaper()
   end
 
   -- Write the breakpoints (in samples) to the take volume envelope. One point
-  -- per breakpoint — a flat level across each segment and a single straight
+  -- per breakpoint – a flat level across each segment and a single straight
   -- ramp across each silence (REAPER interpolates linearly between the two).
   local function writeEnvelope(take, result, playrate)
     local env = getTakeVolEnvelope(take)

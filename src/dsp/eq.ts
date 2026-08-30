@@ -11,12 +11,12 @@
  * What separates "professionally corrected" from "obviously auto-EQ'd" is the
  * constraint set, not the fitter:
  *
- *   - few bands (default 5) — a forest of filters is a spectral match, and
+ *   - few bands (default 5) – a forest of filters is a spectral match, and
  *     spectral matches sound processed;
  *   - gain clamped to ±6 dB, and *cut-biased*: cuts are capped at the full
  *     ±6 dB but boosts at half that. Cutting a resonance is nearly always
  *     safe; boosting a notch dredges up whatever lives down there;
- *   - no boosts where the noise floor is close — boosting a band whose SNR is
+ *   - no boosts where the noise floor is close – boosting a band whose SNR is
  *     poor is buying timbre with noise;
  *   - deviations under a threshold (2 dB) are left alone entirely. Small
  *     wiggles are what voices sound like.
@@ -40,7 +40,7 @@ export interface EqFitOptions {
   minDeviationDb: number;
   /** Cut limit (positive number of dB). */
   maxCutDb: number;
-  /** Boost limit — deliberately half the cut limit. */
+  /** Boost limit – deliberately half the cut limit. */
   maxBoostDb: number;
   /** Q clamp. Wide enough to correct, never surgical. */
   minQ: number;
@@ -151,7 +151,7 @@ export function fitCorrectiveEq(
   // Bounded by *placed* bands, not by attempts: a deviation that gets masked
   // out (a notch we decline to fill) must not consume the band budget, or a
   // few ungated notches early on leave nothing for the resonances that follow.
-  // `attempts` is only a runaway guard — each iteration either places a band
+  // `attempts` is only a runaway guard – each iteration either places a band
   // or removes a grid point from play, so it always terminates.
   for (let attempts = 0; bands.length < opts.maxBands && attempts < freqs.length; attempts++) {
     const worst = maxAbs();
@@ -203,12 +203,12 @@ export interface RumbleDecision {
  * energy an octave below its own fundamental; when the sub-bass sits within
  * `marginDb` of the fundamentals, something non-vocal (traffic, handling,
  * HVAC) is down there and the high-pass earns its place. On clean material it
- * stays off — an always-on filter is not "corrective".
+ * stays off – an always-on filter is not "corrective".
  *
  * This reads the **raw** PSD, not the smoothed grid. The grid's minimum
  * bandwidth deliberately blurs the bottom octaves so the EQ sees a spectral
  * envelope instead of a harmonic comb, and that same blur smears a voice's
- * fundamental down into the sub-bass region — enough to trip this test on
+ * fundamental down into the sub-bass region – enough to trip this test on
  * perfectly clean speech.
  */
 export function decideRumbleFilter(

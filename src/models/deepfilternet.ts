@@ -1,8 +1,8 @@
 /**
  * DeepFilterNet3: everything around the three neural graphs.
  *
- * The ONNX export is not a denoiser. It is three graphs — encoder, ERB decoder,
- * deep-filter decoder — that consume normalised spectral features and emit an
+ * The ONNX export is not a denoiser. It is three graphs – encoder, ERB decoder,
+ * deep-filter decoder – that consume normalised spectral features and emit an
  * ERB gain mask plus a set of complex filter taps. The transform, the ERB
  * filterbank, the running feature normalisation, the mask application, the
  * deep filter and the resynthesis all live outside the model, and every one of
@@ -26,7 +26,7 @@
  *   PyTorch model shifts its own input by `conv_lookahead` frames; the ONNX
  *   export does not include that shift, so upstream's runtime instead applies
  *   the output of model frame `t` to spectrum frame `t − lookahead`. Get this
- *   wrong and the mask still "works" — it is simply 40 ms early, which smears
+ *   wrong and the mask still "works" – it is simply 40 ms early, which smears
  *   onsets and sounds like a bad denoiser rather than like a bug.
  */
 
@@ -128,7 +128,7 @@ export function erbWidths(config: DeepFilterConfig): number[] {
  *
  * Not the sqrt-Hann the rest of the pipeline uses. At 50 % overlap this one
  * satisfies the Princen–Bradley condition, so applying it on both analysis and
- * synthesis sums to unity — and it is what the model was trained through.
+ * synthesis sums to unity – and it is what the model was trained through.
  */
 export function vorbisWindow(fftSize: number): Float64Array {
   const half = fftSize / 2;
@@ -353,7 +353,7 @@ export interface ChunkOptions {
    *
    * The graphs unroll their recurrence over whatever time axis they are
    * handed, so a whole file in one call would be both correct and, on a long
-   * recording, ruinous — the encoder's intermediate tensors alone run to
+   * recording, ruinous – the encoder's intermediate tensors alone run to
    * hundreds of megabytes.
    */
   chunkFrames: number;
@@ -361,7 +361,7 @@ export interface ChunkOptions {
    * Frames prepended to each chunk, whose outputs are not kept outright.
    *
    * Splitting restarts the GRU state at each seam, and this model's state
-   * takes a long time to settle — measured against a whole-file run, a frame
+   * takes a long time to settle – measured against a whole-file run, a frame
    * needs several hundred frames of history before its local-SNR estimate is
    * within half a dB, and it is still creeping at 800. So the warm-up is
    * generous; it costs only compute, which is not the binding constraint.
@@ -378,7 +378,7 @@ export interface ChunkOptions {
  *
  * What this split costs is small and was measured rather than assumed. Against
  * a whole-file run the chunked render differs by about -61 dB, but that
- * difference is not damage — neither estimate is ground truth — so the number
+ * difference is not damage – neither estimate is ground truth – so the number
  * that decided these values is SI-SDR against clean audio, where a whole-file
  * run scores 25.58 dB on a noisy fixture and 58.03 on a clean one, and this
  * split scores 25.62 and 57.88. Crossfading the seam was tried and removed: it
@@ -396,8 +396,8 @@ export const DEFAULT_CHUNK_OPTIONS: ChunkOptions = {
  * Only the inference is chunked. The features were computed once over the
  * whole file so their running normalisation never restarts; the only
  * discontinuity here is the network's own hidden state, which the warm-up
- * covers. Taking a callback keeps the index arithmetic — the part that can be
- * wrong in a way no ear would localise — testable without weights present.
+ * covers. Taking a callback keeps the index arithmetic – the part that can be
+ * wrong in a way no ear would localise – testable without weights present.
  */
 export function runChunked(
   features: Features,
@@ -449,7 +449,7 @@ export function runChunked(
  * Ported from libDF's `apply_stages`. The top branch matters most for
  * transparency: above `maxDbErbThresh` the model declines to touch the frame
  * at all, which is the same instinct the rest of this pipeline is built on.
- * The bottom branch is a mute, which sounds worse than it reads — but the
+ * The bottom branch is a mute, which sounds worse than it reads – but the
  * attenuation-limit mix in {@link applyModel} turns it into an attenuation of
  * exactly the requested reduction rather than digital silence.
  */
@@ -468,7 +468,7 @@ export function stagesFor(
  *
  * `output[t]` is built from model frame `t + lookahead`, per the module note:
  * the graph emits its estimate for frame `t` two frames late. The deep filter
- * reads the *noisy* spectra, not the mask's output — it is a separate estimate
+ * reads the *noisy* spectra, not the mask's output – it is a separate estimate
  * of the same frame from a span of neighbours, and it replaces rather than
  * refines the low bins.
  *
@@ -476,20 +476,20 @@ export function stagesFor(
  *
  * This is the one place that deliberately departs from libDF's runtime, and it
  * is worth the paragraph. The training graph keeps the masked spectrum only
- * for the bins the deep filter does not cover — `spec_e[..., nb_df:, :] =
- * spec_m[..., nb_df:, :]` — so the network was never given a reason to emit
+ * for the bins the deep filter does not cover – `spec_e[..., nb_df:, :] =
+ * spec_m[..., nb_df:, :]` – so the network was never given a reason to emit
  * sensible ERB gains below that boundary, and it does not: on clean speech the
  * bands below bin 96 come back at about 0.25, a flat -12 dB, while the bands
  * above it correctly sit near unity.
  *
  * libDF gets away with masking the whole spectrum because the deep filter then
- * overwrites the low bins. But its `apply_stages` has a branch — local SNR
- * between `maxDbDfThresh` and `maxDbErbThresh` — where the mask runs and the
+ * overwrites the low bins. But its `apply_stages` has a branch – local SNR
+ * between `maxDbDfThresh` and `maxDbErbThresh` – where the mask runs and the
  * deep filter does not, and there the junk gains survive into the output.
  * Measured on the fixture used to develop this: applying the mask across the
  * full spectrum scores 3.8 dB SI-SDR where confining it to the bins it was
  * trained for scores 25.4, and on *clean* input the difference is 6.6 dB
- * against 51.6 — the mask below `nbDf` does not merely fail to help, it
+ * against 51.6 – the mask below `nbDf` does not merely fail to help, it
  * destroys speech that needed nothing. So the mask is applied only from
  * `nbDf` up, and the low bins are either deep-filtered or left alone.
  *
@@ -525,7 +525,7 @@ export function applyModel(
         : { gains: false, zeros: false, deepFilter: false };
 
     if (stages.gains) {
-      // The mask above nbDf, the source below it — the deep filter overwrites
+      // The mask above nbDf, the source below it – the deep filter overwrites
       // the low bins next when it runs, and when it does not, passing them
       // through is the only honest thing left to do with them. The test is
       // per bin rather than per band because the band holding bin nbDf

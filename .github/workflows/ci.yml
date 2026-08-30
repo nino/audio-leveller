@@ -49,7 +49,7 @@ jobs:
 
       # The evaluation corpus is the regression gate: every case states bounds
       # with a reason, and the run exits non-zero when one breaks. The baseline
-      # comparison does not fail the build on its own — it prints what moved, so
+      # comparison does not fail the build on its own – it prints what moved, so
       # a review can see whether a metric shifted and by how much.
       - name: Evaluation corpus
         run: pnpm eval -- --baseline eval/baseline.json
@@ -62,7 +62,7 @@ jobs:
 
       # The ReaScript port is a separate implementation of the levelling maths,
       # and its test re-levels a synthetic signal and checks it lands on target.
-      # It needs only a Lua interpreter, and this is the one place it gets run —
+      # It needs only a Lua interpreter, and this is the one place it gets run –
       # nothing in the Node toolchain touches it.
       - name: Install Lua
         run: sudo apt-get update && sudo apt-get install -y lua5.4

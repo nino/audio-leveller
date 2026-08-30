@@ -1,8 +1,8 @@
 /**
  * Radix-2 FFT, just enough for spectral measurement.
  *
- * Written for the pipeline's actual needs — power spectra of windowed frames
- * (LTAS now, dynamic EQ later) — not as a general-purpose library. Sizes are
+ * Written for the pipeline's actual needs – power spectra of windowed frames
+ * (LTAS now, dynamic EQ later) – not as a general-purpose library. Sizes are
  * powers of two; frames are real-valued and processed as complex with zero
  * imaginary parts, which wastes a factor of two we happily pay for
  * simplicity's sake at analysis (not per-sample) rates.
@@ -98,7 +98,7 @@ export function powerSpectrum(
 
 /**
  * Factorise into radices this transform can handle. Returns null when `n` has
- * a prime factor above 5 — the caller gets a clear error rather than a plan
+ * a prime factor above 5 – the caller gets a clear error rather than a plan
  * that silently computes the wrong thing.
  */
 function factorise(n: number): number[] | null {

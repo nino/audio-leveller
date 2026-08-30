@@ -189,7 +189,7 @@ function runCase(
 /**
  * The pipeline writes its results next to its input, so processing a fixture
  * in place leaves `<name>_processed.wav` and `<name>_roomtone.wav` in the
- * fixtures directory — where the next run would pick them up as fixtures in
+ * fixtures directory – where the next run would pick them up as fixtures in
  * their own right. That is not a corpus, it is a feedback loop: the harness
  * would end up grading the chain on its own output, and on a room-tone bed
  * that no amount of levelling can bring to the loudness target.
@@ -285,7 +285,7 @@ async function fixtureCases(dir: string): Promise<EvalCase[]> {
                     "the whole case for a 9 MB download and a native runtime. On " +
                     "real speech at 20 dB SNR the classical suppressor removes " +
                     "11.8 dB of noise and still ends up 0.2 dB *further* from the " +
-                    "clean reference — it trades signal for quiet. The model gains " +
+                    "clean reference – it trades signal for quiet. The model gains " +
                     "4.97 dB on the same material. The bound sits well below that " +
                     "so it tracks a different recording, but above zero, because a " +
                     "model that cannot beat the classical backend here has no " +
@@ -300,8 +300,8 @@ async function fixtureCases(dir: string): Promise<EvalCase[]> {
     // The de-clicker's sensitivity can only be judged on real speech as well:
     // real voicing is what its pulse-train veto is calibrated against, and the
     // synthetic voice is far more impulsive than any real one. Two cases:
-    // clicks injected at 0.5x the excerpt's peak, de-click alone — did they
-    // get repaired without touching anything else — and the untouched excerpt,
+    // clicks injected at 0.5x the excerpt's peak, de-click alone – did they
+    // get repaired without touching anything else – and the untouched excerpt,
     // where the stage should do (almost) nothing.
     const clickChain = buildChain({ only: ["declick"] });
     cases.push({
@@ -337,7 +337,7 @@ async function fixtureCases(dir: string): Promise<EvalCase[]> {
     });
     cases.push({
       name: `fixture:${basename(file, extname(file))}:clean-declick`,
-      description: "That recording untouched, de-click alone — the real transparency check",
+      description: "That recording untouched, de-click alone – the real transparency check",
       chain: clickChain,
       build: (): CaseInput => ({ input: excerpt, reference: excerpt }),
       expectations: [
@@ -347,7 +347,7 @@ async function fixtureCases(dir: string): Promise<EvalCase[]> {
           because:
             "clean real speech has no clicks, so the stage should barely act. " +
             "Before the pulse-train veto it repaired ~12 glottal pulses a " +
-            "second here and this read -34 dB — audible as smeared, roomy " +
+            "second here and this read -34 dB – audible as smeared, roomy " +
             "consonants in blind listening; with the veto it reads -49 dB",
         },
       ],

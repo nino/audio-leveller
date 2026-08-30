@@ -1,7 +1,7 @@
 /**
  * Dynamic EQ as a pipeline stage.
  *
- * Runs after the static EQ — that one has already removed whatever colouration
+ * Runs after the static EQ – that one has already removed whatever colouration
  * is constant, so what reaches here is the part that comes and goes: ringing
  * vowels, sibilance, the occasional boomy plosive. And before the leveller, so
  * the loudness target is measured on what actually gets written.

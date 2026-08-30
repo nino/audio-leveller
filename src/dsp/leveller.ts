@@ -144,7 +144,7 @@ function buildEnvelope(
 
 /** Linear gain (not dB) at a given sample, interpolating between breakpoints. */
 function gainAt(points: { at: number; db: number }[], sample: number): number {
-  // Points are sorted by `at`. Linear search is fine — envelopes are tiny.
+  // Points are sorted by `at`. Linear search is fine – envelopes are tiny.
   for (let i = points.length - 1; i >= 0; i--) {
     if (sample >= points[i].at) {
       if (i === points.length - 1) return dbToLin(points[i].db);
@@ -172,7 +172,7 @@ function gainAt(points: { at: number; db: number }[], sample: number): number {
  * The attack is a backward pass rather than a delay line: with the whole file
  * in memory, easing the gain down *before* each peak is lookahead without the
  * latency bookkeeping. A gain curve that steps down in one sample puts a sharp
- * corner into the waveform — audibly much like clipping — whereas the ramp
+ * corner into the waveform – audibly much like clipping – whereas the ramp
  * keeps the curve itself free of high-frequency energy. The pass only ever
  * lowers gain, so the ceiling guarantee is untouched.
  */
@@ -226,7 +226,7 @@ export function levelAudio(
 
   // First pass: measure each segment and decide whether it is real speech.
   // A segment quieter than the silence threshold is room tone / a quiet
-  // head or tail — boosting it to target would just amplify the noise floor.
+  // head or tail – boosting it to target would just amplify the noise floor.
   const loudness: number[] = [];
   let isSpeech: boolean[] = [];
   for (let i = 0; i < boundaries.length - 1; i++) {

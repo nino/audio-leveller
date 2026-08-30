@@ -130,7 +130,7 @@ describe("deepfilternet feature frontend", () => {
 
     expect(features.frames).toBe(frames);
     expect(features.erb).toHaveLength(frames * cfg.nbErb);
-    // [1, 2, frames, nbDf] — real block then imaginary block, not interleaved.
+    // [1, 2, frames, nbDf] – real block then imaginary block, not interleaved.
     expect(features.spec).toHaveLength(2 * frames * cfg.nbDf);
     expect(features.erb.every(Number.isFinite)).toBe(true);
     expect(features.spec.every(Number.isFinite)).toBe(true);
@@ -141,8 +141,8 @@ describe("chunked inference", () => {
   /**
    * A stand-in for the graphs that is causal and stateless, so a chunked run
    * must reproduce a whole-file one exactly. Its outputs are derived from the
-   * features it was handed, which is the point: a slicing error — the wrong
-   * ERB range, or the complex feature's two blocks assembled wrongly — changes
+   * features it was handed, which is the point: a slicing error – the wrong
+   * ERB range, or the complex feature's two blocks assembled wrongly – changes
    * the values rather than merely their position, and the test catches it.
    */
   function fakeRunner(erb: Float32Array, spec: Float32Array, frames: number): ModelOutput {

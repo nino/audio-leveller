@@ -34,9 +34,9 @@ export interface LtasOptions {
    * 100 Hz is 23 Hz, narrower than the spacing between a voice's harmonics. The
    * LTAS then resolves the harmonic comb rather than the spectral envelope, and
    * an EQ fitted to it would chase peaks and troughs that are the pitch, not
-   * the room. Holding the bandwidth to at least ~120 Hz down low — the same
+   * the room. Holding the bandwidth to at least ~120 Hz down low – the same
    * shape auditory filters have, roughly constant-Hz below 500 Hz and
-   * constant-octave above — measures the envelope instead.
+   * constant-octave above – measures the envelope instead.
    */
   minBandwidthHz: number;
 }
@@ -61,7 +61,7 @@ export interface Ltas {
    * The unsmoothed mean power spectrum, linear bins. Kept because the smoothed
    * grid deliberately blurs the bottom octaves (see `minBandwidthHz`), which
    * makes it useless for questions that need to separate sub-bass from a
-   * voice's fundamental — the rumble decision being exactly that.
+   * voice's fundamental – the rumble decision being exactly that.
    */
   psd: Float64Array;
   sampleRate: number;
@@ -92,7 +92,7 @@ export interface SampleRange {
 /**
  * Mean PSD over frames lying wholly inside the given ranges, then smoothed
  * onto the log grid. Frames hop by half the FFT size. Returns null when the
- * ranges hold less than a handful of frames — an LTAS from two frames is an
+ * ranges hold less than a handful of frames – an LTAS from two frames is an
  * anecdote, and the caller should decline to EQ rather than fit to it.
  */
 export function computeLtas(
@@ -170,7 +170,7 @@ export function smoothToLogGrid(
  * The reference the corrective EQ pulls deviations toward: the LTAS smoothed
  * much more broadly (default 1.5 octaves). Correcting toward a heavily
  * smoothed version of *itself* removes resonances and notches while leaving
- * the voice's broad tilt — its actual character — alone. An absolute target
+ * the voice's broad tilt – its actual character – alone. An absolute target
  * curve would impose one announcer's timbre on every voice.
  */
 export function broadTarget(ltas: Ltas, smoothingOctaves = 1.5): Float64Array {

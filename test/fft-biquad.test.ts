@@ -45,7 +45,7 @@ describe("fft", () => {
   });
 
   it("windows sum correctly for overlapped averaging", () => {
-    // Periodic Hann at 50% overlap sums to a constant — the property Welch
+    // Periodic Hann at 50% overlap sums to a constant – the property Welch
     // averaging relies on.
     const n = 256;
     const w = hannWindow(n);

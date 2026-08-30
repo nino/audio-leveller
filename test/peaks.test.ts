@@ -3,7 +3,7 @@
  * adversarial review of the Int16-snapshot change: every value peaksFor
  * returns lies in [-1, 1], both branches (pyramid above 256 samples/px, raw
  * snapshot below) agree within one quantisation step, and out-of-range
- * columns are (0, 0) — never a leaked sentinel.
+ * columns are (0, 0) – never a leaked sentinel.
  */
 
 import { describe, expect, it } from "vitest";
@@ -61,7 +61,7 @@ describe("peaksFor", () => {
       for (let x = 0; x < r.max.length; x++) p = Math.max(p, r.max[x], -r.min[x]);
       return p;
     };
-    // Both say full scale, neither says 1.5 — the diagnostic that compares
+    // Both say full scale, neither says 1.5 – the diagnostic that compares
     // the branches must not see a phantom mismatch on hot material.
     expect(peakOf(pyramid)).toBe(1);
     expect(peakOf(raw)).toBe(1);

@@ -1,7 +1,7 @@
 /**
  * The classical backend: spectral suppression, always available.
  *
- * No weights, no native dependency, no download — so this is what runs by
+ * No weights, no native dependency, no download – so this is what runs by
  * default and what every eval baseline is measured against. See
  * `dsp/denoise.ts` for the algorithm and for why it is deliberately modest.
  */

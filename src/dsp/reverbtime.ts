@@ -2,7 +2,7 @@
  * Blind reverberation-time measurement.
  *
  * Lives here rather than with the evaluation metrics because the dereverb
- * stage needs it at runtime to decide whether to engage at all — and a stage
+ * stage needs it at runtime to decide whether to engage at all – and a stage
  * reaching into the test fixtures for a measurement would be exactly backwards.
  */
 
@@ -20,7 +20,7 @@ function median(values: number[]): number {
  *
  * No reference and no impulse response: find the moments where speech stops,
  * and measure how fast the energy falls afterwards. Dry speech decays at the
- * rate the talker's own articulation sets — a syllable ends in tens of
+ * rate the talker's own articulation sets – a syllable ends in tens of
  * milliseconds. A room adds its own, much slower decay on top, so this rises
  * with reverberation and falls when a dereverberator works.
  *

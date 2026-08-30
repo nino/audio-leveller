@@ -200,7 +200,7 @@ let lastInputPath: string | null = null;
 let schema: PipelineSchema | null = null;
 /** Which preset the current settings came from. */
 let activePreset = "";
-/** Fully resolved parameter values, keyed by stage — what gets sent. */
+/** Fully resolved parameter values, keyed by stage – what gets sent. */
 let settings: ParamOverrides = {};
 /** Per-stage on/off. */
 const stageEnabled = new Map<string, boolean>();
@@ -555,7 +555,7 @@ function levellerReportOf(report: PipelineReport): LevellerReport | null {
 
 /**
  * One line saying what a stage actually did. The point of the inspector is to
- * make each stage's decision visible, so "declick 42 ms" is not enough — the
+ * make each stage's decision visible, so "declick 42 ms" is not enough – the
  * question a user has is whether it found anything.
  */
 function summarise(stage: StageReport): string {
@@ -565,17 +565,17 @@ function summarise(stage: StageReport): string {
   switch (stage.name) {
     case "declick": {
       const d = r as DeclickReport;
-      if (d.aborted) return "declined — too much of the file looked like clicks";
+      if (d.aborted) return "declined – too much of the file looked like clicks";
       return d.repaired === 0 ? "no clicks found" : `${d.repaired} click(s) repaired`;
     }
     case "denoise": {
       const d = r as DenoiseReport;
-      if (d.skippedEntirely) return "already clean — nothing removed";
+      if (d.skippedEntirely) return "already clean – nothing removed";
       return `${d.reductionAchievedDb.toFixed(1)} dB of noise removed (${d.backend})`;
     }
     case "dereverb": {
       const d = r as DereverbReport;
-      if (d.skipped) return `dry (${d.decayBeforeMs.toFixed(0)} ms decay) — left alone`;
+      if (d.skipped) return `dry (${d.decayBeforeMs.toFixed(0)} ms decay) – left alone`;
       return `decay ${d.decayBeforeMs.toFixed(0)} → ${d.decayAfterMs.toFixed(0)} ms`;
     }
     case "eq": {
@@ -594,12 +594,12 @@ function summarise(stage: StageReport): string {
     }
     case "expand": {
       const d = r as ExpandReport;
-      if (d.skipped) return "floor already deep — left alone";
+      if (d.skipped) return "floor already deep – left alone";
       return `floor down ${d.floorReductionDb.toFixed(1)} dB`;
     }
     case "compress": {
       const d = r as CompressReport;
-      if (d.skipped) return "already even — left alone";
+      if (d.skipped) return "already even – left alone";
       return `range ${d.loudnessRangeBeforeLu.toFixed(1)} → ${d.loudnessRangeAfterLu.toFixed(1)} LU`;
     }
     case "level": {
@@ -633,14 +633,14 @@ function renderResult(result: NonNullable<ProcessResponse["result"]>): void {
   if (level) {
     const segRows = level.segments
       .map((s, i) => {
-        const l = Number.isFinite(s.loudnessLufs) ? `${s.loudnessLufs.toFixed(1)}` : "—";
+        const l = Number.isFinite(s.loudnessLufs) ? `${s.loudnessLufs.toFixed(1)}` : "–";
         return `<tr><td>${i + 1}</td><td>${l} LUFS</td><td>${signed(s.gainDb)} dB</td></tr>`;
       })
       .join("");
 
     const rt = level.roomTone;
     const roomToneLine = roomTonePath
-      ? `<div class="meta">Wrote <strong>${basename(roomTonePath)}</strong> —
+      ? `<div class="meta">Wrote <strong>${basename(roomTonePath)}</strong> –
            ${rt.durationSec.toFixed(1)}s room tone ·
            ${pluralize(rt.clips.length, "clean clip")} · ${signed(rt.gainDb)} dB</div>`
       : `<div class="meta">No room tone (no usable silence found)</div>`;
@@ -703,7 +703,7 @@ async function run(path: string, name: string): Promise<void> {
   const unsubscribe = leveller.onProgress((p) => {
     setStatus(
       `<div class="working-line"><span class="spinner"></span>
-         <span><strong>${name}</strong> — ${p.stage}, step ${p.index + 1} of ${p.total}</span></div>
+         <span><strong>${name}</strong> – ${p.stage}, step ${p.index + 1} of ${p.total}</span></div>
        <div class="bar"><span style="width:${Math.round(p.overall * 100)}%"></span></div>`,
       "working",
     );

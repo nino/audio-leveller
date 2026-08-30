@@ -9,14 +9,14 @@
  * same principle as the denoiser: single-channel WPE is not free, and running
  * it over a dry recording buys nothing while measurably altering the voice.
  * Reverberation is detected blind, by how long the signal takes to decay after
- * speech stops — no reference and no impulse response needed.
+ * speech stops – no reference and no impulse response needed.
  *
  * On expectations: single-channel WPE is a modest tool. Measured on the eval
  * corpus it takes about 12 % off the decay time and gains about 1 dB of SI-SDR
  * against the dry reference. Most of the published results that sound dramatic
  * are multi-channel, where the spatial information does most of the work. What
- * it does offer is that it cannot invent speech — it only subtracts a linear
- * prediction — so it will never put words in someone's mouth, which a
+ * it does offer is that it cannot invent speech – it only subtracts a linear
+ * prediction – so it will never put words in someone's mouth, which a
  * generative enhancer can.
  */
 
@@ -28,7 +28,7 @@ export interface DereverbParams extends DereverbOptions {
   /**
    * Engage only when the measured decay exceeds this, in milliseconds.
    *
-   * Dry speech measures around 35 ms — that is the talker's own articulation,
+   * Dry speech measures around 35 ms – that is the talker's own articulation,
    * not a room. A noticeably live room lands past 150 ms. The default sits
    * between them so ordinary recordings pass through untouched.
    */

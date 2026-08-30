@@ -205,7 +205,7 @@ describe("compress stage", () => {
     expect(report.maxReductionDb).toBeLessThanOrEqual(DEFAULT_COMPRESS_PARAMS.maxReductionDb + 1e-6);
   });
 
-  it("does not add make-up gain — the leveller does that", () => {
+  it("does not add make-up gain – the leveller does that", () => {
     // A compressor that quietly restored the level would hide how much it took.
     const built = speech(-70, [-35, -18, -30]);
     const signal: Signal = { sampleRate: sr, channels: built.signal.channels, length: built.signal.length };
