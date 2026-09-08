@@ -278,11 +278,6 @@ pub fn fixture_cases(dir: &Path, backends: &Backends) -> Result<Vec<EvalCase>, E
         .collect();
     names.sort();
 
-    let onnx_unavailable = match backends.get("onnx") {
-        None => Some("the onnx backend is not registered in this build".to_string()),
-        Some(backend) => backend.unavailable_reason(48_000),
-    };
-
     let mut cases = Vec::new();
     for path in names {
         let stem = path
@@ -344,6 +339,17 @@ pub fn fixture_cases(dir: &Path, backends: &Backends) -> Result<Vec<EvalCase>, E
                 unavailable: None,
             });
         }
+
+        // Whether the model can run is a question about *this* recording, not
+        // about the machine: the model is trained at one rate, so a 44.1 kHz
+        // fixture cannot reach it however the weights are installed. Asking at
+        // a hard-coded 48 kHz would call the case available and then run it
+        // through a stage that silently does nothing, which reads as a failed
+        // quality bound rather than as a case that never applied.
+        let onnx_unavailable = match backends.get("onnx") {
+            None => Some("the onnx backend is not registered in this build".to_string()),
+            Some(backend) => backend.unavailable_reason(excerpt.sample_rate()),
+        };
 
         // Degrading real speech with known noise supplies the clean reference
         // the fixture cases otherwise lack: the recording itself.
