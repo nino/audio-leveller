@@ -1,0 +1,48 @@
+[package]
+name = "audio-leveller-app"
+description = "The Audio Leveller window."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "audio-leveller-app"
+path = "src/main.rs"
+
+[dependencies]
+leveller-io.workspace = true
+leveller-pipeline.workspace = true
+leveller-stages.workspace = true
+leveller-ui.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+aqua.workspace = true
+block2.workspace = true
+dispatch2.workspace = true
+objc2.workspace = true
+objc2-app-kit = { workspace = true, features = [
+  "NSApplication",
+  "NSDragging",
+  "NSEvent",
+  "NSGraphicsContext",
+  "NSPasteboard",
+  "NSPasteboardItem",
+  "NSTrackingArea",
+  "NSResponder",
+  "NSTrackingArea",
+  "NSMenu",
+  "NSOpenPanel",
+  "NSPanel",
+  "NSSavePanel",
+  "NSView",
+  "NSWindow",
+  "NSBitmapImageRep",
+  "objc2-core-graphics",
+] }
+objc2-core-foundation.workspace = true
+objc2-core-graphics.workspace = true
+objc2-foundation = { workspace = true, features = ["NSGeometry", "NSString", "NSURL", "NSArray", "NSValue", "NSDate", "NSRunLoop", "NSEnumerator"] }

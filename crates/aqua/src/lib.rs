@@ -18,5 +18,7 @@ pub mod paint;
 pub mod render;
 #[cfg(target_os = "macos")]
 pub mod text;
+#[cfg(target_os = "macos")]
+pub mod window;
 
 pub use palette::{Colour, Focus, Gel, Light, Stop};

@@ -136,7 +136,7 @@ trait Pipe: Sized {
 impl<T> Pipe for T {}
 
 fn ns_colour(colour: Colour) -> Retained<NSColor> {
-    { NSColor::colorWithSRGBRed_green_blue_alpha(colour.r, colour.g, colour.b, colour.a) }
+    NSColor::colorWithSRGBRed_green_blue_alpha(colour.r, colour.g, colour.b, colour.a)
 }
 
 fn attributed(text: &str, style: &Style) -> Retained<NSAttributedString> {

@@ -16,7 +16,7 @@ use leveller_pipeline::Registry;
 use serde_json::{Map, Value, json};
 
 /// One exposed parameter.
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ParamSpec {
     #[serde(rename_all = "camelCase")]
@@ -54,7 +54,7 @@ impl ParamSpec {
 }
 
 /// A stage's exposed parameters, with its own one-liner attached.
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StageParams {
     /// Stage name, as registered.

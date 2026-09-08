@@ -16,10 +16,13 @@ leveller-dsp = { path = "crates/leveller-dsp" }
 leveller-pipeline = { path = "crates/leveller-pipeline" }
 leveller-io = { path = "crates/leveller-io" }
 leveller-stages = { path = "crates/leveller-stages" }
+leveller-ui = { path = "crates/leveller-ui" }
 leveller-wav = { path = "crates/leveller-wav" }
 
 anyhow = "1.0"
+aqua = { path = "crates/aqua" }
 block2 = "0.6"
+dispatch2 = "0.3"
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "objc2-core-foundation"] }
 objc2-core-foundation = { version = "0.3", features = ["CFCGTypes"] }

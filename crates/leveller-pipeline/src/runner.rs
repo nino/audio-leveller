@@ -26,7 +26,7 @@ use crate::stage::{StageContext, StageError};
 
 /// A stage as a caller asked for it: which one, on or off, with what
 /// parameters.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StageSpec {
     pub name: String,
     /// A disabled stage still appears in the report, marked bypassed.
