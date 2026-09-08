@@ -5,8 +5,12 @@
 
 pub mod biquad;
 pub mod fft;
+pub mod loudness;
 pub mod signal;
+pub mod truepeak;
 
 pub use biquad::{Biquad, apply_cascade, cascade_magnitude_db, kweighting};
 pub use fft::{FftPlan, RealFftPlan, hann_window, power_spectrum};
+pub use loudness::Weighted;
 pub use signal::{Signal, from_db, to_db};
+pub use truepeak::{true_peak_dbfs, true_peak_envelope, true_peak_linear};
