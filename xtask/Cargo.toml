@@ -1,0 +1,10 @@
+[package]
+name = "xtask"
+description = "Build tasks: assemble the app bundles, sign them, make a disk image."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true

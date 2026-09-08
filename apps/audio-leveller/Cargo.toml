@@ -13,10 +13,12 @@ name = "audio-leveller-app"
 path = "src/main.rs"
 
 [dependencies]
+leveller-dsp.workspace = true
 leveller-io.workspace = true
 leveller-pipeline.workspace = true
 leveller-stages.workspace = true
 leveller-ui.workspace = true
+leveller-wav.workspace = true
 serde_json.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -25,6 +27,10 @@ block2.workspace = true
 dispatch2.workspace = true
 objc2.workspace = true
 objc2-app-kit = { workspace = true, features = [
+  "NSAccessibility",
+  "NSAccessibilityConstants",
+  "NSAccessibilityElement",
+  "NSAccessibilityProtocols",
   "NSApplication",
   "NSDragging",
   "NSEvent",
@@ -45,4 +51,4 @@ objc2-app-kit = { workspace = true, features = [
 ] }
 objc2-core-foundation.workspace = true
 objc2-core-graphics.workspace = true
-objc2-foundation = { workspace = true, features = ["NSGeometry", "NSString", "NSURL", "NSArray", "NSValue", "NSDate", "NSRunLoop", "NSEnumerator"] }
+objc2-foundation = { workspace = true, features = ["NSGeometry", "NSString", "NSURL", "NSArray", "NSValue", "NSDate", "NSRunLoop", "NSEnumerator", "NSAttributedString", "NSDictionary", "NSObject", "NSNotification", "NSData", "NSRange", "NSError"] }

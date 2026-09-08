@@ -3,6 +3,12 @@
 version = 4
 
 [[package]]
+name = "anyhow"
+version = "1.0.104"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
+
+[[package]]
 name = "aqua"
 version = "0.1.0"
 dependencies = [
@@ -21,10 +27,12 @@ dependencies = [
  "aqua",
  "block2",
  "dispatch2",
+ "leveller-dsp",
  "leveller-io",
  "leveller-pipeline",
  "leveller-stages",
  "leveller-ui",
+ "leveller-wav",
  "objc2",
  "objc2-app-kit",
  "objc2-core-foundation",
@@ -419,6 +427,13 @@ name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
+
+[[package]]
+name = "xtask"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+]
 
 [[package]]
 name = "zmij"

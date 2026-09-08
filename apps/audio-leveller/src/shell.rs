@@ -16,15 +16,20 @@ use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2::{AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send};
 use objc2_app_kit::{
+    NSAccessibilityButtonRole, NSAccessibilityCheckBoxRole, NSAccessibilityGroupRole,
+    NSAccessibilityProgressIndicatorRole, NSAccessibilityRadioButtonRole,
+    NSAccessibilityRadioGroupRole, NSAccessibilitySliderRole, NSAccessibilityStaticTextRole,
     NSApplication, NSApplicationDelegate, NSDragOperation, NSDraggingInfo, NSEvent,
     NSGraphicsContext, NSPasteboardTypeFileURL, NSTrackingArea, NSTrackingAreaOptions, NSView,
     NSWindowDelegate,
 };
 use objc2_core_foundation::{CGPoint, CGRect, CGSize};
 use objc2_foundation::{
-    NSArray, NSNotification, NSObject, NSObjectProtocol, NSPoint, NSRect, NSString, NSURL,
+    NSArray, NSCopying, NSNotification, NSObject, NSObjectProtocol, NSPoint, NSRect, NSString,
+    NSURL,
 };
 
+use crate::access;
 use crate::draw::{self, Pointer};
 use crate::layout::{self, Hit, Layout};
 
@@ -47,6 +52,130 @@ pub struct State {
     pointer: RefCell<Pointer>,
     /// The worker's channel, drained on the main thread by a timer.
     inbox: RefCell<Option<Receiver<FromWorker>>>,
+    /// One invisible subview per accessibility element, rebuilt whenever the
+    /// model changes.
+    elements: RefCell<Vec<Retained<AxProxy>>>,
+}
+
+/// What one accessibility proxy knows about itself.
+#[derive(Default)]
+struct ProxyState {
+    role: RefCell<Retained<NSString>>,
+    label: RefCell<Retained<NSString>>,
+    value: RefCell<Option<Retained<NSString>>>,
+    help: RefCell<Option<Retained<NSString>>>,
+    enabled: std::cell::Cell<bool>,
+    /// Which element this is, so activating it can be routed back.
+    index: std::cell::Cell<usize>,
+}
+
+define_class!(
+    /// An invisible view standing in for one drawn control, so the
+    /// accessibility system has something real to find.
+    ///
+    /// It draws nothing and takes no clicks — `hitTest:` refuses, so the mouse
+    /// goes to the view underneath, which is the one that knows how to handle
+    /// it. What it does have is a role, a name, a value and an action, which is
+    /// everything a screen reader wants and none of what a mouse does.
+    #[unsafe(super(NSView))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "AudioLevellerAccessibilityProxy"]
+    #[ivars = ProxyState]
+    struct AxProxy;
+
+    impl AxProxy {
+        #[unsafe(method(hitTest:))]
+        fn hit_test(&self, _point: NSPoint) -> *mut NSView {
+            // Transparent to the mouse: the drawing view handles every click.
+            std::ptr::null_mut()
+        }
+
+        #[unsafe(method(isAccessibilityElement))]
+        fn is_accessibility_element(&self) -> bool {
+            true
+        }
+
+        #[unsafe(method(isAccessibilityEnabled))]
+        fn is_accessibility_enabled(&self) -> bool {
+            self.ivars().enabled.get()
+        }
+
+        #[unsafe(method(accessibilityRole))]
+        fn accessibility_role(&self) -> *mut NSString {
+            Retained::autorelease_return(self.ivars().role.borrow().clone())
+        }
+
+        #[unsafe(method(accessibilityLabel))]
+        fn accessibility_label(&self) -> *mut NSString {
+            Retained::autorelease_return(self.ivars().label.borrow().clone())
+        }
+
+        #[unsafe(method(accessibilityValue))]
+        fn accessibility_value(&self) -> *mut NSString {
+            match self.ivars().value.borrow().clone() {
+                Some(value) => Retained::autorelease_return(value),
+                None => std::ptr::null_mut(),
+            }
+        }
+
+        #[unsafe(method(accessibilityHelp))]
+        fn accessibility_help(&self) -> *mut NSString {
+            match self.ivars().help.borrow().clone() {
+                Some(help) => Retained::autorelease_return(help),
+                None => std::ptr::null_mut(),
+            }
+        }
+
+        /// The same path a click takes, so there is one way for a thing to
+        /// happen rather than two that can disagree.
+        #[unsafe(method(accessibilityPerformPress))]
+        fn accessibility_perform_press(&self) -> objc2::runtime::Bool {
+            // SAFETY: called on the main thread, from the accessibility system.
+            let Some(parent) = (unsafe { self.superview() }) else {
+                return objc2::runtime::Bool::NO;
+            };
+            let Ok(view) = parent.downcast::<LevellerView>() else {
+                return objc2::runtime::Bool::NO;
+            };
+            view.activate_element(self.ivars().index.get());
+            objc2::runtime::Bool::YES
+        }
+    }
+
+    unsafe impl NSObjectProtocol for AxProxy {}
+);
+
+impl AxProxy {
+    fn new(mtm: MainThreadMarker) -> Retained<Self> {
+        let this = Self::alloc(mtm).set_ivars(ProxyState {
+            role: RefCell::new(NSString::from_str("AXUnknown")),
+            label: RefCell::new(NSString::new()),
+            ..ProxyState::default()
+        });
+        unsafe { msg_send![super(this), init] }
+    }
+
+    fn describe(&self, element: &access::Element) {
+        let role = match element.role {
+            access::Role::Button | access::Role::Disclosure => unsafe { NSAccessibilityButtonRole },
+            access::Role::Checkbox => unsafe { NSAccessibilityCheckBoxRole },
+            access::Role::RadioGroup => unsafe { NSAccessibilityRadioGroupRole },
+            access::Role::Radio => unsafe { NSAccessibilityRadioButtonRole },
+            access::Role::Slider => unsafe { NSAccessibilitySliderRole },
+            access::Role::StaticText => unsafe { NSAccessibilityStaticTextRole },
+            access::Role::Group => unsafe { NSAccessibilityGroupRole },
+            access::Role::ProgressIndicator => unsafe { NSAccessibilityProgressIndicatorRole },
+        };
+        *self.ivars().role.borrow_mut() = role.copy();
+        *self.ivars().label.borrow_mut() = NSString::from_str(&element.label);
+        *self.ivars().value.borrow_mut() = element.value.as_deref().map(NSString::from_str);
+        *self.ivars().help.borrow_mut() = element.help.as_deref().map(NSString::from_str);
+        self.ivars().enabled.set(element.enabled);
+    }
+
+    fn set_index(&self, index: usize) {
+        self.ivars().index.set(index);
+    }
 }
 
 define_class!(
@@ -225,6 +354,7 @@ impl LevellerView {
             model: RefCell::new(Model::new()),
             pointer: RefCell::new(Pointer::default()),
             inbox: RefCell::new(None),
+            elements: RefCell::new(Vec::new()),
         });
         let this: Retained<Self> = unsafe { msg_send![super(this), init] };
 
@@ -232,6 +362,64 @@ impl LevellerView {
         this.registerForDraggedTypes(&types);
 
         this
+    }
+
+    /// Rebuild the accessibility proxies from the model as it stands.
+    ///
+    /// One invisible subview per element. Synthetic `NSAccessibilityElement`s
+    /// would be the tidier answer and do not work: AppKit asks the container
+    /// for them, receives them, and reports none — a custom view's synthetic
+    /// children are filtered out somewhere inside. Real subviews are included
+    /// because they are views, which is the whole trick.
+    fn rebuild_elements(&self) {
+        let model = self.ivars().model.borrow();
+        let bounds = self.bounds();
+        let layout = layout::compute(&model, bounds.size.width, bounds.size.height);
+        let wanted = access::elements(&model, &layout);
+        drop(model);
+
+        let Some(mtm) = MainThreadMarker::new() else {
+            return;
+        };
+        let mut proxies = self.ivars().elements.borrow_mut();
+
+        // Reuse the views rather than rebuilding them: an element that keeps
+        // its identity keeps VoiceOver's place in the window, and rebuilding
+        // them all on every parameter tick would move the cursor to the top.
+        while proxies.len() > wanted.len() {
+            if let Some(extra) = proxies.pop() {
+                extra.removeFromSuperview();
+            }
+        }
+        while proxies.len() < wanted.len() {
+            let proxy = AxProxy::new(mtm);
+            self.addSubview(&proxy);
+            proxies.push(proxy);
+        }
+        for (index, (proxy, element)) in proxies.iter().zip(&wanted).enumerate() {
+            proxy.set_index(index);
+            proxy.setFrame(CGRect::new(
+                CGPoint::new(element.rect.x, element.rect.y),
+                CGSize::new(element.rect.width, element.rect.height),
+            ));
+            proxy.describe(element);
+        }
+    }
+
+    /// Activate an element from the accessibility side, which is the same path
+    /// a click takes.
+    fn activate_element(&self, index: usize) {
+        let hit = {
+            let model = self.ivars().model.borrow();
+            let bounds = self.bounds();
+            let layout = layout::compute(&model, bounds.size.width, bounds.size.height);
+            access::elements(&model, &layout)
+                .get(index)
+                .and_then(|e| e.hit)
+        };
+        if let Some(hit) = hit {
+            self.activate(hit);
+        }
     }
 
     fn layout(&self) -> Layout {
@@ -254,6 +442,7 @@ impl LevellerView {
         if let Some(Effect::Process { path, stages }) = effect {
             self.start_worker(path, stages);
         }
+        self.rebuild_elements();
         self.setNeedsDisplay(true);
     }
 
@@ -525,6 +714,79 @@ pub fn run() -> ! {
 /// Draw the window into a PNG without opening one.
 pub fn shot(path: &Path) -> Result<(), std::io::Error> {
     shot_of(path, &Model::new(), Focus::Active)
+}
+
+/// A shot of a window that has done something: a file processed, a stage
+/// opened, a parameter moved.
+///
+/// It processes a synthetic recording for real rather than faking a report,
+/// because a fake one would drift from the real shape the first time a stage's
+/// report changed.
+pub fn shot_busy(path: &Path) -> Result<(), std::io::Error> {
+    let mut model = Model::new();
+    model.update(Msg::ToggleExpanded(7));
+    model.update(Msg::SetParam {
+        stage: "level".into(),
+        key: "targetLufs".into(),
+        value: serde_json::json!(-20.0),
+    });
+    model.update(Msg::ToggleStage(2));
+
+    // A real run over a real file, so the numbers and the decisions are the
+    // ones the app would actually show.
+    let fixture = std::env::temp_dir().join("audio-leveller-shot.wav");
+    write_fixture(&fixture)?;
+    let stages = model.chain();
+    // Through the model, so it remembers the file — which is what turns
+    // Re-render into the default button. The effect it returns is the run this
+    // does by hand below.
+    let _ = model.update(Msg::Dropped(fixture.clone()));
+    let registry = leveller_stages::default_registry();
+    let result = leveller_io::process_file(&fixture, &stages, &registry, |_| {})
+        .map_err(std::io::Error::other)?;
+    let _ = std::fs::remove_file(&fixture);
+    model.update(Msg::Finished(Ok(Box::new(result))));
+
+    shot_of(path, &model, Focus::Active)
+}
+
+/// A short synthetic recording for the shot to process.
+fn write_fixture(path: &Path) -> Result<(), std::io::Error> {
+    use leveller_dsp::Signal;
+    let sample_rate = 48_000u32;
+    let seconds = 8.0;
+    let n = (seconds * f64::from(sample_rate)) as usize;
+
+    // Two spurts at different levels, with pauses, so the leveller has
+    // something to segment and the room-tone harvester something to harvest.
+    let mut samples = vec![0.0f32; n];
+    let mut state = 1u32;
+    for (i, sample) in samples.iter_mut().enumerate() {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let noise = f64::from(state >> 8) / f64::from(1u32 << 23) - 1.0;
+        let t = i as f64 / f64::from(sample_rate);
+        let voiced = (1.5..3.5).contains(&t) || (5.0..7.0).contains(&t);
+        let level = if (1.5..3.5).contains(&t) { 0.06 } else { 0.22 };
+        let envelope = if voiced {
+            0.5 - 0.5 * (std::f64::consts::TAU * 4.0 * t).cos()
+        } else {
+            0.0
+        };
+        let tone: f64 = (1..14)
+            .map(|h| (std::f64::consts::TAU * 120.0 * f64::from(h) * t).sin() / f64::from(h))
+            .sum();
+        *sample = (tone * envelope * level + noise * 0.0015) as f32;
+    }
+
+    let audio = leveller_wav::Audio {
+        signal: Signal::mono(sample_rate, samples),
+        bit_depth: 24,
+        format: leveller_wav::SampleFormat::Int,
+    };
+    std::fs::write(
+        path,
+        leveller_wav::encode(&audio).map_err(std::io::Error::other)?,
+    )
 }
 
 /// Draw a particular model into a PNG.
