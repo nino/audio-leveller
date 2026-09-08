@@ -11,6 +11,7 @@ license = "MIT"
 repository = "https://github.com/nino/audio-leveller"
 
 [workspace.dependencies]
+leveller-audio = { path = "crates/leveller-audio" }
 leveller-corpus = { path = "crates/leveller-corpus" }
 leveller-dsp = { path = "crates/leveller-dsp" }
 leveller-pipeline = { path = "crates/leveller-pipeline" }
