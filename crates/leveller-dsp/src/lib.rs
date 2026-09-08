@@ -5,6 +5,7 @@
 
 pub mod biquad;
 pub mod convolve;
+pub mod declick;
 pub mod dynamics;
 pub mod fft;
 pub mod loudness;
@@ -19,6 +20,7 @@ pub mod truepeak;
 
 pub use biquad::{Biquad, apply_cascade, cascade_magnitude_db, kweighting};
 pub use convolve::convolve;
+pub use declick::{DeclickOptions, declick};
 pub use dynamics::{Compressor, Expander, Timing};
 pub use fft::{FftPlan, RealFftPlan, hann_window, power_spectrum};
 pub use loudness::Weighted;

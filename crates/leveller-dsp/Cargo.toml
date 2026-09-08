@@ -18,4 +18,7 @@ default = ["serde"]
 serde = ["dep:serde"]
 
 [dev-dependencies]
+# A development cycle, which cargo allows: the corpus is built from the DSP,
+# and the DSP is tested against the corpus.
+leveller-corpus.workspace = true
 serde_json.workspace = true

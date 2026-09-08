@@ -95,7 +95,8 @@ fn median(values: &mut [f64]) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::convolve::{convolve, synthetic_impulse};
+    use crate::convolve::convolve;
+    use leveller_corpus::{RirOptions, synthetic_rir};
     use std::f64::consts::TAU;
 
     const SR: u32 = 48_000;
@@ -128,7 +129,19 @@ mod tests {
         // The property the dereverb stage relies on. Absolute values from a
         // blind estimate are not worth asserting; the ordering is.
         let dry = bursts(20, 300.0, 300.0);
-        let wet = Signal::mono(SR, convolve(dry.channel(0), &synthetic_impulse(SR, 0.5, 3)));
+        let wet = Signal::mono(
+            SR,
+            convolve(
+                dry.channel(0),
+                &synthetic_rir(
+                    SR,
+                    &RirOptions {
+                        rt60_sec: 0.5,
+                        ..RirOptions::default()
+                    },
+                ),
+            ),
+        );
 
         let dry_ms = reverb_decay(&dry).expect("dry decay");
         let wet_ms = reverb_decay(&wet).expect("wet decay");
@@ -138,8 +151,32 @@ mod tests {
     #[test]
     fn a_longer_room_measures_longer_than_a_shorter_one() {
         let dry = bursts(20, 300.0, 300.0);
-        let short = Signal::mono(SR, convolve(dry.channel(0), &synthetic_impulse(SR, 0.2, 3)));
-        let long = Signal::mono(SR, convolve(dry.channel(0), &synthetic_impulse(SR, 0.8, 3)));
+        let short = Signal::mono(
+            SR,
+            convolve(
+                dry.channel(0),
+                &synthetic_rir(
+                    SR,
+                    &RirOptions {
+                        rt60_sec: 0.2,
+                        ..RirOptions::default()
+                    },
+                ),
+            ),
+        );
+        let long = Signal::mono(
+            SR,
+            convolve(
+                dry.channel(0),
+                &synthetic_rir(
+                    SR,
+                    &RirOptions {
+                        rt60_sec: 0.8,
+                        ..RirOptions::default()
+                    },
+                ),
+            ),
+        );
 
         let short_ms = reverb_decay(&short).expect("short decay");
         let long_ms = reverb_decay(&long).expect("long decay");
@@ -168,24 +205,51 @@ mod tests {
     }
 
     #[test]
-    fn a_finer_frame_gives_a_comparable_answer() {
+    fn the_frame_size_changes_the_answer_and_the_stage_must_hold_it_fixed() {
+        // Worth being explicit about, because it looks like an implementation
+        // detail and is not. A coarse frame smooths the envelope and reports
+        // the slow room tail; a fine one resolves the fast initial fall the
+        // talker's own articulation produces, and reports that instead. The
+        // numbers differ by a factor of three on the same audio.
+        //
+        // So a threshold in milliseconds is only meaningful against a stated
+        // frame size, and the dereverb stage's dryness threshold is calibrated
+        // against reverb_decay's 5 ms.
         let dry = bursts(20, 300.0, 300.0);
-        let wet = Signal::mono(SR, convolve(dry.channel(0), &synthetic_impulse(SR, 0.5, 3)));
+        let wet = Signal::mono(
+            SR,
+            convolve(dry.channel(0), &synthetic_rir(SR, &RirOptions::default())),
+        );
+
         let coarse = reverb_decay_ms(&wet, 10.0).expect("coarse");
         let fine = reverb_decay_ms(&wet, 2.0).expect("fine");
-        // Not equal — the envelope is smoothed differently — but the same
-        // order, or the measurement is telling you about the frame size rather
-        // than about the room.
-        assert!(
-            fine > coarse * 0.4 && fine < coarse * 2.5,
-            "{coarse} vs {fine}"
-        );
+        assert!(fine < coarse, "fine {fine} ms, coarse {coarse} ms");
+
+        // What does hold at any frame size, and what the stage relies on: a
+        // room makes the number bigger.
+        for frame_ms in [2.0, 5.0, 10.0] {
+            let dry_ms = reverb_decay_ms(&dry, frame_ms).expect("dry");
+            let wet_ms = reverb_decay_ms(&wet, frame_ms).expect("wet");
+            assert!(
+                wet_ms > dry_ms,
+                "at {frame_ms} ms: dry {dry_ms}, wet {wet_ms}"
+            );
+        }
     }
 
     #[test]
     fn stereo_is_measured_across_both_channels() {
         let dry = bursts(20, 300.0, 300.0);
-        let wet = convolve(dry.channel(0), &synthetic_impulse(SR, 0.5, 3));
+        let wet = convolve(
+            dry.channel(0),
+            &synthetic_rir(
+                SR,
+                &RirOptions {
+                    rt60_sec: 0.5,
+                    ..RirOptions::default()
+                },
+            ),
+        );
         let mono = reverb_decay(&Signal::mono(SR, wet.clone())).expect("mono");
         let stereo = reverb_decay(&Signal::new(SR, vec![wet.clone(), wet])).expect("stereo");
         assert_eq!(mono, stereo, "duplicating a channel should change nothing");
