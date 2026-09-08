@@ -15,6 +15,7 @@ leveller-corpus = { path = "crates/leveller-corpus" }
 leveller-dsp = { path = "crates/leveller-dsp" }
 leveller-pipeline = { path = "crates/leveller-pipeline" }
 leveller-io = { path = "crates/leveller-io" }
+leveller-listen = { path = "crates/leveller-listen" }
 leveller-stages = { path = "crates/leveller-stages" }
 leveller-ui = { path = "crates/leveller-ui" }
 leveller-wav = { path = "crates/leveller-wav" }

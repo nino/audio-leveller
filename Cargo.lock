@@ -126,6 +126,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "leveller-listen"
+version = "0.1.0"
+dependencies = [
+ "leveller-dsp",
+ "leveller-wav",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "leveller-pipeline"
 version = "0.1.0"
 dependencies = [
