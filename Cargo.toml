@@ -19,6 +19,12 @@ leveller-stages = { path = "crates/leveller-stages" }
 leveller-wav = { path = "crates/leveller-wav" }
 
 anyhow = "1.0"
+block2 = "0.6"
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "objc2-core-foundation"] }
+objc2-core-foundation = { version = "0.3", features = ["CFCGTypes"] }
+objc2-core-graphics = { version = "0.3", default-features = false, features = ["std", "libc", "CGContext", "CGColorSpace", "CGGradient", "CGColor", "CGPath", "CGAffineTransform", "CGImage"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "objc2-core-foundation"] }
 rayon = "1.12"
 realfft = "3.5"
 rustfft = "6.4"
