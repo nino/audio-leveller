@@ -1,0 +1,21 @@
+[package]
+name = "leveller-io"
+description = "Read a file, run the chain, write the results."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+leveller-dsp.workspace = true
+leveller-pipeline.workspace = true
+leveller-stages.workspace = true
+leveller-wav.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+leveller-corpus.workspace = true

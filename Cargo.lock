@@ -15,6 +15,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
+name = "leveller-cli"
+version = "0.1.0"
+dependencies = [
+ "leveller-corpus",
+ "leveller-dsp",
+ "leveller-io",
+ "leveller-pipeline",
+ "leveller-stages",
+ "leveller-wav",
+ "serde_json",
+]
+
+[[package]]
 name = "leveller-corpus"
 version = "0.1.0"
 dependencies = [
@@ -30,6 +43,20 @@ dependencies = [
  "rustfft",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "leveller-io"
+version = "0.1.0"
+dependencies = [
+ "leveller-corpus",
+ "leveller-dsp",
+ "leveller-pipeline",
+ "leveller-stages",
+ "leveller-wav",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]

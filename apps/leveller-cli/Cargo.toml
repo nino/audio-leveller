@@ -1,0 +1,24 @@
+[package]
+name = "leveller-cli"
+description = "The command line: run the chain over a file and say what it decided."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "audio-leveller"
+path = "src/main.rs"
+
+[dev-dependencies]
+leveller-corpus.workspace = true
+leveller-dsp.workspace = true
+leveller-wav.workspace = true
+
+[dependencies]
+leveller-io.workspace = true
+leveller-pipeline.workspace = true
+leveller-stages.workspace = true
+serde_json.workspace = true
