@@ -6,6 +6,7 @@
 pub mod biquad;
 pub mod convolve;
 pub mod declick;
+pub mod dereverb;
 pub mod dynamics;
 pub mod dyneq;
 pub mod eq;
@@ -25,6 +26,7 @@ pub mod truepeak;
 pub use biquad::{Biquad, apply_cascade, cascade_magnitude_db, kweighting};
 pub use convolve::convolve;
 pub use declick::{DeclickOptions, declick};
+pub use dereverb::{DereverbOptions, dereverb};
 pub use dynamics::{Compressor, Expander, Timing};
 pub use dyneq::{DynEqOptions, dynamic_eq};
 pub use eq::{EqBand, EqFit, EqFitOptions, build_cascade, decide_rumble, fit_corrective};
