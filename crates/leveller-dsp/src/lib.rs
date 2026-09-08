@@ -4,8 +4,10 @@
 //! anywhere and can be tested without a disk or a window.
 
 pub mod biquad;
+pub mod convolve;
 pub mod fft;
 pub mod loudness;
+pub mod lpc;
 pub mod resample;
 pub mod signal;
 pub mod silence;
@@ -13,8 +15,10 @@ pub mod stft;
 pub mod truepeak;
 
 pub use biquad::{Biquad, apply_cascade, cascade_magnitude_db, kweighting};
+pub use convolve::convolve;
 pub use fft::{FftPlan, RealFftPlan, hann_window, power_spectrum};
 pub use loudness::Weighted;
+pub use lpc::{ArModel, interpolate_gap};
 pub use resample::{resample, resampled_length};
 pub use signal::{Signal, from_db, to_db};
 pub use silence::{SilenceAnalysis, SilenceOptions, SilenceRegion};
