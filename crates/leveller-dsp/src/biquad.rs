@@ -175,7 +175,7 @@ pub mod kweighting {
 
     /// Stage 1: high-shelf boost centred at ~1681 Hz, the "head" filter.
     pub fn shelving(sample_rate: f64) -> Biquad {
-        let f0 = 1681.974_450_955_531_9;
+        let f0 = 1_681.974_450_955_532;
         let g = 3.999_843_853_394_032_4;
         let q = 0.707_175_236_955_419_3;
 
@@ -287,7 +287,10 @@ mod tests {
         ] {
             for &f in &[50.0, 200.0, 1_000.0, 5_000.0, 15_000.0] {
                 let (a, m) = (c.magnitude_db(f, sr), measured_db(&c, f, sr));
-                assert!((a - m).abs() < 0.02, "at {f} Hz: analytic {a}, measured {m}");
+                assert!(
+                    (a - m).abs() < 0.02,
+                    "at {f} Hz: analytic {a}, measured {m}"
+                );
             }
         }
     }
@@ -336,7 +339,10 @@ mod tests {
             let out = kweighting::apply(&input, sr);
             let rms = |xs: &[f32]| -> f64 {
                 let tail = &xs[2_000..];
-                (tail.iter().map(|x| f64::from(*x) * f64::from(*x)).sum::<f64>()
+                (tail
+                    .iter()
+                    .map(|x| f64::from(*x) * f64::from(*x))
+                    .sum::<f64>()
                     / tail.len() as f64)
                     .sqrt()
             };

@@ -225,9 +225,9 @@ type Reader = fn(&[u8]) -> f32;
 fn sample_reader(format: SampleFormat, bits: u16) -> Result<Reader, WavError> {
     let reader: Reader = match (format, bits) {
         (SampleFormat::Float, 32) => |b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]),
-        (SampleFormat::Float, 64) => |b| {
-            f64::from_le_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]]) as f32
-        },
+        (SampleFormat::Float, 64) => {
+            |b| f64::from_le_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]]) as f32
+        }
         (SampleFormat::Int, 8) => |b| (f32::from(b[0]) - 128.0) / 128.0,
         (SampleFormat::Int, 16) => |b| f32::from(i16::from_le_bytes([b[0], b[1]])) / 32768.0,
         (SampleFormat::Int, 24) => |b| {
@@ -299,9 +299,7 @@ mod tests {
             (0..channels)
                 .map(|c| {
                     (0..frames)
-                        .map(|i| {
-                            (0.5 * (TAU * (i as f64) / 32.0 + c as f64).sin()) as f32
-                        })
+                        .map(|i| (0.5 * (TAU * (i as f64) / 32.0 + c as f64).sin()) as f32)
                         .collect()
                 })
                 .collect(),
@@ -468,18 +466,9 @@ mod tests {
     #[test]
     fn nonsense_is_refused_with_a_reason() {
         assert_eq!(decode(b"nope").unwrap_err(), WavError::Truncated);
-        assert_eq!(
-            decode(b"RIFX\0\0\0\0WAVE").unwrap_err(),
-            WavError::NotRiff
-        );
-        assert_eq!(
-            decode(b"RIFF\0\0\0\0AIFF").unwrap_err(),
-            WavError::NotWave
-        );
-        assert_eq!(
-            decode(b"RIFF\0\0\0\0WAVE").unwrap_err(),
-            WavError::NoFormat
-        );
+        assert_eq!(decode(b"RIFX\0\0\0\0WAVE").unwrap_err(), WavError::NotRiff);
+        assert_eq!(decode(b"RIFF\0\0\0\0AIFF").unwrap_err(), WavError::NotWave);
+        assert_eq!(decode(b"RIFF\0\0\0\0WAVE").unwrap_err(), WavError::NoFormat);
         assert_eq!(
             encode_as(&audio(16, SampleFormat::Int), 12, SampleFormat::Int).unwrap_err(),
             WavError::UnsupportedDepth {

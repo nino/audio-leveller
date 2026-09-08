@@ -191,7 +191,10 @@ mod tests {
 
     #[test]
     fn digital_silence_peaks_at_minus_infinity() {
-        assert_eq!(Signal::silence(48_000, 1, 16).peak_dbfs(), f64::NEG_INFINITY);
+        assert_eq!(
+            Signal::silence(48_000, 1, 16).peak_dbfs(),
+            f64::NEG_INFINITY
+        );
         assert_eq!(to_db(0.0), f64::NEG_INFINITY);
     }
 

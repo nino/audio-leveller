@@ -110,7 +110,10 @@ impl RealFftPlan {
     /// # Panics
     /// If `size` is not even — a real transform has no half-spectrum otherwise.
     pub fn new(size: usize) -> Self {
-        assert!(size >= 2 && size % 2 == 0, "real FFT size must be even");
+        assert!(
+            size >= 2 && size.is_multiple_of(2),
+            "real FFT size must be even"
+        );
         let fft = RealFftPlanner::<f64>::new().plan_fft_forward(size);
         let scratch = fft.make_scratch_vec();
         Self {
@@ -137,7 +140,12 @@ impl RealFftPlan {
     /// If `frame` or `spectrum` is the wrong length.
     pub fn forward(&mut self, frame: &[f64], spectrum: &mut [Complex64]) {
         assert_eq!(frame.len(), self.size, "plan is for {} points", self.size);
-        assert_eq!(spectrum.len(), self.bins(), "spectrum is {} bins", self.bins());
+        assert_eq!(
+            spectrum.len(),
+            self.bins(),
+            "spectrum is {} bins",
+            self.bins()
+        );
         self.input.copy_from_slice(frame);
         self.fft
             .process_with_scratch(&mut self.input, spectrum, &mut self.scratch)
@@ -182,7 +190,12 @@ pub fn power_spectrum_with(plan: &mut RealFftPlan, frame: &[f32], window: &[f64]
 
     // A window of all zeros would divide by zero; treat it as unity rather than
     // handing back a spectrum of NaN.
-    let scale = 1.0 / if window_energy == 0.0 { 1.0 } else { window_energy };
+    let scale = 1.0
+        / if window_energy == 0.0 {
+            1.0
+        } else {
+            window_energy
+        };
     for (o, x) in out.iter_mut().zip(spectrum.iter()) {
         *o = x.norm_sqr() * scale;
     }
@@ -256,7 +269,10 @@ mod tests {
         // periodic one peaks there too but never repeats the endpoint.
         assert!((w[4] - 1.0).abs() < 1e-12);
         for i in 0..4 {
-            assert!((w[i] + w[i + 4] - 1.0).abs() < 1e-12, "half-overlap sum at {i}");
+            assert!(
+                (w[i] + w[i + 4] - 1.0).abs() < 1e-12,
+                "half-overlap sum at {i}"
+            );
         }
     }
 
@@ -303,7 +319,10 @@ mod tests {
 
         for k in 0..=n / 2 {
             let expected = complex[k].norm_sqr() / energy;
-            assert!((got[k] - expected).abs() < 1e-12 * expected.max(1.0), "bin {k}");
+            assert!(
+                (got[k] - expected).abs() < 1e-12 * expected.max(1.0),
+                "bin {k}"
+            );
         }
     }
 }

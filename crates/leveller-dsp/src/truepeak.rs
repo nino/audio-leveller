@@ -179,7 +179,11 @@ mod tests {
             .collect();
         let sample_peak = signal.iter().fold(0.0f32, |m, s| m.max(s.abs()));
         let true_peak = true_peak_linear(&[signal]);
-        assert!((sample_peak - 0.707_1).abs() < 1e-3, "sample peak {sample_peak}");
+        let half_power = std::f32::consts::FRAC_1_SQRT_2;
+        assert!(
+            (sample_peak - half_power).abs() < 1e-3,
+            "sample peak {sample_peak}"
+        );
         assert!(true_peak > 0.98, "true peak {true_peak}");
     }
 
@@ -226,7 +230,7 @@ mod tests {
         let signal: Vec<f32> = (0..2_000)
             .map(|i| (0.8 * (TAU * 7_000.0 * i as f64 / 48_000.0).sin()) as f32)
             .collect();
-        let envelope = true_peak_envelope(&[signal.clone()]);
+        let envelope = true_peak_envelope(std::slice::from_ref(&signal));
         let overall = true_peak_linear(&[signal]);
         let from_envelope = envelope.iter().fold(0.0f32, |m, v| m.max(*v));
         assert!((from_envelope - overall).abs() < 1e-6);

@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn doubling_a_mono_signal_into_stereo_adds_three_db() {
         let s = sine(1000.0, 1.0, SR, 0.5);
-        let mono = Weighted::new(&[s.clone()], SR).loudness();
+        let mono = Weighted::new(std::slice::from_ref(&s), SR).loudness();
         let stereo = Weighted::new(&[s.clone(), s], SR).loudness();
         assert!((stereo - mono - 3.0103).abs() < 0.01, "{stereo} vs {mono}");
     }
@@ -257,7 +257,10 @@ mod tests {
             "gated {} vs tone {tone_only}",
             w.integrated()
         );
-        assert!(w.loudness() < w.integrated() - 5.0, "the ungated mean should sag");
+        assert!(
+            w.loudness() < w.integrated() - 5.0,
+            "the ungated mean should sag"
+        );
     }
 
     #[test]
@@ -297,8 +300,7 @@ mod tests {
         // but a tenth of a dB is the honest tolerance.
         let mut signal = vec![0.0f32; SR as usize];
         signal.extend(sine(1000.0, 2.0, SR, 0.4));
-        let inside = Weighted::new(&[signal], SR)
-            .loudness_of_range(SR as usize, SR as usize * 3);
+        let inside = Weighted::new(&[signal], SR).loudness_of_range(SR as usize, SR as usize * 3);
         let alone = Weighted::new(&[sine(1000.0, 2.0, SR, 0.4)], SR).loudness();
         assert!((inside - alone).abs() < 0.1, "{inside} vs {alone}");
     }
