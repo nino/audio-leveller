@@ -61,7 +61,8 @@ Tasks:
   sign <identity>         codesign the bundles with the hardened runtime
   dmg                     build a disk image from the bundles
   verify                  check the signatures and the notarisation
-  fetch-model [<id>]      download and verify the DeepFilterNet3 weights";
+  fetch-model [<id>]      download and verify the DeepFilterNet3 weights
+  fetch-fixtures [<id>]   download and verify the evaluation recordings";
 
 fn main() -> Result<()> {
     let mut args = std::env::args().skip(1);
@@ -99,6 +100,7 @@ fn main() -> Result<()> {
             let wanted: Vec<String> = args.collect();
             fetch_models(&wanted)
         }
+        Some("fetch-fixtures") => fetch_fixtures(args.next().as_deref()),
         _ => {
             println!("{USAGE}");
             Ok(())
@@ -441,5 +443,153 @@ fn fetch_models(wanted: &[String]) -> Result<()> {
         let _ = Role::ALL;
     }
 
+    Ok(())
+}
+
+// --------------------------------------------------------- fetch-fixtures --
+
+/// A set of real recordings, as `eval/references/manifest.json` describes them.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FixtureSet {
+    id: String,
+    description: String,
+    base_url: String,
+    format: String,
+    files: Vec<FixtureFile>,
+}
+
+#[derive(serde::Deserialize)]
+struct FixtureFile {
+    name: String,
+    role: String,
+    sha256: String,
+}
+
+#[derive(serde::Deserialize)]
+struct Manifest {
+    sets: Vec<FixtureSet>,
+}
+
+/// Where a file goes depends on the part it plays, and the harness treats the
+/// three differently.
+///
+/// A reference must never land in `eval/fixtures/`, or the harness would enrol
+/// somebody else's master as a recording to be mastered — and mastering a
+/// master produces numbers that mean nothing.
+fn destination(role: &str) -> Result<&'static str> {
+    match role {
+        // Picked up automatically as `fixture:<name>`.
+        "input" => Ok("eval/fixtures"),
+        // Never processed; something to compare against.
+        "reference" | "archive" => Ok("eval/references"),
+        other => bail!("unknown role \"{other}\""),
+    }
+}
+
+/// Download the real recordings the evaluation harness can be run against.
+///
+/// The audio is not in the repository — it is hundreds of megabytes and it is
+/// someone's actual voice — so what lives there instead is a manifest of URLs
+/// and SHA-256 checksums. That is the whole point: a fixture whose bytes can
+/// drift silently is worthless as a regression baseline, and "it sounded better
+/// on my machine" is not a result anyone can check.
+fn fetch_fixtures(wanted: Option<&str>) -> Result<()> {
+    use leveller_model::registry::sha256_file;
+
+    let manifest_path = root().join("eval/references/manifest.json");
+    let manifest: Manifest = serde_json::from_slice(&fs::read(&manifest_path)?)
+        .with_context(|| format!("reading {}", manifest_path.display()))?;
+
+    let sets: Vec<&FixtureSet> = manifest
+        .sets
+        .iter()
+        .filter(|set| wanted.is_none_or(|id| set.id == id))
+        .collect();
+    if sets.is_empty() {
+        bail!(
+            "no set called \"{}\" (available: {})",
+            wanted.unwrap_or(""),
+            manifest
+                .sets
+                .iter()
+                .map(|s| s.id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+
+    for set in sets {
+        println!("{}: {} files, {}", set.id, set.files.len(), set.format);
+        println!("  {}", set.description);
+
+        for file in &set.files {
+            let dir = root().join(destination(&file.role)?);
+            fs::create_dir_all(&dir)?;
+            let target = dir.join(&file.name);
+
+            if target.is_file() {
+                let digest = sha256_file(&target)?;
+                if digest == file.sha256 {
+                    println!("  {}: present and verified", file.name);
+                    continue;
+                }
+                // Not overwritten silently: a mismatch here is either a
+                // corrupted download or a file edited in place, and both are
+                // worth knowing about before the bytes are replaced.
+                bail!(
+                    "{}: on disk but does not match the manifest\n  expected {}\n  got      {}\n  \
+                     delete it and re-run if you want the pinned version back",
+                    file.name,
+                    file.sha256,
+                    digest
+                );
+            }
+
+            let url = format!("{}{}", set.base_url, file.name);
+            println!("  {}: downloading", file.name);
+
+            // Streamed to a scratch name, verified, then renamed — so an
+            // interrupted or corrupt download never appears at the real path
+            // where the harness would pick it up as a fixture.
+            let scratch = dir.join(format!("{}.partial", file.name));
+            let fetched = run(
+                "curl",
+                &[
+                    "--fail",
+                    "--location",
+                    "--progress-bar",
+                    "--output",
+                    &scratch.to_string_lossy(),
+                    &url,
+                ],
+            );
+            if let Err(error) = fetched {
+                let _ = fs::remove_file(&scratch);
+                return Err(error);
+            }
+
+            let digest = sha256_file(&scratch)?;
+            if digest != file.sha256 {
+                let _ = fs::remove_file(&scratch);
+                bail!(
+                    "{}: checksum mismatch\n  expected {}\n  got      {}",
+                    file.name,
+                    file.sha256,
+                    digest
+                );
+            }
+            let size = fs::metadata(&scratch)?.len();
+            fs::rename(&scratch, &target)?;
+            println!(
+                "  {}: verified ({} MB) → {}/",
+                file.name,
+                size / 1_000_000,
+                destination(&file.role)?
+            );
+        }
+    }
+
+    println!("\nRun `cargo run --release --bin leveller-eval` to include them.");
     Ok(())
 }

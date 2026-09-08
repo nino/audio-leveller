@@ -9,3 +9,5 @@ publish = false
 [dependencies]
 anyhow.workspace = true
 leveller-model.workspace = true
+serde.workspace = true
+serde_json.workspace = true

@@ -155,38 +155,103 @@ pub fn model_file_path(spec: &ModelSpec, role: Role) -> Option<PathBuf> {
 /// SHA-256, hand-rolled.
 ///
 /// A hash is a page of arithmetic with published test vectors, and this needs
-/// exactly one of them. Reaching for a crate here would add a dependency to
-/// the tree of a program whose whole reason for using it is to be careful
-/// about what it trusts.
-pub fn sha256(bytes: &[u8]) -> String {
-    const K: [u32; 64] = [
-        0x428a_2f98, 0x7137_4491, 0xb5c0_fbcf, 0xe9b5_dba5, 0x3956_c25b, 0x59f1_11f1, 0x923f_82a4,
-        0xab1c_5ed5, 0xd807_aa98, 0x1283_5b01, 0x2431_85be, 0x550c_7dc3, 0x72be_5d74, 0x80de_b1fe,
-        0x9bdc_06a7, 0xc19b_f174, 0xe49b_69c1, 0xefbe_4786, 0x0fc1_9dc6, 0x240c_a1cc, 0x2de9_2c6f,
-        0x4a74_84aa, 0x5cb0_a9dc, 0x76f9_88da, 0x983e_5152, 0xa831_c66d, 0xb003_27c8, 0xbf59_7fc7,
-        0xc6e0_0bf3, 0xd5a7_9147, 0x06ca_6351, 0x1429_2967, 0x27b7_0a85, 0x2e1b_2138, 0x4d2c_6dfc,
-        0x5338_0d13, 0x650a_7354, 0x766a_0abb, 0x81c2_c92e, 0x9272_2c85, 0xa2bf_e8a1, 0xa81a_664b,
-        0xc24b_8b70, 0xc76c_51a3, 0xd192_e819, 0xd699_0624, 0xf40e_3585, 0x106a_a070, 0x19a4_c116,
-        0x1e37_6c08, 0x2748_774c, 0x34b0_bcb5, 0x391c_0cb3, 0x4ed8_aa4a, 0x5b9c_ca4f, 0x682e_6ff3,
-        0x748f_82ee, 0x78a5_636f, 0x84c8_7814, 0x8cc7_0208, 0x90be_fffa, 0xa450_6ceb, 0xbef9_a3f7,
-        0xc671_78f2,
-    ];
+/// exactly one of them. Reaching for a crate here would add a dependency to the
+/// tree of a program whose whole reason for using it is to be careful about
+/// what it trusts.
+///
+/// Incremental rather than one-shot because the things being hashed are not all
+/// small: a model file is a few megabytes, but the fixture fetcher hashes
+/// 200 MB recordings with the same code, and holding one of those in memory to
+/// checksum it is a waste when 64 KB at a time will do.
+pub struct Sha256 {
+    state: [u32; 8],
+    /// Bytes not yet part of a full 64-byte block.
+    buffer: Vec<u8>,
+    length: u64,
+}
 
-    let mut h: [u32; 8] = [
-        0x6a09_e667, 0xbb67_ae85, 0x3c6e_f372, 0xa54f_f53a, 0x510e_527f, 0x9b05_688c, 0x1f83_d9ab,
-        0x5be0_cd19,
-    ];
+const K: [u32; 64] = [
+    0x428a_2f98, 0x7137_4491, 0xb5c0_fbcf, 0xe9b5_dba5, 0x3956_c25b, 0x59f1_11f1, 0x923f_82a4,
+    0xab1c_5ed5, 0xd807_aa98, 0x1283_5b01, 0x2431_85be, 0x550c_7dc3, 0x72be_5d74, 0x80de_b1fe,
+    0x9bdc_06a7, 0xc19b_f174, 0xe49b_69c1, 0xefbe_4786, 0x0fc1_9dc6, 0x240c_a1cc, 0x2de9_2c6f,
+    0x4a74_84aa, 0x5cb0_a9dc, 0x76f9_88da, 0x983e_5152, 0xa831_c66d, 0xb003_27c8, 0xbf59_7fc7,
+    0xc6e0_0bf3, 0xd5a7_9147, 0x06ca_6351, 0x1429_2967, 0x27b7_0a85, 0x2e1b_2138, 0x4d2c_6dfc,
+    0x5338_0d13, 0x650a_7354, 0x766a_0abb, 0x81c2_c92e, 0x9272_2c85, 0xa2bf_e8a1, 0xa81a_664b,
+    0xc24b_8b70, 0xc76c_51a3, 0xd192_e819, 0xd699_0624, 0xf40e_3585, 0x106a_a070, 0x19a4_c116,
+    0x1e37_6c08, 0x2748_774c, 0x34b0_bcb5, 0x391c_0cb3, 0x4ed8_aa4a, 0x5b9c_ca4f, 0x682e_6ff3,
+    0x748f_82ee, 0x78a5_636f, 0x84c8_7814, 0x8cc7_0208, 0x90be_fffa, 0xa450_6ceb, 0xbef9_a3f7,
+    0xc671_78f2,
+];
 
-    let mut message = bytes.to_vec();
-    let bit_length = (bytes.len() as u64) * 8;
-    message.push(0x80);
-    while message.len() % 64 != 56 {
-        message.push(0);
+impl Default for Sha256 {
+    fn default() -> Self {
+        Self::new()
     }
-    message.extend_from_slice(&bit_length.to_be_bytes());
+}
 
-    let mut w = [0u32; 64];
-    for block in message.as_chunks::<64>().0 {
+impl Sha256 {
+    pub fn new() -> Self {
+        Self {
+            state: [
+                0x6a09_e667, 0xbb67_ae85, 0x3c6e_f372, 0xa54f_f53a, 0x510e_527f, 0x9b05_688c,
+                0x1f83_d9ab, 0x5be0_cd19,
+            ],
+            buffer: Vec::with_capacity(64),
+            length: 0,
+        }
+    }
+
+    pub fn update(&mut self, bytes: &[u8]) {
+        self.length += bytes.len() as u64;
+        let mut rest = bytes;
+
+        // Finish whatever partial block is already held, then take whole
+        // blocks straight from the caller's slice.
+        if !self.buffer.is_empty() {
+            let wanted = 64 - self.buffer.len();
+            let take = wanted.min(rest.len());
+            self.buffer.extend_from_slice(&rest[..take]);
+            rest = &rest[take..];
+            if self.buffer.len() == 64 {
+                let block: [u8; 64] = self.buffer[..].try_into().expect("a full block");
+                self.compress(&block);
+                self.buffer.clear();
+            }
+        }
+
+        let (blocks, tail) = rest.as_chunks::<64>();
+        for block in blocks {
+            self.compress(block);
+        }
+        self.buffer.extend_from_slice(tail);
+    }
+
+    pub fn finish(mut self) -> String {
+        // The padding is where a hand-rolled hash goes wrong: a 1 bit, then
+        // zeroes, then the length in bits — and the length must land in a block
+        // of its own when it does not fit in this one.
+        let bits = self.length * 8;
+        self.buffer.push(0x80);
+        while self.buffer.len() % 64 != 56 {
+            self.buffer.push(0);
+        }
+        self.buffer.extend_from_slice(&bits.to_be_bytes());
+
+        // Taken out of the buffer first, because compressing borrows `self`
+        // mutably and the blocks live in a field of it.
+        let blocks = std::mem::take(&mut self.buffer);
+        for block in blocks.as_chunks::<64>().0 {
+            self.compress(block);
+        }
+
+        self.state
+            .iter()
+            .map(|word| format!("{word:08x}"))
+            .collect()
+    }
+
+    fn compress(&mut self, block: &[u8; 64]) {
+        let mut w = [0u32; 64];
         for (i, word) in w.iter_mut().take(16).enumerate() {
             *word = u32::from_be_bytes([
                 block[4 * i],
@@ -204,7 +269,7 @@ pub fn sha256(bytes: &[u8]) -> String {
                 .wrapping_add(s1);
         }
 
-        let mut v = h;
+        let mut v = self.state;
         for i in 0..64 {
             let s1 = v[4].rotate_right(6) ^ v[4].rotate_right(11) ^ v[4].rotate_right(25);
             let ch = (v[4] & v[5]) ^ (!v[4] & v[6]);
@@ -228,12 +293,32 @@ pub fn sha256(bytes: &[u8]) -> String {
                 v[6],
             ];
         }
-        for (h, v) in h.iter_mut().zip(v) {
-            *h = h.wrapping_add(v);
+        for (state, v) in self.state.iter_mut().zip(v) {
+            *state = state.wrapping_add(v);
         }
     }
+}
 
-    h.iter().map(|word| format!("{word:08x}")).collect()
+/// SHA-256 of a slice.
+pub fn sha256(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hasher.finish()
+}
+
+/// SHA-256 of a file, read in chunks rather than held in memory.
+pub fn sha256_file(path: &Path) -> std::io::Result<String> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            return Ok(hasher.finish());
+        }
+        hasher.update(&buffer[..read]);
+    }
 }
 
 /// Verify one file against its expected hash.
@@ -324,6 +409,22 @@ mod tests {
             // Not a known vector, just that it produces something of the right
             // shape rather than panicking on the boundary.
             assert_eq!(sha256(&vec![0u8; length]).len(), 64);
+        }
+    }
+
+    #[test]
+    fn feeding_the_hasher_in_pieces_gives_the_same_answer() {
+        // The whole reason for the incremental form is hashing a 200 MB file in
+        // 64 KB pieces, and the buffering across a block boundary is exactly
+        // the sort of thing that works for one chunk size and not another.
+        let data: Vec<u8> = (0..1000u32).map(|i| (i % 251) as u8).collect();
+        let whole = sha256(&data);
+        for chunk in [1usize, 7, 63, 64, 65, 128, 999] {
+            let mut hasher = Sha256::new();
+            for piece in data.chunks(chunk) {
+                hasher.update(piece);
+            }
+            assert_eq!(hasher.finish(), whole, "in pieces of {chunk}");
         }
     }
 

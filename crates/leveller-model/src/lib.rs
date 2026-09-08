@@ -12,6 +12,6 @@ pub mod registry;
 pub mod session;
 
 pub use deepfilternet::{Config, DFN3};
-pub use registry::{MODELS, ModelSpec, Role, model_directory, model_for, verify_model};
+pub use registry::{MODELS, ModelSpec, Role, Sha256, model_directory, model_for, sha256, sha256_file, verify_model};
 pub use backend::{Model, backends, registry, weights_installed};
 pub use session::{ModelError, Session};

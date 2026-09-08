@@ -10,10 +10,10 @@ cargo run --release --bin leveller-eval
 A pinned set can be fetched rather than hunted for:
 
 ```bash
-pnpm fetch-fixtures
+cargo xtask fetch-fixtures
 ```
 
-(Still the TypeScript fetcher; it has not been ported yet.) That reads
+That reads
 `eval/references/manifest.json`, downloads each file, and verifies it against a
 checksum tracked in the repository – see `eval/references/README.md`.
 Reference masters from that manifest land in `eval/references/` instead, because

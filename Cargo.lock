@@ -2122,6 +2122,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "leveller-model",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

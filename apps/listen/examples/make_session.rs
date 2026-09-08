@@ -1,9 +1,14 @@
 //! Build a listening session out of synthetic audio, for the screenshots and
 //! for trying the app without a real recording to hand.
 //!
-//! Writes into `$LISTENING_ROOT` (or `./listening`) the same layout the real
-//! sessions use: `sessions/<name>/session.json`, its `key.json`, one WAV per
-//! clip, and a file under `annotate/` with something worth marking in it.
+//! Takes the directory to write into as its one argument, and insists on it:
+//! the obvious default would be `./listening`, which is where the real sessions
+//! live, and a synthetic `chili-15` sitting next to a real `chili` is a trap
+//! rather than a convenience.
+//!
+//! What it writes is the layout the real sessions use: `sessions/<name>/
+//! session.json`, its `key.json`, one WAV per clip, and a file under
+//! `annotate/` with something worth marking in it.
 //!
 //! The clips are the same passage put through different processing, which is
 //! what a real session is — otherwise the test is "which recording do you
@@ -20,12 +25,16 @@ use leveller_listen::{
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let root = PathBuf::from(
-        std::env::args()
-            .nth(1)
-            .or_else(|| std::env::var("LISTENING_ROOT").ok())
-            .unwrap_or_else(|| "listening".into()),
-    );
+    let Some(root) = std::env::args().nth(1).map(PathBuf::from) else {
+        eprintln!(
+            "Usage: cargo run -p listen-app --example make_session -- <directory>\n\n\
+             Writes a synthetic session there. Give it a scratch directory rather \n\
+             than your real listening root: the material is fake, and mixing it in \n\
+             with recordings you actually care about is how a listening test ends \n\
+             up scoring a sine wave."
+        );
+        std::process::exit(2);
+    };
     let name = "chili-15";
     let dir = root.join("sessions").join(name);
     std::fs::create_dir_all(&dir)?;
