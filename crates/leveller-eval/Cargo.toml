@@ -1,0 +1,18 @@
+[package]
+name = "leveller-eval"
+description = "The evaluation harness: a synthetic corpus, objective metrics, and bounds with reasons."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+leveller-corpus.workspace = true
+leveller-dsp.workspace = true
+leveller-pipeline.workspace = true
+leveller-stages.workspace = true
+leveller-wav.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

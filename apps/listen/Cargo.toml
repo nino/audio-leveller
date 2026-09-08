@@ -1,0 +1,51 @@
+[package]
+name = "listen-app"
+description = "The blind listening-test and annotation app."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "listen-app"
+path = "src/main.rs"
+
+[dependencies]
+leveller-audio.workspace = true
+leveller-dsp.workspace = true
+leveller-listen.workspace = true
+leveller-wav.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+leveller-corpus.workspace = true
+serde.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+aqua.workspace = true
+objc2.workspace = true
+objc2-app-kit = { workspace = true, features = [
+  "NSAccessibility",
+  "NSAccessibilityConstants",
+  "NSApplication",
+  "NSCell",
+  "NSControl",
+  "NSEvent",
+  "NSGraphicsContext",
+  "NSMenu",
+  "NSOpenPanel",
+  "NSPanel",
+  "NSResponder",
+  "NSSavePanel",
+  "NSText",
+  "NSTextField",
+  "NSTrackingArea",
+  "NSView",
+  "NSWindow",
+  "objc2-core-graphics",
+] }
+objc2-core-foundation.workspace = true
+objc2-core-graphics.workspace = true
+objc2-foundation = { workspace = true, features = ["NSGeometry", "NSString", "NSURL", "NSArray", "NSValue", "NSDate", "NSRunLoop", "NSEnumerator", "NSObject", "NSNotification"] }
