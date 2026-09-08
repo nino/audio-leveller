@@ -278,13 +278,14 @@ mod tests {
 
     impl Scratch {
         fn new() -> Self {
+            // A counter rather than the clock: macOS reports the time to the
+            // microsecond, so two scratch directories made in the same instant
+            // collide and one test's cleanup deletes the other's files.
+            static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
             let path = std::env::temp_dir().join(format!(
-                "leveller-listen-{}-{:?}",
+                "leveller-listen-{}-{}",
                 std::process::id(),
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos()
+                NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
             ));
             std::fs::create_dir_all(&path).unwrap();
             Self(path)

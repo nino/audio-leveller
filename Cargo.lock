@@ -310,6 +310,7 @@ version = "0.1.0"
 dependencies = [
  "leveller-corpus",
  "leveller-dsp",
+ "leveller-eval",
  "leveller-io",
  "leveller-pipeline",
  "leveller-stages",
@@ -333,6 +334,20 @@ dependencies = [
  "rustfft",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "leveller-eval"
+version = "0.1.0"
+dependencies = [
+ "leveller-corpus",
+ "leveller-dsp",
+ "leveller-pipeline",
+ "leveller-stages",
+ "leveller-wav",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

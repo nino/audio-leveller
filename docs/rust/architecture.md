@@ -16,6 +16,7 @@ crates/
   leveller-stages    the eight stages, the chain, the parameter schema, presets.
   leveller-io        reading a file, running the chain, writing the results.
   leveller-corpus    synthetic speech, noise, clicks and rooms, for the tests.
+  leveller-eval      the evaluation corpus, the metrics, and the bounds.
   leveller-listen    the listening-test data model, sessions, annotations, peaks.
   leveller-audio     the gapless clip player: a lock-free mixer, and a device.
   aqua               the Aqua look: palette, drawing primitives, the chrome,
@@ -26,7 +27,7 @@ crates/
 apps/
   audio-leveller     the drag-and-drop leveller. Ships as an .app bundle.
   listen             the blind listening-test and annotation app.
-  leveller-cli       the command line, and the evaluation harness.
+  leveller-cli       two binaries: the command line, and the evaluation harness.
 ```
 
 Dependencies point strictly downward. `leveller-ui` never mentions AppKit;

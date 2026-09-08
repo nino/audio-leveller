@@ -14,6 +14,7 @@ repository = "https://github.com/nino/audio-leveller"
 leveller-audio = { path = "crates/leveller-audio" }
 leveller-corpus = { path = "crates/leveller-corpus" }
 leveller-dsp = { path = "crates/leveller-dsp" }
+leveller-eval = { path = "crates/leveller-eval" }
 leveller-pipeline = { path = "crates/leveller-pipeline" }
 leveller-io = { path = "crates/leveller-io" }
 leveller-listen = { path = "crates/leveller-listen" }

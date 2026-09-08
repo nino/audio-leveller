@@ -6,6 +6,8 @@ Real recordings, pinned by checksum in `manifest.json` and fetched with:
 pnpm fetch-fixtures
 ```
 
+(Still the TypeScript fetcher; it has not been ported yet.)
+
 The audio itself is not in the repository. It is hundreds of megabytes and it is
 someone's actual voice, so what is tracked is the manifest: a URL and a SHA-256
 per file. A fixture whose bytes can change without anyone noticing is worthless

@@ -12,12 +12,20 @@ repository.workspace = true
 name = "audio-leveller"
 path = "src/main.rs"
 
+# The evaluation harness. Its own binary rather than a subcommand: it takes a
+# different set of flags, it is a developer tool rather than part of the app,
+# and nothing about levelling one file belongs in the same argument parser.
+[[bin]]
+name = "leveller-eval"
+path = "src/eval/main.rs"
+
 [dev-dependencies]
 leveller-corpus.workspace = true
 leveller-dsp.workspace = true
 leveller-wav.workspace = true
 
 [dependencies]
+leveller-eval.workspace = true
 leveller-io.workspace = true
 leveller-pipeline.workspace = true
 leveller-stages.workspace = true
