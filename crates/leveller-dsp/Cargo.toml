@@ -1,0 +1,21 @@
+[package]
+name = "leveller-dsp"
+description = "The signal processing behind Audio Leveller: no IO, no platform, just maths."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+realfft.workspace = true
+rustfft.workspace = true
+serde = { workspace = true, optional = true }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde"]
+
+[dev-dependencies]
+serde_json.workspace = true
