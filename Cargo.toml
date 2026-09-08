@@ -13,6 +13,7 @@ repository = "https://github.com/nino/audio-leveller"
 [workspace.dependencies]
 leveller-corpus = { path = "crates/leveller-corpus" }
 leveller-dsp = { path = "crates/leveller-dsp" }
+leveller-pipeline = { path = "crates/leveller-pipeline" }
 
 anyhow = "1.0"
 rayon = "1.12"
