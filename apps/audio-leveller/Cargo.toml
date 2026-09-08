@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 leveller-dsp.workspace = true
 leveller-io.workspace = true
+leveller-model.workspace = true
 leveller-pipeline.workspace = true
 leveller-stages.workspace = true
 leveller-ui.workspace = true

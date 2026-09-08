@@ -26,9 +26,8 @@ seconds and score the result against the recording itself – which supplies the
 clean reference real material otherwise lacks. They are the only place a
 *trained* denoiser can be judged, because the synthetic corpus is speech-shaped
 rather than speech and DeepFilterNet3 does not accept it as a voice. The `onnx`
-pair is skipped when the weights are absent, and until the ONNX backend is
-ported it is skipped always — loudly, in the run's output, because a check
-nobody runs must not look like one that passed.
+pair is skipped, loudly, when the weights are absent — fetch them with
+`cargo xtask fetch-model`.
 
 The chain's own outputs – `<name>_processed.wav` and `<name>_roomtone.wav`,
 which it writes next to its input – are ignored here. Otherwise processing a

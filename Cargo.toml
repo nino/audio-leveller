@@ -18,6 +18,7 @@ leveller-eval = { path = "crates/leveller-eval" }
 leveller-pipeline = { path = "crates/leveller-pipeline" }
 leveller-io = { path = "crates/leveller-io" }
 leveller-listen = { path = "crates/leveller-listen" }
+leveller-model = { path = "crates/leveller-model" }
 leveller-stages = { path = "crates/leveller-stages" }
 leveller-ui = { path = "crates/leveller-ui" }
 leveller-wav = { path = "crates/leveller-wav" }
@@ -37,12 +38,17 @@ rustfft = "6.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
+tract-onnx = "0.23"
 
 [profile.release]
 opt-level = 3
 lto = "thin"
 codegen-units = 1
 panic = "abort"
+# tract pulls in a large graph-optimisation library, and the symbol table for it
+# is most of what a debug-symbol-carrying binary weighs. Nothing here reads a
+# backtrace from a shipped build.
+strip = "symbols"
 
 # The DSP is only worth testing at speed; debug builds of it are unusably slow
 # on a real recording.

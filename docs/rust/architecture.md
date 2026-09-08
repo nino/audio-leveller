@@ -17,6 +17,7 @@ crates/
   leveller-io        reading a file, running the chain, writing the results.
   leveller-corpus    synthetic speech, noise, clicks and rooms, for the tests.
   leveller-eval      the evaluation corpus, the metrics, and the bounds.
+  leveller-model     DeepFilterNet3: the DSP around the graphs, and tract.
   leveller-listen    the listening-test data model, sessions, annotations, peaks.
   leveller-audio     the gapless clip player: a lock-free mixer, and a device.
   aqua               the Aqua look: palette, drawing primitives, the chrome,
@@ -63,6 +64,22 @@ click takes.
 Text is the exception. Editing it means selection, the clipboard, input methods
 and the spelling checker, so the layout marks out where a field goes and the
 shell puts a real `NSTextField` over the well the drawing painted.
+
+**tract rather than ONNX Runtime.** The model backend needs an inference
+engine, and the fast answer is Microsoft's ONNX Runtime. It costs a native
+library: either a build-time download from a third party's CDN, or a vendored
+`libonnxruntime.dylib` to sign, bundle and make universal alongside the app.
+tract is pure Rust, so the whole question disappears — nothing is downloaded at
+build time, nothing extra goes in the `.app`, and a cross-compile is a
+cross-compile. Upstream DeepFilterNet runs this same export through tract, so it
+is a road already driven, and the two agree: on the corpus case that turns
+entirely on the inference, tract and ONNX Runtime differ by 4e-6 dB.
+
+What it costs is size. tract adds about 14 MB to a stripped release binary,
+taking the leveller from 1.4 MB to 15.5 MB. For a local tool replacing an
+Electron app that was two orders of magnitude larger, that is a trade worth
+making; if it ever stops being one, the `DenoiseBackend` trait is the seam to
+put a different engine behind.
 
 **A real titled NSWindow with a painted title bar.** Not a borderless window:
 the system keeps drawing the shadow, the corner mask, the resize edges, the

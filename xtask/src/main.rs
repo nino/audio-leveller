@@ -8,6 +8,7 @@
 //!
 //! `cargo xtask bundle` puts the apps in `target/bundle`.
 
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -59,7 +60,8 @@ Tasks:
   bundle [--debug]        assemble the .app bundles into target/bundle
   sign <identity>         codesign the bundles with the hardened runtime
   dmg                     build a disk image from the bundles
-  verify                  check the signatures and the notarisation";
+  verify                  check the signatures and the notarisation
+  fetch-model [<id>]      download and verify the DeepFilterNet3 weights";
 
 fn main() -> Result<()> {
     let mut args = std::env::args().skip(1);
@@ -92,6 +94,10 @@ fn main() -> Result<()> {
                 verify(&bundle_path(app))?;
             }
             Ok(())
+        }
+        Some("fetch-model") => {
+            let wanted: Vec<String> = args.collect();
+            fetch_models(&wanted)
         }
         _ => {
             println!("{USAGE}");
@@ -307,5 +313,133 @@ fn verify(bundle: &Path) -> Result<()> {
         }
     }
     println!("{} verifies", bundle.display());
+    Ok(())
+}
+
+/// Run a program and fail loudly if it does.
+fn run(program: &str, args: &[&str]) -> Result<()> {
+    let status = Command::new(program)
+        .args(args)
+        .status()
+        .with_context(|| format!("running {program}"))?;
+    if !status.success() {
+        bail!("{program} failed");
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------------ fetch-model --
+
+/// Download the weights the model backend needs, and verify them.
+///
+/// The archive is checked against its own hash and then every extracted file
+/// against its own, because the two catch different things: a corrupted
+/// download, and a correct archive with one graph swapped inside it.
+///
+/// Nothing is bundled with the app. The weights carry their own licences, they
+/// are large, and a local-first tool should let the user decide what to
+/// download — which is why this is a separate command rather than something the
+/// app does on first launch.
+fn fetch_models(wanted: &[String]) -> Result<()> {
+    use leveller_model::registry::{MODELS, Role, model_path, sha256, verify_model};
+
+    let specs: Vec<_> = MODELS
+        .iter()
+        .filter(|spec| wanted.is_empty() || wanted.iter().any(|w| w == spec.id))
+        .collect();
+    if specs.is_empty() {
+        bail!(
+            "no such model (known: {})",
+            MODELS
+                .iter()
+                .map(|m| m.id)
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+
+    for spec in specs {
+        let target = model_path(spec);
+        if verify_model(spec).is_ok() {
+            println!("{}: already present in {}", spec.id, target.display());
+            continue;
+        }
+
+        println!("{}: fetching {}", spec.id, spec.archive.url);
+        println!("  licence: {} — see {}", spec.licence, spec.source);
+
+        let scratch = std::env::temp_dir().join(format!("audio-leveller-model-{}", spec.id));
+        let _ = fs::remove_dir_all(&scratch);
+        fs::create_dir_all(&scratch)?;
+        let archive = scratch.join("model.tar.gz");
+
+        // curl rather than an HTTP crate: it is on every macOS and Linux box,
+        // and a build task does not need to carry an async runtime to fetch one
+        // file.
+        run(
+            "curl",
+            &[
+                "--fail",
+                "--location",
+                "--silent",
+                "--show-error",
+                "--output",
+                &archive.to_string_lossy(),
+                spec.archive.url,
+            ],
+        )?;
+
+        let digest = sha256(&fs::read(&archive)?);
+        if digest != spec.archive.sha256 {
+            bail!(
+                "{}: archive checksum mismatch\n  expected {}\n  got      {}",
+                spec.id,
+                spec.archive.sha256,
+                digest
+            );
+        }
+
+        run(
+            "tar",
+            &[
+                "xzf",
+                &archive.to_string_lossy(),
+                "-C",
+                &scratch.to_string_lossy(),
+                &format!("--strip-components={}", spec.archive.strip),
+            ],
+        )?;
+
+        // Every file verified before anything is installed, so a bad archive
+        // never leaves a half-installed model behind.
+        for (role, file) in &spec.files {
+            let extracted = scratch.join(file.name);
+            if !extracted.is_file() {
+                bail!("{}: archive has no {}", spec.id, file.name);
+            }
+            let digest = sha256(&fs::read(&extracted)?);
+            if digest != file.sha256 {
+                bail!(
+                    "{}: {:?} ({}) checksum mismatch\n  expected {}\n  got      {}",
+                    spec.id,
+                    role,
+                    file.name,
+                    file.sha256,
+                    digest
+                );
+            }
+        }
+
+        fs::create_dir_all(&target)?;
+        for (_, file) in &spec.files {
+            fs::rename(scratch.join(file.name), target.join(file.name))?;
+        }
+        let _ = fs::remove_dir_all(&scratch);
+
+        verify_model(spec).map_err(anyhow::Error::msg)?;
+        println!("{}: installed into {}", spec.id, target.display());
+        let _ = Role::ALL;
+    }
+
     Ok(())
 }

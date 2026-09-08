@@ -1057,54 +1057,59 @@ fn clicks() -> ClickOptions {
 /// the normal state of a fresh checkout, since nothing here bundles a 9 MB
 /// model.
 ///
-/// There is no synthetic *quality* case here on purpose. A trained denoiser has
-/// learned what speech looks like, and the corpus voice is not speech: it is a
-/// glottal pulse train through a fixed formant filter, with no coarticulation,
-/// no fricatives worth the name and no prosody. Scoring the model on it would
-/// measure how far that synthesis sits from the model's training distribution,
-/// which is a fact about the corpus rather than about the model. What can
-/// honestly be asserted synthetically is that the backend runs, refuses rates
-/// it cannot handle, and does not eat the programme; quality belongs on a
-/// fixture.
+/// ## Why there is no synthetic quality case here
+///
+/// The corpus is speech-*shaped*, not speech: a harmonic stack with formants
+/// and a syllable-rate envelope. That is enough to evaluate a spectral
+/// suppressor, which knows nothing about speech and only asks what is
+/// stationary. It is not enough to evaluate a trained model, which asks whether
+/// what it is hearing is a voice — and DeepFilterNet3's answer on this material
+/// is no. Given `noisy-20db` it removes the programme rather than the noise,
+/// pulling gated loudness down by 10 dB. On real speech at the same SNR the
+/// same code moves loudness by 0.07 dB and gains 4.97 dB of SI-SDR.
+///
+/// So a synthetic bound on the model's *quality* would be measuring the
+/// corpus's synthetic-ness. What is asserted here instead is the behaviour that
+/// has to hold whatever the material: the stage must not ship a render in which
+/// a backend has deleted the programme. The quality bounds live on the fixture
+/// cases, which need a real recording.
 fn model_cases(backends: &Backends) -> Vec<EvalCase> {
     let unavailable = match backends.get("onnx") {
         None => Some("the onnx backend is not registered in this build".to_string()),
         Some(backend) => backend.unavailable_reason(SR),
     };
+    let onnx = || params(json!({ "backends": ["onnx"] }));
 
     vec![
         EvalCase {
             name: "ood-denoise-onnx".into(),
-            description: "Out-of-distribution synthetic speech, model denoiser alone".into(),
-            chain: only_with(
-                &["denoise"],
-                vec![("denoise".into(), params(json!({ "backends": ["onnx"] })))],
-            ),
+            description: "Material the model misreads — the stage must reject its output".into(),
+            chain: only_with(&["denoise"], vec![("denoise".into(), onnx())]),
             build: Box::new(|| {
                 let speech = Programme::new([-30.0, -18.0, -25.0]).build();
                 CaseInput::new(add_noise(&speech.signal, 20.0, 991))
                     .reference(speech.signal)
                     .segments(speech.segments)
+                    .target()
             }),
-            expectations: vec![Expectation::max(
-                "programmeLossDb",
-                3.0,
-                "the honest synthetic assertion about a trained model: whatever it \
-                 removes, it must not be the programme. Quality is not asserted here \
-                 because the corpus voice is out of distribution — a glottal pulse \
-                 train is not speech — and a number measured on it would be a fact \
-                 about the corpus. What it does catch is a model that has started \
-                 subtracting whatever it does not recognise",
+            expectations: vec![untouched(
+                "this is the guard case, and it is asserted on synthetic speech \
+                 precisely because the model does not recognise it. Handed material it \
+                 misreads, DeepFilterNet3 attenuates the voice by 10 dB — bounded only \
+                 by the requested reduction, which is the difference between a quiet \
+                 render and an empty one. The stage measures the programme loudness it \
+                 cost and discards a backend's output when it exceeds \
+                 `maxProgrammeLossDb`, so the signal here must come back bit-identical. \
+                 A real number means a model is free to decide the speech is the noise \
+                 and have that reach the file",
             )],
             unavailable: unavailable.clone(),
         },
         EvalCase {
             name: "clean-denoise-onnx".into(),
-            description: "Clean speech through the model denoiser — it should back off too".into(),
-            chain: only_with(
-                &["denoise"],
-                vec![("denoise".into(), params(json!({ "backends": ["onnx"] })))],
-            ),
+            description: "Clean speech through DeepFilterNet3 alone — the transparency check"
+                .into(),
+            chain: only_with(&["denoise"], vec![("denoise".into(), onnx())]),
             build: Box::new(|| {
                 let speech = Programme::new([-30.0, -18.0, -25.0]).build();
                 CaseInput::new(speech.signal.clone())
@@ -1112,9 +1117,15 @@ fn model_cases(backends: &Backends) -> Vec<EvalCase> {
                     .segments(speech.segments)
             }),
             expectations: vec![untouched(
-                "the clean-source taper is the stage's, not a backend's, so it must \
-                 hold whichever backend is selected. A model that runs anyway on a \
-                 source with nothing to remove is a model inventing detail for no reason",
+                "the same bound as `clean-denoise`, reached by a different route. This \
+                 backend declares a 45 dB clean-source threshold rather than the \
+                 stage's 35, so unlike the classical one it *does* run here — and then \
+                 costs 6.2 dB of programme loudness, because it does not recognise \
+                 synthetic speech as speech, so the guard discards it. Bit-identical \
+                 output is therefore the check that the two safeguards compose: a \
+                 backend permitted to run on clean material still cannot get speech \
+                 damage into the file. If this ever returns a real number, one of them \
+                 has stopped working",
             )],
             unavailable,
         },

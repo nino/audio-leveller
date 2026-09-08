@@ -27,6 +27,7 @@ leveller-wav.workspace = true
 [dependencies]
 leveller-eval.workspace = true
 leveller-io.workspace = true
+leveller-model.workspace = true
 leveller-pipeline.workspace = true
 leveller-stages.workspace = true
 serde_json.workspace = true

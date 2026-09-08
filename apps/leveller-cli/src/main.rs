@@ -11,7 +11,7 @@ use std::process::ExitCode;
 
 use leveller_io::{output_path_for, process_file_to};
 use leveller_pipeline::Progress;
-use leveller_stages::{ChainOptions, DEFAULT_CHAIN, build_chain, default_registry, params};
+use leveller_stages::{ChainOptions, DEFAULT_CHAIN, build_chain, params};
 
 fn main() -> ExitCode {
     match run() {
@@ -25,7 +25,10 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), String> {
     let args = args::parse(std::env::args().skip(1))?;
-    let registry = default_registry();
+    // The model backend included: it runs where its weights are installed and
+    // verify, and otherwise the classical suppressor does and the report says
+    // why.
+    let registry = leveller_model::registry();
 
     if args.help {
         println!("{}", args::USAGE);

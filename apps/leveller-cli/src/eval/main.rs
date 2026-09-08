@@ -17,7 +17,7 @@ use std::process::ExitCode;
 
 use leveller_eval::cases;
 use leveller_eval::runner;
-use leveller_stages::{default_backends, default_registry};
+
 
 fn main() -> ExitCode {
     match run() {
@@ -38,7 +38,9 @@ fn run() -> Result<bool, String> {
         return Ok(true);
     }
 
-    let backends = default_backends();
+    // The model backend included, so its cases run rather than being skipped
+    // wherever the weights happen to be installed.
+    let backends = leveller_model::backends();
     let mut cases = cases::all(&backends);
     cases.extend(
         runner::fixture_cases(&args.fixtures_dir, &backends).map_err(|e| e.to_string())?,
@@ -50,7 +52,7 @@ fn run() -> Result<bool, String> {
         }
     }
 
-    let registry = default_registry();
+    let registry = leveller_model::registry();
     // Printed as they finish rather than at the end: a full run is minutes of
     // DSP, and watching it go is the difference between a tool and a wait.
     let quiet = args.json;
@@ -110,9 +112,14 @@ mod tests {
     fn results() -> &'static Vec<runner::CaseResult> {
         static RESULTS: std::sync::OnceLock<Vec<runner::CaseResult>> = std::sync::OnceLock::new();
         RESULTS.get_or_init(|| {
-            let backends = default_backends();
+            // The classical backend only: the model cases are minutes of
+            // inference and depend on weights that are not in the repository,
+            // so the test suite runs the part that is the same everywhere and
+            // the command runs everything.
+            let backends = leveller_stages::default_backends();
             let cases = cases::all(&backends);
-            runner::run_all(&cases, &default_registry(), |_| {}, None).expect("the corpus runs")
+            runner::run_all(&cases, &leveller_stages::default_registry(), |_| {}, None)
+                .expect("the corpus runs")
         })
     }
 

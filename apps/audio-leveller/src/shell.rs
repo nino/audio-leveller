@@ -554,7 +554,7 @@ impl LevellerView {
         *self.ivars().inbox.borrow_mut() = Some(receiver);
 
         std::thread::spawn(move || {
-            let registry = leveller_stages::default_registry();
+            let registry = leveller_model::registry();
             let progress = sender.clone();
             let result = leveller_io::process_file(&path, &stages, &registry, |p| {
                 let _ = progress.send(FromWorker::Progress {
@@ -741,7 +741,7 @@ pub fn shot_busy(path: &Path) -> Result<(), std::io::Error> {
     // Re-render into the default button. The effect it returns is the run this
     // does by hand below.
     let _ = model.update(Msg::Dropped(fixture.clone()));
-    let registry = leveller_stages::default_registry();
+    let registry = leveller_model::registry();
     let result = leveller_io::process_file(&fixture, &stages, &registry, |_| {})
         .map_err(std::io::Error::other)?;
     let _ = std::fs::remove_file(&fixture);
