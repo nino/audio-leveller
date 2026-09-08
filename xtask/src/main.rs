@@ -31,14 +31,26 @@ struct App {
     opens_wav: bool,
 }
 
-const APPS: &[App] = &[App {
-    package: "audio-leveller-app",
-    binary: "audio-leveller-app",
-    display_name: "Audio Leveller",
-    identifier: "com.ninoan.audioleveller",
-    icon: Some("icon.icns"),
-    opens_wav: true,
-}];
+const APPS: &[App] = &[
+    App {
+        package: "audio-leveller-app",
+        binary: "audio-leveller-app",
+        display_name: "Audio Leveller",
+        identifier: "com.ninoan.audioleveller",
+        icon: Some("icon.icns"),
+        opens_wav: true,
+    },
+    App {
+        package: "listen-app",
+        binary: "listen-app",
+        display_name: "Listen",
+        identifier: "com.ninoan.listen",
+        icon: None,
+        // It reads whole sessions out of a folder rather than one file at a
+        // time, so a WAV dropped on its icon would have nowhere to go.
+        opens_wav: false,
+    },
+];
 
 const USAGE: &str = "\
 Usage: cargo xtask <task>

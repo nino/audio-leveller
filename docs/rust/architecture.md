@@ -14,12 +14,12 @@ crates/
                      give back the bytes that came in.
   leveller-pipeline  Signal, the Stage trait, the runner, the memoised Analyzer.
   leveller-stages    the eight stages, the chain, the parameter schema, presets.
-  leveller-model     DeepFilterNet3's frontend and the ONNX session behind it.
   leveller-io        reading a file, running the chain, writing the results.
-  leveller-eval      the synthetic corpus, the metrics, the bounds.
+  leveller-corpus    synthetic speech, noise, clicks and rooms, for the tests.
   leveller-listen    the listening-test data model, sessions, annotations, peaks.
-  aqua               the Aqua look: palette, drawing primitives, NSCell
-                     subclasses, the window. macOS only.
+  leveller-audio     the gapless clip player: a lock-free mixer, and a device.
+  aqua               the Aqua look: palette, drawing primitives, the chrome,
+                     the window, and an offscreen renderer. macOS only.
   leveller-ui        what each app *is*, as state and messages, with no window
                      in sight — so it can be tested without one, and so a GTK
                      or Win32 shell can be added without touching it.
@@ -40,14 +40,28 @@ such restriction, is considerably faster, and is checked here against a direct
 DFT — which is the only honest reference for a transform anyway. Bit-identity
 with V8's arithmetic is not a goal; agreement with the definition is.
 
-**Stock NSControls with custom NSCell subclasses, not a hand-rolled widget
-tree.** Overriding `drawBezelWithFrame:inView:` on an `NSButtonCell` replaces
-the pixels and keeps everything else: the key-view loop, key equivalents,
-Space and Return, the accessibility role, label, value and actions, the focus
-ring. A custom view hierarchy would mean rewriting all of that by hand and
-getting the accessibility subtly wrong. Custom views are for the things AppKit
-has no equivalent of — the brushed-metal ground, the gel traffic lights, the
-waveform.
+**One custom-drawn view per window, with invisible `NSView`s for the
+accessibility tree.** The first plan was stock `NSControl`s with custom
+`NSCell` subclasses, which would have kept the key-view loop and the
+accessibility behaviour for free. It did not survive contact: almost every
+control here is something AppKit has no equivalent of — the gel traffic lights,
+the waveform, the scale strips, the region overlay — and the few that are not
+were being positioned by the same layout pass anyway. So each window is one
+flipped view that paints from a `layout` module, and the same layout builds the
+hit-testing and the accessibility tree, which is what stops the three from
+disagreeing.
+
+Accessibility then has to be built by hand, and the way that works is not
+obvious. Synthetic `NSAccessibilityElement`s returned from
+`accessibilityChildren` do not work: AppKit asks for them, receives them, and
+reports none. What does work is one real, invisible `NSView` per element whose
+`hitTest:` returns null, so the mouse passes through to the drawing view and
+`accessibilityPerformPress` routes back through the same activation path a
+click takes.
+
+Text is the exception. Editing it means selection, the clipboard, input methods
+and the spelling checker, so the layout marks out where a field goes and the
+shell puts a real `NSTextField` over the well the drawing painted.
 
 **A real titled NSWindow with a painted title bar.** Not a borderless window:
 the system keeps drawing the shadow, the corner mask, the resize edges, the
