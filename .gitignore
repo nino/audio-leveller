@@ -19,3 +19,6 @@ eval/references/*
 listening/*
 !listening/specs/
 .claude/worktrees/
+
+# Rust
+/target

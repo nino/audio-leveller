@@ -1,0 +1,54 @@
+[package]
+name = "aqua"
+description = "The Aqua look, drawn with Core Graphics: palette, primitives, cells, views and the window."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2.workspace = true
+objc2.workspace = true
+objc2-app-kit = { workspace = true, features = [
+  "objc2-core-graphics",
+  "NSApplication",
+  "NSBitmapImageRep",
+  "NSColorSpace",
+  "NSImageRep",
+  "NSButton",
+  "NSButtonCell",
+  "NSCell",
+  "NSColor",
+  "NSControl",
+  "NSFont",
+  "NSGraphics",
+  "NSGraphicsContext",
+  "NSImage",
+  "NSMenu",
+  "NSMenuItem",
+  "NSParagraphStyle",
+  "NSResponder",
+  "NSScreen",
+  "NSShadow",
+  "NSStringDrawing",
+  "NSText",
+  "NSAttributedString",
+  "NSTrackingArea",
+  "NSView",
+  "NSWindow",
+  "NSPanel",
+  "NSRunningApplication",
+] }
+objc2-core-foundation.workspace = true
+objc2-core-graphics.workspace = true
+objc2-foundation = { workspace = true, features = [
+  "NSAttributedString",
+  "NSBundle",
+  "NSDictionary",
+  "NSGeometry",
+  "NSNotification",
+  "NSString",
+  "NSValue",
+] }

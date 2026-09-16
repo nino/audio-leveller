@@ -3,7 +3,7 @@
 Real recordings, pinned by checksum in `manifest.json` and fetched with:
 
 ```bash
-pnpm fetch-fixtures
+cargo xtask fetch-fixtures
 ```
 
 The audio itself is not in the repository. It is hundreds of megabytes and it is

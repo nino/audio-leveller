@@ -1,0 +1,19 @@
+[package]
+name = "leveller-stages"
+description = "The eight stages of the chain, the order they run in, and the parameters worth putting in front of someone."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+leveller-dsp.workspace = true
+leveller-pipeline.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+leveller-corpus.workspace = true

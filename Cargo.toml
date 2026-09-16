@@ -1,0 +1,59 @@
+[workspace]
+resolver = "3"
+members = ["apps/*", "crates/*", "xtask"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+authors = ["Nino Annighoefer"]
+license = "MIT"
+repository = "https://github.com/nino/audio-leveller"
+
+[workspace.dependencies]
+leveller-audio = { path = "crates/leveller-audio" }
+leveller-corpus = { path = "crates/leveller-corpus" }
+leveller-dsp = { path = "crates/leveller-dsp" }
+leveller-eval = { path = "crates/leveller-eval" }
+leveller-pipeline = { path = "crates/leveller-pipeline" }
+leveller-io = { path = "crates/leveller-io" }
+leveller-listen = { path = "crates/leveller-listen" }
+leveller-model = { path = "crates/leveller-model" }
+leveller-stages = { path = "crates/leveller-stages" }
+leveller-ui = { path = "crates/leveller-ui" }
+leveller-wav = { path = "crates/leveller-wav" }
+
+anyhow = "1.0"
+aqua = { path = "crates/aqua" }
+block2 = "0.6"
+dispatch2 = "0.3"
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "objc2-core-foundation"] }
+objc2-core-foundation = { version = "0.3", features = ["CFCGTypes"] }
+objc2-core-graphics = { version = "0.3", default-features = false, features = ["std", "libc", "CGContext", "CGColorSpace", "CGGradient", "CGColor", "CGPath", "CGAffineTransform", "CGImage"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "objc2-core-foundation"] }
+rayon = "1.12"
+realfft = "3.5"
+rustfft = "6.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tract-onnx = "0.23"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+# tract pulls in a large graph-optimisation library, and the symbol table for it
+# is most of what a debug-symbol-carrying binary weighs. Nothing here reads a
+# backtrace from a shipped build.
+strip = "symbols"
+
+# The DSP is only worth testing at speed; debug builds of it are unusably slow
+# on a real recording.
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev]
+opt-level = 1

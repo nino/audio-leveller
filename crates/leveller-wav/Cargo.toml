@@ -1,0 +1,13 @@
+[package]
+name = "leveller-wav"
+description = "RIFF/WAVE reading and writing, kept honest enough that a decode/encode round trip returns the bytes it was given."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+leveller-dsp.workspace = true
+thiserror.workspace = true
