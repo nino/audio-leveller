@@ -59,6 +59,41 @@ jobs:
       - name: Evaluation corpus
         run: pnpm eval -- --baseline eval/baseline.json
 
+  rust:
+    name: Rust workspace
+    # macOS, because the two app crates are AppKit and are not yet gated for
+    # anything else. A Linux runner would fail in `apps/` before it reached the
+    # DSP it could actually check.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # The runner's rustup is preinstalled; `rust-version` in Cargo.toml says
+      # what the workspace needs, and the current stable is past it.
+      - name: Rust toolchain
+        run: rustup update --no-self-update stable && rustup default stable && rustc --version
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Warnings are errors here and nowhere else: a developer's build should
+      # not stop for a lint, but a merge should not carry one.
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --workspace
+
+      # Same reasoning as the Node job: without weights the model backend's
+      # cases skip, and the guard case that matters most would skip for ever.
+      - name: Fetch model weights
+        run: cargo xtask fetch-model
+
+      # Release, because the harness is minutes of DSP at dev optimisation and
+      # seconds at full. The baseline comparison prints what moved; the bounds
+      # are what fail the build.
+      - name: Evaluation corpus
+        run: cargo run --release --bin leveller-eval -- --baseline eval/baseline.json
+
   reaper:
     name: REAPER script
     runs-on: ubuntu-latest
