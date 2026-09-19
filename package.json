@@ -35,18 +35,18 @@
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.102.8",
-    "@tanstack/react-router": "^1.170.32",
+    "@tanstack/react-router": "^1.170.36",
     "@types/node": "^26.4.1",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
-    "electron": "^44.1.1",
+    "electron": "^44.4.1",
     "electron-builder": "^26.15.3",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "typescript": "^7.0.2",
-    "vite": "^8.2.2",
-    "vitest": "^4.1.11"
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
   },
   "build": {
     "appId": "com.ninoan.audioleveller",
@@ -75,6 +75,6 @@
     }
   },
   "optionalDependencies": {
-    "onnxruntime-node": "^1.29.0"
+    "onnxruntime-node": "^1.30.0"
   }
 }
