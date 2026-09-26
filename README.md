@@ -435,24 +435,29 @@ project does — the `.icns` is committed, so a build never runs it.
 
 ### Signed releases
 
-`.github/workflows/release.yml` builds the Apple Silicon DMG, signs it with a
-Developer ID certificate, notarises both the app and the disk image, and
-staples the tickets. A stapled DMG opens on someone else's Mac with no
-Gatekeeper warning and no network round-trip.
+`.github/workflows/release.yml` builds the two Rust apps, Audio Leveller and
+Listen, with `cargo xtask bundle`, signs them with a Developer ID certificate
+and the hardened runtime, notarises and staples them, then puts them in a disk
+image that is itself signed, notarised and stapled. The apps and the DMG open
+on someone else's Mac with no Gatekeeper warning and no network round-trip.
+The Electron app is no longer part of a release.
 
-Only arm64 is built. `onnxruntime-node` downloads binaries for the host
-architecture at install time, so the machine that builds decides which ONNX
-runtime ends up in the bundle, and cross-building Intel would mean fetching
-that dependency for a platform the runner is not.
+Only arm64 is built, because the bundles are built for the runner's own
+architecture. Nothing stands in the way of a universal build now that the
+ONNX runtime is gone; it would mean building both targets and joining them
+with `lipo` in `xtask bundle`.
 
-The workflow imports the certificate into a keychain of its own rather than
-letting electron-builder do it. electron-builder passes the `.p12` password to
-`security set-key-partition-list`, which wants the keychain's password —
-harmless on older systems, fatal on macOS 26, and unchanged in electron-builder
-26. With `CSC_LINK` unset it skips that path and searches `CSC_KEYCHAIN`
-instead. The same bug is why signing locally works best with no `CSC_LINK` at
-all: the certificate is already in your login keychain, and electron-builder
-will find it there.
+The same steps work locally, given a Developer ID certificate in the login
+keychain:
+
+```bash
+cargo xtask bundle
+cargo xtask sign "Developer ID Application: …"
+cargo xtask dmg
+```
+
+That leaves the apps signed but not notarised; notarising needs the App Store
+Connect key the workflow uses.
 
 Five repository secrets, under Settings → Secrets and variables → Actions:
 
@@ -464,8 +469,8 @@ Five repository secrets, under Settings → Secrets and variables → Actions:
 | `APPLE_API_KEY_ID` | The ten-character key ID shown next to that key. |
 | `APPLE_API_ISSUER_ID` | The issuer UUID shown above the key list. |
 
-Cutting a release is a version bump and a tag — the workflow refuses to build
-if the two disagree:
+Cutting a release is a bump of `version` under `[workspace.package]` in
+`Cargo.toml` and a tag — the workflow refuses to build if the two disagree:
 
 ```bash
 git tag v0.2.0 && git push origin v0.2.0

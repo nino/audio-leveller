@@ -1,9 +1,9 @@
 name: Release
 
-# Signed, notarised macOS build. Tag a version and the DMG lands on a GitHub
-# release page you can send someone; a manual run does the same work and leaves
-# the DMG as a run artifact instead, which is how you test the pipeline without
-# burning a version number.
+# Signed, notarised macOS build of the Rust apps. Tag a version and the DMG
+# lands on a GitHub release page you can send someone; a manual run does the
+# same work and leaves the DMG as a run artifact instead, which is how you test
+# the pipeline without burning a version number.
 on:
   push:
     tags: ["v*"]
@@ -22,35 +22,29 @@ permissions:
 jobs:
   mac:
     name: Signed DMG (Apple Silicon)
-    # macos-latest is an Apple Silicon runner, which is the arch we ship:
-    # onnxruntime-node's install script only fetches binaries for the host, so
-    # building where we ship is what keeps the ONNX backend in the bundle.
+    # macos-latest is an Apple Silicon runner, and the bundles are built for
+    # the host, so this is what decides the architecture that ships.
     runs-on: macos-latest
     timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
+      - name: Rust toolchain
+        run: rustup update --no-self-update stable && rustup default stable && rustc --version
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
+      - uses: Swatinem/rust-cache@v2
 
-      # Unlike CI, this install must be the real thing: the Electron binary and
-      # onnxruntime's native dylib are precisely what gets signed here.
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      # A tag that disagrees with package.json produces a release called v0.2.0
-      # holding a DMG called 0.1.0. Catch it before anything is signed.
-      - name: Check the tag matches package.json
+      # A tag that disagrees with the workspace version produces a release
+      # called v0.3.0 holding a DMG called 0.2.0. Catch it before anything is
+      # signed. xtask takes the bundle version from the same place.
+      - name: Check the tag matches the workspace version
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          version=$(node -p "require('./package.json').version")
+          version=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "xtask") | .version')
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $version"
+            echo "::error::tag $GITHUB_REF_NAME does not match workspace version $version"
             exit 1
           fi
 
@@ -68,14 +62,10 @@ jobs:
           umask 077
           printf '%s\n' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/apple-api-key.p8"
 
-      # The certificate is imported here rather than by electron-builder,
-      # because the way electron-builder does it is wrong: it hands
-      # `security set-key-partition-list` the .p12 password where the
-      # keychain's own password belongs. macOS 26 rejects that outright
-      # (SecKeychainUnlock), and the line is unchanged in electron-builder 26,
-      # so the runner's OS version would decide whether a release builds.
-      # Given no CSC_LINK, electron-builder skips its own keychain handling and
-      # searches CSC_KEYCHAIN instead — which is the one built here.
+      # A keychain of its own, unlocked with a password generated here, so
+      # codesign never stops to ask. The identity's hash goes into the
+      # environment: it names exactly one certificate, where the common name
+      # could match an expired one left in the search list.
       - name: Import the signing certificate
         env:
           MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
@@ -96,102 +86,97 @@ jobs:
           security set-keychain-settings "$keychain"
           security unlock-keychain -p "$keychain_password" "$keychain"
           security import "$certificate" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" \
-            -T /usr/bin/codesign -T /usr/bin/productbuild
+            -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
             -k "$keychain_password" "$keychain" > /dev/null
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           rm -f "$certificate"
 
           security find-identity -v -p codesigning "$keychain"
-          if ! security find-identity -v -p codesigning "$keychain" | grep -q "Developer ID Application"; then
+          identity=$(security find-identity -v -p codesigning "$keychain" \
+            | awk '/Developer ID Application/ { print $2; exit }')
+          if [ -z "$identity" ]; then
             echo "::error::the certificate holds no Developer ID Application identity — wrong export?"
             exit 1
           fi
+          echo "SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
 
-      # Hardened runtime is on, and electron-builder's default entitlements
-      # cover what Electron and a loaded ONNX dylib need: JIT, unsigned
-      # executable memory, and library validation off. Notarisation of the .app
-      # happens here, from the API key written above.
-      - name: Build, sign and notarise the app
-        env:
-          CSC_KEYCHAIN: ${{ runner.temp }}/signing.keychain-db
-          APPLE_API_KEY: ${{ runner.temp }}/apple-api-key.p8
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
+      # Both bundles, release profile, signed with the hardened runtime. No
+      # entitlements: a statically linked Rust binary needs none of the JIT and
+      # library-validation exceptions Electron did.
+      - name: Build and sign the apps
         run: |
-          pnpm build
-          pnpm exec electron-builder --mac --publish never
+          cargo xtask bundle
+          cargo xtask sign "$SIGNING_IDENTITY"
 
-      # The step above notarises the .app; the disk image around it carries no
-      # ticket of its own, so Gatekeeper has to phone home the first time
-      # someone mounts it — and refuses if they are offline. One more
-      # submission and a staple makes the DMG self-contained.
-      - name: Notarise and staple the disk image
+      # Apple's service takes a zip. One submission covers both apps, since the
+      # ticket is looked up per bundle when stapling.
+      - name: Notarise and staple the apps
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: |
-          shopt -s nullglob
-          dmgs=(release/*.dmg)
-          if [ ${#dmgs[@]} -ne 1 ]; then
-            echo "::error::expected exactly one DMG in release/, found ${#dmgs[@]}"
-            exit 1
-          fi
-          xcrun notarytool submit "${dmgs[0]}" \
-            --key "$RUNNER_TEMP/apple-api-key.p8" \
-            --key-id "$APPLE_API_KEY_ID" \
-            --issuer "$APPLE_API_ISSUER_ID" \
-            --wait
-          xcrun stapler staple "${dmgs[0]}"
+          ditto -c -k --keepParent target/bundle "$RUNNER_TEMP/bundles.zip"
+          .github/scripts/notarise "$RUNNER_TEMP/bundles.zip"
+          for app in target/bundle/*.app; do
+            xcrun stapler staple "$app"
+          done
 
-      # What a downloader's Mac will check, checked here instead: the signature
-      # is whole, the ticket is attached, and Gatekeeper opens it.
-      - name: Verify the signature and the ticket
+      # The disk image is made from the stapled apps, so someone who drags them
+      # out offline still has the tickets. Then the image is signed and
+      # notarised in its own right, so mounting it needs no network either.
+      - name: Build, sign, notarise and staple the disk image
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: |
-          shopt -s nullglob
-          dmgs=(release/*.dmg)
-          apps=(release/mac*/*.app)
-          if [ ${#apps[@]} -ne 1 ] || [ ${#dmgs[@]} -ne 1 ]; then
-            echo "::error::expected one app and one DMG, found ${#apps[@]} and ${#dmgs[@]}"
-            exit 1
-          fi
+          dmg=$(cargo xtask dmg | tail -n 1)
+          codesign --timestamp --sign "$SIGNING_IDENTITY" "$dmg"
+          .github/scripts/notarise "$dmg"
+          xcrun stapler staple "$dmg"
+          echo "DMG=$dmg" >> "$GITHUB_ENV"
 
-          codesign --verify --deep --strict --verbose=2 "${apps[0]}"
+      # What a downloader's Mac will check, checked here instead: signatures
+      # whole, Developer ID, hardened runtime, tickets attached, and Gatekeeper
+      # accepting both the app and the image it arrives in.
+      - name: Verify the signatures and the tickets
+        run: |
+          for app in target/bundle/*.app; do
+            codesign --verify --strict --verbose=2 "$app"
 
-          signature=$(codesign --display --verbose=4 "${apps[0]}" 2>&1)
-          echo "$signature" | grep -E "Authority|TeamIdentifier|flags="
-          if ! echo "$signature" | grep -q "Authority=Developer ID Application"; then
-            echo "::error::not signed with a Developer ID Application certificate"
-            exit 1
-          fi
-          if ! echo "$signature" | grep -q "flags=.*runtime"; then
-            echo "::error::hardened runtime is not enabled"
-            exit 1
-          fi
+            signature=$(codesign --display --verbose=4 "$app" 2>&1)
+            echo "$signature" | grep -E "Authority|TeamIdentifier|flags="
+            if ! echo "$signature" | grep -q "Authority=Developer ID Application"; then
+              echo "::error::$app is not signed with a Developer ID Application certificate"
+              exit 1
+            fi
+            if ! echo "$signature" | grep -q "flags=.*runtime"; then
+              echo "::error::$app does not have the hardened runtime"
+              exit 1
+            fi
 
-          # Both tickets: the one stapled to the app, and the one stapled to the
-          # disk image around it. For the DMG this is the whole check available.
-          # spctl wants a signature on the disk image, and electron-builder
-          # leaves disk images unsigned on purpose — its own schema says signing
-          # them "will lead to unwanted errors in combination with notarization
-          # requirements" — so asking spctl about the DMG only ever gets back
-          # "no usable signature", ticket or no ticket.
-          xcrun stapler validate "${apps[0]}"
-          xcrun stapler validate "${dmgs[0]}"
+            xcrun stapler validate "$app"
 
-          # What Gatekeeper actually does when someone runs the app they dragged
-          # out of that disk image.
-          assessment=$(spctl --assess --type exec -vv "${apps[0]}" 2>&1)
+            assessment=$(spctl --assess --type exec -vv "$app" 2>&1)
+            echo "$assessment"
+            if ! echo "$assessment" | grep -q "source=Notarized Developer ID"; then
+              echo "::error::Gatekeeper does not see $app as a notarised Developer ID app"
+              exit 1
+            fi
+          done
+
+          xcrun stapler validate "$DMG"
+          assessment=$(spctl --assess --type open --context context:primary-signature -vv "$DMG" 2>&1)
           echo "$assessment"
           if ! echo "$assessment" | grep -q "source=Notarized Developer ID"; then
-            echo "::error::Gatekeeper does not see a notarised Developer ID app"
+            echo "::error::Gatekeeper does not see the disk image as notarised Developer ID"
             exit 1
           fi
 
       - uses: actions/upload-artifact@v7
         with:
           name: audio-leveller-macos-arm64
-          path: release/*.dmg
+          path: ${{ env.DMG }}
           if-no-files-found: error
 
       - name: Publish the release
@@ -199,7 +184,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" release/*.dmg \
+          gh release create "$GITHUB_REF_NAME" "$DMG" \
             --title "$GITHUB_REF_NAME" \
             --generate-notes
 
