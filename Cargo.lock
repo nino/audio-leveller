@@ -59,7 +59,7 @@ checksum = "fb5dfbc6d8d2675589ccbe4d0fd61df2419075625f8c1a62325e718e2b0049f9"
 
 [[package]]
 name = "aqua"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "block2",
  "objc2",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "audio-leveller-app"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aqua",
  "block2",
@@ -627,7 +627,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "leveller-audio"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cpal",
  "leveller-dsp",
@@ -636,7 +636,7 @@ dependencies = [
 
 [[package]]
 name = "leveller-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "leveller-corpus",
  "leveller-dsp",
@@ -651,14 +651,14 @@ dependencies = [
 
 [[package]]
 name = "leveller-corpus"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "leveller-dsp",
 ]
 
 [[package]]
 name = "leveller-dsp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "leveller-corpus",
  "realfft",
@@ -669,7 +669,7 @@ dependencies = [
 
 [[package]]
 name = "leveller-eval"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "leveller-corpus",
  "leveller-dsp",
@@ -683,7 +683,7 @@ dependencies = [
 
 [[package]]
 name = "leveller-io"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "leveller-corpus",
  "leveller-dsp",
@@ -697,7 +697,7 @@ dependencies = [
 
 [[package]]
 name = "leveller-listen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "leveller-dsp",
  "leveller-wav",
@@ -708,7 +708,7 @@ dependencies = [
 
 [[package]]
 name = "leveller-model"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "leveller-dsp",
  "leveller-pipeline",
@@ -722,7 +722,7 @@ dependencies = [
 
 [[package]]
 name = "leveller-pipeline"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "leveller-corpus",
  "leveller-dsp",
@@ -733,7 +733,7 @@ dependencies = [
 
 [[package]]
 name = "leveller-stages"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "leveller-corpus",
  "leveller-dsp",
@@ -745,7 +745,7 @@ dependencies = [
 
 [[package]]
 name = "leveller-ui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "leveller-io",
  "leveller-pipeline",
@@ -755,7 +755,7 @@ dependencies = [
 
 [[package]]
 name = "leveller-wav"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "leveller-dsp",
  "thiserror 2.0.20",
@@ -781,7 +781,7 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "listen-app"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aqua",
  "leveller-audio",
@@ -2118,7 +2118,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "leveller-model",
