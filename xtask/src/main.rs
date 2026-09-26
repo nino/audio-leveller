@@ -279,14 +279,45 @@ fn sign(bundle: &Path, identity: &str) -> Result<()> {
     Ok(())
 }
 
+/// The disk image, named for the version and the architecture it was built on,
+/// since that is what goes up on the release page.
 fn dmg() -> Result<PathBuf> {
-    let output = root().join("target/Audio Leveller.dmg");
+    let arch = match std::env::consts::ARCH {
+        "aarch64" => "arm64",
+        other => other,
+    };
+    let output = root().join(format!("target/Audio Leveller-{}-{arch}.dmg", version()?));
     if output.exists() {
         std::fs::remove_file(&output)?;
     }
+
+    // The bundles plus a link to /Applications, so installing is a drag inside
+    // the window that opens. ditto rather than a Rust copy: it keeps the
+    // extended attributes a stapled ticket lives in.
+    let staging = root().join("target/dmg");
+    if staging.exists() {
+        std::fs::remove_dir_all(&staging)?;
+    }
+    std::fs::create_dir_all(&staging)?;
+    for app in APPS {
+        let bundle = bundle_path(app);
+        if !bundle.exists() {
+            bail!(
+                "{} is not there — run `cargo xtask bundle` first",
+                bundle.display()
+            );
+        }
+        let target = staging.join(bundle.file_name().expect("a bundle has a name"));
+        run(
+            "ditto",
+            &[&bundle.to_string_lossy(), &target.to_string_lossy()],
+        )?;
+    }
+    std::os::unix::fs::symlink("/Applications", staging.join("Applications"))?;
+
     let status = Command::new("hdiutil")
         .args(["create", "-volname", "Audio Leveller", "-srcfolder"])
-        .arg(bundle_root())
+        .arg(&staging)
         .args(["-ov", "-format", "UDZO"])
         .arg(&output)
         .status()
