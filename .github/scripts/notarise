@@ -1,0 +1,28 @@
+#!/bin/bash
+# Submit one file to Apple's notary service and wait for the verdict.
+#
+# The verdict is read out of notarytool's JSON rather than its exit code, so
+# every outcome ends the same way: on anything but "Accepted" the submission's
+# log is printed, because that is where Apple says which binary failed and why.
+#
+# Expects the key written by the release workflow, and APPLE_API_KEY_ID and
+# APPLE_API_ISSUER_ID in the environment.
+set -euo pipefail
+
+file=$1
+auth=(
+  --key "$RUNNER_TEMP/apple-api-key.p8"
+  --key-id "$APPLE_API_KEY_ID"
+  --issuer "$APPLE_API_ISSUER_ID"
+)
+
+result=$(xcrun notarytool submit "$file" "${auth[@]}" --wait --output-format json) || true
+echo "$result"
+status=$(echo "$result" | jq -r .status)
+id=$(echo "$result" | jq -r .id)
+
+if [ "$status" != "Accepted" ]; then
+  xcrun notarytool log "$id" "${auth[@]}" || true
+  echo "::error::notarisation of $(basename "$file") came back $status"
+  exit 1
+fi
