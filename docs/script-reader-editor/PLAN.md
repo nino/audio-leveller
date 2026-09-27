@@ -11,10 +11,13 @@ Nino answered them on 2026-09-27, and the rest of this document has been
 updated to match. Where an older passage and this section disagree, this
 section wins.
 
-- **Scale.** One chapter per output file, an hour at most. Each recording is
-  about half an hour, so a chapter is normally **two or more recordings**, and
-  a later recording usually starts by re-reading the end of the one before.
-  Several recordings per chapter is therefore a v0 requirement, not a v2 one.
+- **Scale.** One chapter per output file, an hour at most. A chapter is often
+  recorded in several sittings of about half an hour each. For v0 the sittings
+  are joined **outside the app** into one combined, otherwise unedited file
+  per chapter, so the app only ever sees one recording. A sitting usually
+  starts by re-reading the end of the one before; in the combined file that
+  is just another backward jump, handled like any retake. `Project.recordings`
+  stays a list, because punch-in (v1) adds recordings back.
 - **How the retakes actually look.** A struggle with a long sentence often
   goes: the whole sentence three times, then only its second half a few more
   times. Retake jumps land mid-sentence, and a keeper stitched from two passes
@@ -431,8 +434,15 @@ forced aligner and it is what torchaudio's alignment tutorial does.
   convolutional front end plus a transformer, which tract generally supports,
   but nobody has tried it here. This is the first step of the spike.
 - **Cost:** roughly 0.05–0.2× real time on Apple silicon CPU for the base
-  model; a half-hour recording is a few minutes at most, and the emissions
-  cache means it is paid once.
+  model. A combined chapter file of an hour or so is on the order of 3–12
+  minutes, and the emissions cache means it is paid once.
+- **Chunking:** the model cannot take an hour of audio in one call; its
+  self-attention grows with the square of the input length. The file is run
+  in windows of about 20–30 s with a couple of seconds of overlap, and the
+  emissions are stitched by keeping each window's middle and discarding the
+  overlapping edges, where the model has too little context. This is ordinary,
+  but it belongs in the spike, because a stitching error looks exactly like
+  an alignment error.
 - **The catch:** plain CTC forced alignment is *total and monotone* — it must
   consume all the audio and all the text, in order. A recording with retakes
   and asides violates both. Feeding it a script it cannot satisfy does not
@@ -545,18 +555,32 @@ Decisions). The restriction is also unnecessary. If a jump from `j'` back to
 `j` costs `J + λ·(j' − j)`, the best jump into cell `(i, j)` is
 `min over j' ≥ j of (D[i][j'] + λ·j') − λ·j + J`, and that minimum is a running
 suffix minimum along the row, so the whole grid stays O(audio words × script
-words). At the sizes in the Decisions section — a half-hour recording decodes
-to roughly 5,000 words, an hour-long chapter is roughly 9,000 script words —
-that is about 45 million cells, which is small. Sentence and clause starts can
-still be made slightly cheaper to land on, as a prior rather than a rule.
+words). At the sizes in the Decisions section — an hour-long chapter is
+roughly 9,000 script words, and its combined raw recording, retakes included,
+might decode to 10,000–13,000 words — that is on the order of 100 million
+cells. Time is not the problem; storing a back-pointer for every cell is a few
+hundred megabytes if done naively. Keeping every *k*-th row and recomputing
+the rows in between during traceback brings that down to tens of megabytes.
+Sentence and clause starts can still be made slightly cheaper to land on, as a
+prior rather than a rule.
 
-**A recording covers only part of the script.** A chapter is two or more
-recordings, and each one starts and ends somewhere in the middle of the
-script, usually with some overlap at the boundary. So the alignment is free at
-both ends of the script dimension (semi-global): starting at any script word
-and stopping at any script word costs nothing. The passes from all of a
-chapter's recordings then go into the same grouping and keeper selection
-below, which already do not care which recording a pass came from.
+**Free ends in the script.** The alignment is free at both ends of the
+script dimension (semi-global): starting and stopping at any script word costs
+nothing. A combined chapter file does cover the whole script, so production
+use does not need this, but the spike and the eval bounds run on excerpts (60
+seconds, 5 minutes) that do not, and it costs nothing to support. Chatter
+before the first line or after the last ("chapter three, take one") is just
+unaligned audio either way.
+
+**Where the sittings meet.** The join between two sittings in the combined
+file is usually a backward jump (the new sitting re-reads a little) and
+almost always a step in room tone, level and microphone distance. The jump is
+handled like any retake. The step is what `spliceCost`'s level and
+noise-floor terms are for, and it is the strongest case for the room-tone
+seam described under Cut mechanics. The per-recording statistics the scorer
+uses (median speaking rate, loudness relative to programme) are computed over
+the whole file; if sittings differ enough for that to matter, the fixture
+will show it.
 
 **The jump cost is calibrated, not chosen.** `J` is the single knob that trades
 missed retakes against false ones, and it should be *calibrated on the
@@ -967,7 +991,7 @@ Two affordances that matter more than they look:
 ### v0 — the reading report (read-only)
 
 **Nothing is edited. Nothing is cut. Nothing is rendered.** v0 aligns a
-chapter's recordings (usually two or more) to a pasted script and tells the
+chapter's recording (one combined file, see Decisions) to a pasted script and tells the
 user what happened, and that alone is
 worth having: a punch-list of spans to re-record, and a map of where the
 retakes are, is most of a session's editing decisions made.
@@ -977,11 +1001,11 @@ retakes are, is most of a session's editing decisions made.
   classification, retake grouping and scoring. Pure, no platform, unit-tested,
   like `leveller-dsp`.
 - An `align` subcommand of `apps/leveller-cli`
-  (`leveller align script.txt take1.wav take2.wav --report out.json`),
+  (`leveller align script.txt chapter.wav --report out.json`),
   printing what it found and how sure it is. This is the tool the spike and the
   eval bounds run against, before any UI exists.
 - The reader app: a text field to paste the script into, then the script with
-  divergences highlighted, the alignment ribbon (one per recording), the issue
+  divergences highlighted, the alignment ribbon, the issue
   list and the punch-list. Aqua-styled, like the other two apps.
 - wav2vec2 added to the `leveller-model` registry with pinned hashes and
   fetched by `cargo xtask fetch-model`, with the same "say exactly what is
@@ -1013,8 +1037,9 @@ the alignment actually is.
 **Build this first, before any of the above: the labelled fixture.** Record
 one 10–15 minute read of a known script with retakes and misreadings made
 *deliberately and logged as they happen*, including the "whole sentence
-three times, then the second half three more times" pattern, and split across
-two recordings with an overlap, the way a real chapter is. Annotate it in the
+three times, then the second half three more times" pattern, and recorded
+in two sittings joined into one file with an overlap at the join, the way a
+real chapter will be. Annotate it in the
 annotation mode of `apps/listen`. Then bound alignment quality in
 `leveller-eval` the way every
 other stage in this repo is bounded — word-boundary error in ms, retake
@@ -1051,8 +1076,8 @@ completely different job (fit the new take's spectrum to the old take's).
 ### v2 — projects
 
 A book is many chapters, recorded over weeks with different room tone and
-different distances to the microphone. (Several recordings per *chapter* is
-already v0.) Book-level assembly, per-chapter export through the chain, consistency checks across
+different distances to the microphone. Book-level assembly, importing a
+chapter's sittings as separate files instead of pre-joining them, per-chapter export through the chain, consistency checks across
 sessions, breath-aware cuts once the breath detector the annotator is
 collecting data for exists, Whisper for naming asides, and a
 reader-specific pronunciation lexicon built from confirmed alignments — which
@@ -1064,13 +1089,15 @@ part of this plan, considerably less weak.
 1. Record and label the fixture. (Half a day. Do it first.)
 2. Export wav2vec2-base-960h to ONNX and check that tract loads and runs it
    (if it does not, that is the first thing to solve, before any accuracy
-   question). Run it on 60 s of the fixture; print per-word timings from a plain forced alignment against the true text
+   question). Run it on 60 s of the fixture, in the same overlapping windows
+   production will use, so the stitching is tested from the start; print
+   per-word timings from a plain forced alignment against the true text
    of that 60 s. Compare against hand-marked boundaries. **If the median
    boundary error is not under ~30 ms, stop and reconsider the whole option.**
 3. Greedy decode plus the jump-permitting alignment over a 5-minute stretch
    with known retakes, including the half-sentence ones. Measure recall and
    precision of the backward jumps. Calibrate `J`. Then run it across the
-   boundary between the two fixture recordings.
+   join between the two sittings in the fixture.
 4. Only then build anything with a UI.
 
 Steps 2 and 3 are a few days and they settle the largest risk in the project.
@@ -1119,10 +1146,9 @@ Two fallbacks for what the rules miss:
   the same written word in the chapter. That remembered list is a first,
   small version of the v2 pronunciation lexicon.
 
-**Inference time.** A chapter is an hour at most and a recording about half an
-hour, so the first pass over a recording is minutes at most, and the emissions
-cache makes re-alignment nearly free. The UI still needs a progress report per
-recording.
+**Inference time.** One combined file per chapter, an hour of finished audio
+plus retakes, so the first pass is minutes, and the emissions cache makes
+re-alignment nearly free. The UI still needs a progress report while it runs.
 
 **The asymmetry of a wrong cut.** Stated once more because it should govern
 every threshold: a missed retake costs a minute of manual work, a wrong cut
@@ -1134,8 +1160,8 @@ above recall.
 distance, voice, time of day. Splicing it in is easy; making it inaudible is
 the hard part, and it may turn out that punch-in only works within a session.
 
-**Whole-chapter second takes.** Several recordings per chapter is v0, because
-each recording covers part of the chapter. Recording the *same* part twice in
-full and choosing per sentence is the same machinery (the DP over covers does
-not care which recording a pass came from), but the UI for choosing between
-two complete reads is not v0.
+**Whole-chapter second takes.** Recording the *same* chapter twice in full
+and choosing per sentence is the same machinery (the DP over covers does not
+care which recording a pass came from, and in a combined file the second read
+is one long backward jump), but the UI for choosing between two complete reads
+is not v0.
