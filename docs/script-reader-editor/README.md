@@ -29,15 +29,17 @@ browser. Fake data throughout, but the interactions that carry the idea work.
   marked word or an issue row to select it; <kbd>j</kbd>/<kbd>k</kbd> to move,
   <kbd>a</kbd>/<kbd>s</kbd>/<kbd>i</kbd>/<kbd>x</kbd> to resolve,
   <kbd>space</kbd> to play.
-- **[mockups/retakes.html](mockups/retakes.html)** — the retake review. One
-  card per group, passes as lanes over a shared *script-position* axis, the
-  keeper highlighted with its reasoning written out in words. Click a lane to
-  change which take is kept and watch the reasoning and the resulting text
-  update; group 2 demonstrates a stitched cover, where the kept pass does not
-  span everything the abandoned one did.
-  This predates the decision to make retake review a take-comping view
-  (see PLAN.md, "Retake review: take comping"): the mockup picks whole
-  lanes, where the plan now selects spans within lanes.
+- **[mockups/retakes.html](mockups/retakes.html)** — the retake review, as
+  take comping. One card per group: the script words as a ruler, a comp lane
+  showing which pass supplies each word, and one lane per pass, all aligned
+  word by word rather than by time. Each group opens with the suggested comp
+  (a small version of the plan's cover DP, running on the fake data), with
+  the reasoning for each segment and each join written out. Drag across a
+  lane to take those words from it; click a pass name to take all of it;
+  click or <kbd>⇧</kbd>-click ruler words and press <kbd>1</kbd>–<kbd>9</kbd>;
+  click a join and move it with <kbd>⌥←</kbd>/<kbd>⌥→</kbd>. Group 1 is the
+  "whole sentence three times, then the second half three more" pattern;
+  bulk apply skips stitched comps.
 
 Styling follows `listen/src/aqua.css` from before the Rust rewrite (now the
 `aqua` crate), so the screens read as part of the same application. The

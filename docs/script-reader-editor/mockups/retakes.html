@@ -86,81 +86,110 @@
       h1 { font-size: 20px; margin: 2px 0 4px; text-shadow: 0 1px 0 rgba(255,255,255,0.7); }
       h2 { font-size: 14px; margin: 0 0 8px; text-shadow: 0 1px 0 rgba(255,255,255,0.7); }
 
+
+      .aqua-button:disabled { opacity: 0.5; cursor: default; }
+
       /* ---- a group card ---- */
-      .card.applied { opacity: 0.62; }
-      .card.rejected { opacity: 0.62; }
+      .card { outline: none; }
+      .card.active { border-color: rgba(40,90,170,0.7); box-shadow: inset 0 1px 0 #fff, 0 0 0 2px rgba(80,140,240,0.35), 0 1px 2px rgba(0,0,0,0.25); }
+      .card.applied, .card.rejected { opacity: 0.62; }
       .cardhead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
       .cardhead .grow { flex: 1; }
-      .status {
-        font: 10px Monaco, Menlo, monospace; padding: 1px 7px; border-radius: 8px; background: rgba(0,0,0,0.1);
-      }
+      .status { font: 10px Monaco, Menlo, monospace; padding: 1px 7px; border-radius: 8px; background: rgba(0,0,0,0.1); }
       .status.applied { background: rgba(70,160,80,0.32); }
       .status.rejected { background: rgba(200,90,80,0.3); }
       .status.open { background: rgba(230,170,40,0.35); }
+      .chip { font: 10px Monaco, Menlo, monospace; padding: 1px 7px; border-radius: 8px; }
+      .chip.stitched { background: rgba(120,80,190,0.2); color: #4b2c80; }
+      .chip.single { background: rgba(70,160,80,0.2); color: #2f5c32; }
 
-      .axis {
-        position: relative; height: 15px; margin: 10px 0 2px;
-        font: 10px Monaco, Menlo, monospace; color: #556;
-      }
-      .axis .tick { position: absolute; top: 0; border-left: 1px solid rgba(60,80,120,0.35); padding-left: 3px; height: 15px; }
+      /* ---- the comping grid ---- */
+      .comp { margin-top: 10px; user-select: none; -webkit-user-select: none; }
+      .row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; align-items: stretch; margin-bottom: 4px; }
+      .row .name { font-size: 12px; display: flex; flex-direction: column; justify-content: center; line-height: 1.25; }
+      .row .name b { font-size: 12px; }
+      .row .name .mono { color: #666; font-size: 10px; }
+      .row.lane .name { cursor: pointer; border-radius: 4px; padding: 0 4px; margin: 0 -4px; }
+      .row.lane .name:hover { background: rgba(255,255,255,0.6); }
+      .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; border: 1px solid rgba(0,0,0,0.3); }
 
-      .lanes { display: flex; flex-direction: column; gap: 6px; }
-      .lane {
-        position: relative; display: grid; grid-template-columns: 74px minmax(0,1fr) 128px;
-        gap: 8px; align-items: center; padding: 5px 6px; border-radius: 5px; cursor: pointer;
-        border: 1px solid transparent;
+      .ruler { position: relative; height: 20px; }
+      .ruler .w {
+        position: absolute; top: 0; height: 20px; padding: 3px 3px 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+        font: 11px Palatino, "Palatino Linotype", Georgia, serif; color: #333; cursor: pointer;
+        border-left: 1px solid rgba(60,80,120,0.22);
       }
-      .lane:hover { background: rgba(255,255,255,0.5); }
-      .lane.keep {
-        background: rgba(120,200,130,0.22);
-        border-color: rgba(60,150,70,0.6);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.16);
+      .ruler .w:hover { background: rgba(255,255,255,0.6); }
+      .ruler .w.sel { background: rgba(60,120,220,0.25); color: #102a5c; }
+
+      .track {
+        position: relative; height: 38px; border-radius: 3px; overflow: hidden;
+        background: linear-gradient(to bottom, rgba(255,255,255,0.35), rgba(255,255,255,0.15));
+        border: 1px solid rgba(0,0,0,0.14);
       }
-      .lane.stitched { background: rgba(120,200,130,0.12); border-color: rgba(60,150,70,0.35); border-style: dashed; }
-      .lane .name { font-size: 12px; }
-      .lane .name b { display: block; }
-      .lane .meta { font: 10px Monaco, Menlo, monospace; color: #555; text-align: right; }
-      .track { position: relative; height: 34px; }
-      .track svg {
-        position: absolute; top: 0; height: 34px; display: block;
+      .lane .track { cursor: crosshair; }
+      .track .cov {
+        position: absolute; top: 0; bottom: 0;
         background: linear-gradient(to bottom, #f9fbff, #e7edf7);
-        border: 1px solid rgba(60,80,120,0.35); border-radius: 3px;
-        box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.15); border-left: 1px solid rgba(60,80,120,0.3); border-right: 1px solid rgba(60,80,120,0.3);
       }
-      .track .rail { position: absolute; left: 0; right: 0; top: 16px; height: 2px; background: rgba(60,80,120,0.14); }
+      .track .own { position: absolute; top: 0; bottom: 0; }
+      .track svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+      .track .div { position: absolute; bottom: 1px; height: 4px; border-radius: 2px; background: #c8443a; }
+      .track .dis { position: absolute; top: 2px; width: 7px; height: 7px; margin-left: -3px; border-radius: 50%; background: #d99a1f; border: 1px solid #8a5b00; }
+      .track .trunc {
+        position: absolute; top: 0; bottom: 0;
+        background: repeating-linear-gradient(135deg, rgba(200,70,60,0.28) 0 4px, transparent 4px 8px);
+      }
+      .track .band { position: absolute; top: 0; bottom: 0; background: rgba(60,120,220,0.14); border-left: 1px dashed rgba(40,90,170,0.6); border-right: 1px dashed rgba(40,90,170,0.6); pointer-events: none; }
+      .track .drag { position: absolute; top: 0; bottom: 0; background: rgba(60,120,220,0.28); border: 1px solid rgba(40,90,170,0.8); pointer-events: none; display: none; }
 
-      .flags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
-      .flag {
-        font-size: 10px; padding: 0 6px; border-radius: 8px; border: 1px solid #b09a6a;
-        background: linear-gradient(to bottom, #fff2cf, #f5dfa1); color: #6b4f10; white-space: nowrap;
+      .row.comprow .track { height: 30px; background: rgba(0,0,0,0.06); }
+      .comprow .seg {
+        position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center;
+        font: bold 10px Monaco, Menlo, monospace; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,0.45);
+        border-right: 1px solid rgba(0,0,0,0.25); overflow: hidden; white-space: nowrap;
       }
-      .flag.bad { border-color: #b8736c; background: linear-gradient(to bottom, #ffe0dc, #f5bdb6); color: #762a22; }
-      .flag.good { border-color: #7fa87f; background: linear-gradient(to bottom, #dff5df, #bfe6bf); color: #2f5c32; }
+      .comprow .seg.manual::after { content: "✎"; margin-left: 4px; font-weight: normal; }
+      .comprow .join {
+        position: absolute; top: -2px; bottom: -2px; width: 11px; margin-left: -5px; cursor: pointer; z-index: 2;
+        display: flex; justify-content: center;
+      }
+      .comprow .join::before { content: ""; width: 3px; background: #fff; border: 1px solid rgba(0,0,0,0.55); border-radius: 2px; }
+      .comprow .join.sel::before { background: #3d82ea; border-color: #173f86; box-shadow: 0 0 6px rgba(61,130,234,0.9); }
+      .comprow .join.restart::before { background: #f0c64a; }
+      .comprow .join.sel.restart::before { background: #3d82ea; }
+
+      .legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 0 0 104px; }
+      .legend span { display: inline-flex; align-items: center; gap: 5px; }
+      .legend i { display: inline-block; width: 14px; height: 8px; border-radius: 2px; }
 
       .why { margin: 10px 0 0; padding: 8px 10px; border-radius: 5px; }
       .why ul { margin: 4px 0 0; padding-left: 18px; }
-      .why li { margin: 1px 0; font-size: 12px; }
+      .why li { margin: 2px 0; font-size: 12px; }
+      .why li.warnline { color: #6a4d0d; }
+      .why li.joinline { color: #3a2a66; }
       .result {
         margin-top: 10px; padding: 9px 12px; border-radius: 5px; background: #fdfdfb;
         border: 1px solid rgba(0,0,0,0.28); box-shadow: inset 0 1px 4px rgba(0,0,0,0.2);
-        font-family: Palatino, "Palatino Linotype", Georgia, serif; font-size: 15px; line-height: 1.7;
+        font-family: Palatino, "Palatino Linotype", Georgia, serif; font-size: 15px; line-height: 1.8;
       }
-      .result .cutout { color: #a89; text-decoration: line-through; opacity: 0.6; }
-      .result .kept { background: rgba(120,200,130,0.24); border-radius: 2px; }
-      .result .stitchword { background: rgba(120,200,130,0.14); border-bottom: 2px dashed rgba(60,150,70,0.6); }
-      .result .seam {
-        display: inline-block; width: 12px; text-align: center; color: #7a4fae; font-weight: bold;
-      }
+      .result .rw { border-radius: 2px; padding: 0 1px; }
+      .result .seam { display: inline-block; width: 12px; text-align: center; color: #7a4fae; font-weight: bold; }
       .acts { display: flex; gap: 7px; margin-top: 11px; flex-wrap: wrap; align-items: center; }
-      .warn {
-        margin-top: 8px; padding: 7px 10px; border-radius: 5px; font-size: 12px;
-        border: 1px solid #b8934a; background: linear-gradient(to bottom, #fff6e0, #f7e6bd); color: #6a4d0d;
-      }
       .summary { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
       .big { font-size: 22px; font-weight: bold; }
       .slider { display: flex; align-items: center; gap: 8px; }
-      input[type="range"] { width: 150px; }
-      a.aqua-link { color: #2653a5; }
+      input[type="range"] { width: 130px; }
+      .keys { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+
+      .toast {
+        position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); max-width: 560px;
+        padding: 8px 14px; border-radius: 8px; font-size: 12px; color: #fff; text-align: center;
+        background: rgba(30,40,60,0.9); box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+        opacity: 0; transition: opacity 0.2s; pointer-events: none;
+      }
+      .toast.on { opacity: 1; }
     </style>
   </head>
   <body>
@@ -170,41 +199,39 @@
           <div class="lights">
             <span class="light red"></span><span class="light yellow"></span><span class="light green"></span>
           </div>
-          <div class="title">Reader — retake review — <span class="mono">ch03-second-pass.wav</span></div>
+          <div class="title">Reader — retake review — <span class="mono">ch03.wav</span></div>
         </div>
 
         <div class="toolbar">
           <a class="aqua-button small" href="editor.html">← Editor</a>
           <span class="spacer"></span>
           <span class="slider">
-            <span class="hint small">auto-apply above</span>
+            <span class="hint small">bulk-apply floor</span>
             <input type="range" id="floor" min="50" max="100" value="90" />
             <span class="mono" id="floorval">0.90</span>
           </span>
-          <button class="aqua-button small" id="applyall">Apply all above floor <kbd>⇧⏎</kbd></button>
+          <button class="aqua-button small" id="applyall" title="Stitched comps are never bulk-applied">Apply single-take groups above floor <kbd>⇧⏎</kbd></button>
           <button class="aqua-button small primary" id="render">Render edit…</button>
         </div>
 
         <div class="content">
           <div class="panel glass">
             <div class="summary">
-              <div>
-                <div class="big" id="statOpen">3</div>
-                <div class="hint small">groups to review</div>
+              <div><div class="big" id="statOpen">3</div><div class="hint small">groups to review</div></div>
+              <div><div class="big" id="statJoins">0</div><div class="hint small">joins in the comps</div></div>
+              <div><div class="big" id="statTime">0.0 s</div><div class="hint small">audio removed by applied groups</div></div>
+              <div class="hint small" style="max-width: 440px">
+                Each group opens with the <b>suggested comp</b>: later passes preferred, misreadings, cut-off
+                words and muttered passes avoided, joins placed in pauses and kept off the first word of a
+                mid-sentence restart. Drag across a lane to take those words from it instead.
               </div>
-              <div>
-                <div class="big" id="statTime">21.4 s</div>
-                <div class="hint small">audio these cuts remove</div>
-              </div>
-              <div>
-                <div class="big">4 : 1</div>
-                <div class="hint small">precision : recall weighting — a wrong cut costs far more than a missed one</div>
-              </div>
-              <div class="hint small" style="max-width: 330px">
-                Every group's default is <b>the last complete pass</b>. The reader stopped
-                re-reading when he was satisfied; that judgement outranks any score here.
-                The scores exist to <i>explain</i>, and to decide the cases the rule does not.
-              </div>
+            </div>
+            <div class="keys hint small">
+              <span><b>drag</b> across a lane: take those words from it</span>
+              <span><b>click</b> a pass name: take everything it read</span>
+              <span><b>click / ⇧click</b> ruler words: select, then <kbd>1</kbd>–<kbd>9</kbd> takes them from that pass</span>
+              <span><b>click</b> a join, then <kbd>⌥←</kbd> <kbd>⌥→</kbd> to move it a word, <kbd>space</kbd> to preview it</span>
+              <span><kbd>⏎</kbd> apply group</span>
             </div>
           </div>
 
@@ -212,245 +239,530 @@
         </div>
       </div>
     </div>
+    <div class="toast" id="toast"></div>
 
     <script>
       // ------------------------------------------------------------------
-      // Fake data, shaped like RetakeGroup / Pass / PassMetrics in ../PLAN.md.
+      // Fake data, shaped like RetakeGroup / Pass in ../PLAN.md. Word indices
+      // are local to the group; `to` is exclusive. Per-word problems are keyed
+      // by word index: div = misread or skipped (what was heard), dis = a filled
+      // pause before the word. `trunc` means the pass's last word is cut off.
       // ------------------------------------------------------------------
       const GROUPS = [
         {
-          id: "r1",
-          script: { from: 296, to: 340 },
-          text: ["The words are still arriving.", "The sentences still end where they should."],
-          conf: 0.97,
+          id: "g1", conf: 0.88, start: 412,
+          note: "The usual pattern: the whole sentence three times, then only its second half three more times.",
+          text: "Nobody has ever found a reliable way to notice it from the inside, which is why the second pass exists at all.",
           passes: [
-            { id: "p1", n: 1, audio: [18.0, 21.1], script: [296, 335], seed: 11,
-              m: { cover: 0.89, div: 2, dis: 1, rateZ: -0.2, lead: 0.7, lufsOff: -0.4, trunc: true, score: 0.81 },
-              flags: [["bad", "truncated tail"], ["", "1 disfluency"], ["", "2 divergences"]] },
-            { id: "p2", n: 2, audio: [21.6, 25.9], script: [296, 340], seed: 29,
-              m: { cover: 1.0, div: 0, dis: 0, rateZ: 0.1, lead: 0.5, lufsOff: -0.1, trunc: false, score: 0.96 },
-              flags: [["good", "complete"], ["good", "0 divergences"], ["good", "level −0.1 dB"]] },
+            { n: 1, from: 0, to: 22, t: 118.2, rate: 1.06, seed: 3, lufs: -0.4, div: { 5: "reliably" }, dis: { 8: "um" } },
+            { n: 2, from: 0, to: 22, t: 124.9, rate: 1.0, seed: 17, lufs: -0.2, div: { 17: "secondary" }, dis: {} },
+            { n: 3, from: 0, to: 22, t: 131.3, rate: 0.97, seed: 29, lufs: 0.1, div: {}, dis: { 18: "uh" } },
+            { n: 4, from: 13, to: 19, t: 138.0, rate: 1.02, seed: 41, lufs: 0.0, div: {}, dis: {}, trunc: true },
+            { n: 5, from: 13, to: 22, t: 140.6, rate: 0.99, seed: 53, lufs: -0.3, div: { 21: "(skipped)" }, dis: {} },
+            { n: 6, from: 13, to: 22, t: 144.1, rate: 0.98, seed: 67, lufs: 0.2, div: {}, dis: {} },
           ],
-          keep: "p2",
         },
         {
-          id: "r2",
-          script: { from: 512, to: 566 },
-          text: ["But some part of the machinery has gone over to autopilot,",
-                 "and you find that you have read half a page without hearing a word of it."],
-          conf: 0.93,
+          id: "g2", conf: 0.97, start: 296,
+          note: "A plain retake: one abandoned pass, one complete one. Nothing to stitch, so it can be bulk-applied.",
+          text: "The words are still arriving. The sentences still end where they should.",
           passes: [
-            { id: "p1", n: 1, audio: [30.5, 34.1], script: [512, 548], seed: 7,
-              m: { cover: 0.67, div: 1, dis: 0, rateZ: -0.4, lead: 1.1, lufsOff: -0.2, trunc: true, score: 0.74 },
-              flags: [["bad", "truncated tail"], ["", "misread “machinery”"]] },
-            { id: "p2", n: 2, audio: [34.7, 39.2], script: [512, 540], seed: 41,
-              m: { cover: 0.52, div: 0, dis: 1, rateZ: -1.9, lead: 0.6, lufsOff: -5.8, trunc: false, score: 0.58 },
-              flags: [["bad", "level −5.8 dB"], ["bad", "1.9σ slow"], ["", "muttered"]] },
-            { id: "p3", n: 3, audio: [39.6, 45.0], script: [524, 566], seed: 63,
-              m: { cover: 0.78, div: 0, dis: 0, rateZ: 0.2, lead: 0.4, lufsOff: 0.1, trunc: false, score: 0.94 },
-              flags: [["good", "0 divergences"], ["good", "reaches the end"], ["bad", "starts at word 524"]] },
+            { n: 1, from: 0, to: 10, t: 61.0, rate: 1.03, seed: 11, lufs: -0.4, div: {}, dis: { 7: "er" }, trunc: true },
+            { n: 2, from: 0, to: 12, t: 65.2, rate: 0.99, seed: 23, lufs: -0.1, div: {}, dis: {} },
           ],
-          keep: "p3",
         },
         {
-          id: "r3",
-          script: { from: 980, to: 1040 },
-          text: ["Nobody has ever found a reliable way to notice it from the inside,",
-                 "which is why the second pass exists."],
-          conf: 0.99,
+          id: "g3", conf: 0.91, start: 512,
+          note: "Chained retakes: the last pass restarts a few words in, so the start has to come from an earlier one.",
+          text: "But some part of the machinery has gone over to autopilot, and you find that you have read half a page without hearing a word of it.",
           passes: [
-            { id: "p1", n: 1, audio: [60.4, 62.2], script: [980, 1002], seed: 5,
-              m: { cover: 0.37, div: 0, dis: 2, rateZ: -0.1, lead: 1.9, lufsOff: 0.0, trunc: true, score: 0.70 },
-              flags: [["bad", "truncated tail"], ["bad", "2 disfluencies"]] },
-            { id: "p2", n: 2, audio: [62.6, 64.3], script: [980, 1008], seed: 23,
-              m: { cover: 0.47, div: 1, dis: 0, rateZ: 0.6, lead: 0.4, lufsOff: -0.3, trunc: true, score: 0.76 },
-              flags: [["bad", "truncated tail"], ["", "false start on “second”"]] },
-            { id: "p3", n: 3, audio: [65.0, 69.8], script: [980, 1040], seed: 87,
-              m: { cover: 1.0, div: 0, dis: 0, rateZ: 0.0, lead: 0.7, lufsOff: 0.2, trunc: false, score: 0.98 },
-              flags: [["good", "complete"], ["good", "0 divergences"], ["good", "1.9 s lead-in"]] },
+            { n: 1, from: 0, to: 14, t: 190.5, rate: 1.0, seed: 7, lufs: -0.2, div: { 5: "mechanery" }, dis: {}, trunc: true },
+            { n: 2, from: 0, to: 10, t: 195.8, rate: 1.25, seed: 19, lufs: -5.8, div: {}, dis: { 3: "um" } },
+            { n: 3, from: 4, to: 27, t: 199.9, rate: 0.98, seed: 61, lufs: 0.1, div: {}, dis: {} },
           ],
-          keep: "p3",
         },
       ];
 
-      const state = { keep: {}, status: {}, floor: 0.9 };
-      GROUPS.forEach((g) => { state.keep[g.id] = g.keep; state.status[g.id] = "open"; });
+      const HUES = ["#4a7fd0", "#d98b2b", "#8a5cc2", "#2a9d8f", "#c9506a", "#6f8f2f", "#b07a3c", "#3f6f8f", "#9a4f9a"];
+      const PUNCT = /[,.;:!?]$/;
 
       // ------------------------------------------------------------------
-      // Cover: the keeper may not span the whole group. Fill the prefix with
-      // the latest earlier pass that reaches it — this is the tiny DP in the
-      // plan, run by hand for a mockup.
+      // Derived timing: per-pass word durations, and column widths from the
+      // median duration of each word across the passes that read it.
       // ------------------------------------------------------------------
-      function cover(g) {
-        const keeper = g.passes.find((p) => p.id === state.keep[g.id]);
-        const out = [];
-        if (keeper.script[0] > g.script.from) {
-          // Cheapest pass that reaches the keeper's start: the DP's passPenalty
-          // is score-led, with recency only as a tiebreak.
-          const fillers = g.passes
-            .filter((p) => p !== keeper && p.script[0] <= g.script.from && p.script[1] > keeper.script[0])
-            .sort((a, b) => b.m.score - a.m.score || b.n - a.n);
-          if (fillers[0]) out.push({ pass: fillers[0], from: g.script.from, to: keeper.script[0], stitch: true });
+      function rng(seed) {
+        let s = seed * 7919 + 13;
+        return () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+      }
+      GROUPS.forEach((g) => {
+        g.words = g.text.split(/\s+/);
+        g.passes.forEach((p) => {
+          const r = rng(p.seed);
+          p.dur = {};
+          let t = p.t;
+          for (let i = p.from; i < p.to; i++) {
+            const letters = g.words[i].replace(/[^A-Za-z]/g, "").length;
+            let d = (0.1 + 0.055 * letters) * p.rate * (0.85 + 0.3 * r());
+            if (p.trunc && i === p.to - 1) d *= 0.55;
+            p.dur[i] = d;
+            t += d + (PUNCT.test(g.words[i]) ? 0.28 : 0.04);
+          }
+          p.end = t;
+        });
+        const widths = g.words.map((_, i) => {
+          const ds = g.passes.filter((p) => i >= p.from && i < p.to).map((p) => p.dur[i]).sort((a, b) => a - b);
+          return ds[Math.floor(ds.length / 2)] + (PUNCT.test(g.words[i]) ? 0.05 : 0);
+        });
+        const total = widths.reduce((a, b) => a + b, 0);
+        g.x = [0];
+        widths.forEach((w) => g.x.push(g.x[g.x.length - 1] + (w / total) * 100));
+      });
+
+      // ------------------------------------------------------------------
+      // The suggested comp: the cover DP from the plan, per word.
+      //   wordCost: later passes cheaper; misreadings, fillers, cut-off words and
+      //             muttered passes expensive; the first word of a mid-sentence
+      //             restart is charged, because it tends to carry sentence-start
+      //             emphasis.
+      //   splice:   every join costs something; a join mid-phrase costs more
+      //             than one after punctuation, where there is a pause.
+      // ------------------------------------------------------------------
+      function covers(p, i) { return i >= p.from && i < p.to; }
+      function isRestartWord(p, i) { return i === p.from && p.from > 0; }
+      function wordCost(g, p, i) {
+        const maxN = g.passes[g.passes.length - 1].n;
+        let c = (maxN - p.n) * 0.25;
+        if (p.div[i]) c += 4;
+        if (p.dis[i]) c += 2;
+        if (p.trunc && i === p.to - 1) c += 10;
+        if (Math.abs(p.lufs) > 3) c += 3;
+        if (isRestartWord(p, i)) c += 2;
+        return c;
+      }
+      function spliceCost(g, i) { return 1 + (PUNCT.test(g.words[i - 1]) ? 0 : 0.6); }
+      function suggest(g) {
+        const n = g.words.length;
+        const best = [], back = [];
+        for (let i = 0; i < n; i++) {
+          best.push({}); back.push({});
+          g.passes.forEach((p) => {
+            if (!covers(p, i)) return;
+            let b = Infinity, from = null;
+            if (i === 0) b = 0;
+            else
+              for (const q of g.passes) {
+                const prev = best[i - 1][q.n];
+                if (prev === undefined) continue;
+                const c = prev + (q === p ? 0 : spliceCost(g, i));
+                if (c < b) { b = c; from = q.n; }
+              }
+            best[i][p.n] = b + wordCost(g, p, i);
+            back[i][p.n] = from;
+          });
         }
-        out.push({ pass: keeper, from: Math.max(g.script.from, keeper.script[0]), to: keeper.script[1] });
+        let cur = +Object.entries(best[n - 1]).sort((a, b) => a[1] - b[1])[0][0];
+        const owner = new Array(n);
+        for (let i = n - 1; i >= 0; i--) { owner[i] = cur; cur = back[i][cur]; }
+        return owner;
+      }
+
+      // ------------------------------------------------------------------
+      // State
+      // ------------------------------------------------------------------
+      const state = { floor: 0.9, active: "g1", drag: null };
+      GROUPS.forEach((g) => {
+        g.suggested = suggest(g);
+        g.owner = g.suggested.slice();
+        g.status = "open";
+        g.sel = null; // [a, b] inclusive word range on the ruler
+        g.join = null; // selected join: index of the first word after it
+      });
+      const byId = (id) => GROUPS.find((g) => g.id === id);
+      const pass = (g, n) => g.passes.find((p) => p.n === n);
+      const hue = (n) => HUES[(n - 1) % HUES.length];
+      const quote = (g, a, b) => (a === b ? `“${g.words[a]}”` : `“${g.words[a]} … ${g.words[b]}”`);
+
+      function segments(g) {
+        const out = [];
+        g.owner.forEach((n, i) => {
+          const last = out[out.length - 1];
+          if (last && last.n === n) last.b = i;
+          else out.push({ n, a: i, b: i });
+        });
+        out.forEach((s) => { s.manual = g.owner.slice(s.a, s.b + 1).some((n, k) => n !== g.suggested[s.a + k]); });
         return out;
       }
 
-      function reasons(g) {
-        const keeper = g.passes.find((p) => p.id === state.keep[g.id]);
-        const last = g.passes[g.passes.length - 1];
-        const complete = keeper.m.cover >= 0.999;
-        const r = [];
-        r.push(
-          keeper === last && complete
-            ? `<b>Last complete pass</b> — pass ${keeper.n} of ${g.passes.length} reads to the end of the span and continues past it without another backward jump.`
-            : keeper === last
-            ? `<b>Last pass</b>, but it only covers ${(keeper.m.cover * 100) | 0}% of the span — the rest is stitched from an earlier pass.`
-            : `<b>Manual choice</b> — pass ${keeper.n} of ${g.passes.length}. This overrules the default (the last complete pass), which is a judgement the reader already made in the room.`
-        );
-        r.push(`${keeper.m.div === 0 ? "No divergences" : keeper.m.div + " divergence(s)"} against the script; ${keeper.m.dis === 0 ? "no disfluencies" : keeper.m.dis + " disfluency/-ies"}.`);
-        r.push(`Level ${keeper.m.lufsOff >= 0 ? "+" : ""}${keeper.m.lufsOff.toFixed(1)} dB against programme loudness; rate ${keeper.m.rateZ >= 0 ? "+" : ""}${keeper.m.rateZ.toFixed(1)}σ from this reader's median.`);
-        r.push(`${keeper.m.lead.toFixed(1)} s of silence before it — the cut point in and the cut point out are both in room tone.`);
-        if (keeper.m.trunc) r.push(`<b>Warning:</b> this pass's last word is cut off by whatever follows it.`);
-        r.push(`Detected from ${g.passes.length - 1} backward jump(s) in the alignment path, each with silence and a truncated word. Confidence ${g.conf.toFixed(2)}.`);
-        return r;
+      let toastTimer;
+      function toast(msg) {
+        const t = document.getElementById("toast");
+        t.textContent = msg; t.classList.add("on");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove("on"), 2600);
       }
 
-      // deterministic pseudo-waveform for a lane
-      function waveSvg(seed, wPct) {
-        let s = seed * 7919 + 13;
-        const rnd = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-        const bars = 90, W = 300, H = 34, mid = 17;
-        let d = "";
-        for (let b = 0; b < bars; b++) {
-          const env = 0.35 + 0.65 * Math.abs(Math.sin((b / bars) * 9.4) * Math.sin((b / bars) * 3.1 + seed));
-          const h = Math.min(0.95, env * (0.5 + 0.7 * rnd())) * (mid - 2);
-          const x = 1.5 + (b / bars) * (W - 3);
-          d += `M${x.toFixed(1)},${(mid - h).toFixed(1)}L${x.toFixed(1)},${(mid + h).toFixed(1)}`;
-        }
-        return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="left:${wPct.left}%;width:${wPct.width}%">
-          <path d="${d}" stroke="#41618f" stroke-width="2" opacity="0.8"/></svg>`;
+      // Assign words a..b to pass n, as far as that pass read them.
+      function take(g, n, a, b) {
+        const p = pass(g, n);
+        if (!p) return toast(`There is no pass ${n} in this group.`);
+        const lo = Math.max(a, p.from), hi = Math.min(b, p.to - 1);
+        if (lo > hi) return toast(`Pass ${n} did not read ${quote(g, a, b)}.`);
+        for (let i = lo; i <= hi; i++) g.owner[i] = n;
+        if (lo > a || hi < b) toast(`Pass ${n} only read ${quote(g, lo, hi)}; the rest is unchanged.`);
+        g.status = "open";
+        g.join = null;
       }
 
       // ------------------------------------------------------------------
+      // Rendering
+      // ------------------------------------------------------------------
+      function waveSvg(g, p) {
+        const r = rng(p.seed + 101);
+        const amp = Math.abs(p.lufs) > 3 ? 0.45 : 1;
+        let d = "";
+        for (let i = p.from; i < p.to; i++) {
+          const x0 = g.x[i] * 10, x1 = g.x[i + 1] * 10;
+          const cut = p.trunc && i === p.to - 1 ? 0.55 : 1;
+          const bars = Math.max(3, Math.round((x1 - x0) / 5));
+          for (let k = 0; k < bars; k++) {
+            const f = (k + 0.5) / bars;
+            if (f > cut) break;
+            const env = Math.pow(Math.sin(Math.PI * f), 0.7) * (0.55 + 0.45 * Math.sin(f * 7 + p.seed + i));
+            const h = Math.max(0.06, env * (0.55 + 0.45 * r())) * 15 * amp;
+            const x = x0 + 2 + f * (x1 - x0 - 4);
+            d += `M${x.toFixed(1)},${(19 - h).toFixed(1)}L${x.toFixed(1)},${(19 + h).toFixed(1)}`;
+          }
+        }
+        return `<svg viewBox="0 0 1000 38" preserveAspectRatio="none"><path d="${d}" stroke="#2f4a73" stroke-width="1.6" opacity="0.8" vector-effect="non-scaling-stroke"/></svg>`;
+      }
+
+      const pct = (g, a, b) => `left:${g.x[a]}%;width:${g.x[b] - g.x[a]}%`;
+
+      function laneRow(g, p) {
+        const bits = [];
+        bits.push(`<div class="cov" style="${pct(g, p.from, p.to)}"></div>`);
+        g.owner.forEach((n, i) => {
+          if (n === p.n) bits.push(`<div class="own" style="${pct(g, i, i + 1)};background:${hue(p.n)}55"></div>`);
+        });
+        if (p.trunc) bits.push(`<div class="trunc" style="${pct(g, p.to - 1, p.to)}" title="cut off"></div>`);
+        bits.push(waveSvg(g, p));
+        Object.entries(p.div).forEach(([i, heard]) => {
+          i = +i;
+          bits.push(`<div class="div" style="left:calc(${g.x[i]}% + 2px);width:calc(${g.x[i + 1] - g.x[i]}% - 4px)" title="${g.words[i]} → ${heard}"></div>`);
+        });
+        Object.entries(p.dis).forEach(([i, what]) => {
+          bits.push(`<div class="dis" style="left:${g.x[+i]}%" title="“${what}” before ${g.words[+i]}"></div>`);
+        });
+        if (g.sel) bits.push(`<div class="band" style="${pct(g, g.sel[0], g.sel[1] + 1)}"></div>`);
+        bits.push(`<div class="drag"></div>`);
+        const dur = p.end - p.t;
+        return `<div class="row lane">
+          <div class="name" data-take="${p.n}" title="Take everything pass ${p.n} read">
+            <b><span class="swatch" style="background:${hue(p.n)}"></span>Pass ${p.n}</b>
+            <span class="mono">${fmtTime(p.t)} · ${dur.toFixed(1)} s</span>
+          </div>
+          <div class="track" data-lane="${p.n}">${bits.join("")}</div>
+        </div>`;
+      }
+
+      function fmtTime(s) {
+        const m = Math.floor(s / 60);
+        return `${m}:${(s - m * 60).toFixed(1).padStart(4, "0")}`;
+      }
+
+      function compRow(g, segs) {
+        const bits = segs.map((s) =>
+          `<div class="seg ${s.manual ? "manual" : ""}" style="${pct(g, s.a, s.b + 1)};background:${hue(s.n)}">P${s.n}</div>`);
+        segs.slice(1).forEach((s) => {
+          const restart = isRestartWord(pass(g, s.n), s.a);
+          bits.push(`<div class="join ${g.join === s.a ? "sel" : ""} ${restart ? "restart" : ""}" data-join="${s.a}" style="left:${g.x[s.a]}%"
+            title="Join before “${g.words[s.a]}”"></div>`);
+        });
+        return `<div class="row comprow">
+          <div class="name"><b>Comp</b><span class="mono">${segs.length === 1 ? "one take" : segs.length + " segments"}</span></div>
+          <div class="track">${bits.join("")}</div>
+        </div>`;
+      }
+
+      function rulerRow(g) {
+        const ws = g.words.map((w, i) => {
+          const sel = g.sel && i >= g.sel[0] && i <= g.sel[1];
+          return `<div class="w ${sel ? "sel" : ""}" data-word="${i}" style="${pct(g, i, i + 1)}" title="${w}">${w}</div>`;
+        });
+        return `<div class="row"><div class="name hint small">script</div><div class="ruler">${ws.join("")}</div></div>`;
+      }
+
+      // Why each segment comes from where it does, in words.
+      function reasons(g, segs) {
+        const out = [];
+        segs.forEach((s, k) => {
+          const p = pass(g, s.n);
+          let line = `<b>${quote(g, s.a, s.b)}</b> from pass ${s.n}`;
+          if (s.manual) {
+            const sug = [...new Set(g.suggested.slice(s.a, s.b + 1))].map((n) => "pass " + n).join(" and ");
+            line += ` — your choice; the suggestion was ${sug}.`;
+          } else {
+            const later = g.passes.filter((q) => q.n > s.n && covers(q, s.a) && covers(q, s.b));
+            if (!later.length) {
+              line += ` — the last pass that reads ${s.a === s.b ? "this word" : "these words"}.`;
+            } else {
+              const why = later.map((q) => {
+                if (isRestartWord(q, s.a) && s.a === s.b) return `pass ${q.n} starts its restart on it`;
+                if (isRestartWord(q, s.a)) return `pass ${q.n} starts its restart on “${g.words[s.a]}”`;
+                if (Math.abs(q.lufs) > 3) return `pass ${q.n} is ${q.lufs.toFixed(1)} dB down, muttered`;
+                const d = Object.keys(q.div).map(Number).find((i) => i >= s.a && i <= s.b);
+                if (d !== undefined) return `pass ${q.n} reads “${g.words[d]}” as “${q.div[d]}”`;
+                const f = Object.keys(q.dis).map(Number).find((i) => i >= s.a && i <= s.b);
+                if (f !== undefined) return `pass ${q.n} has “${q.dis[f]}” before “${g.words[f]}”`;
+                if (q.trunc && q.to - 1 >= s.a && q.to - 1 <= s.b) return `pass ${q.n} is cut off in “${g.words[q.to - 1]}”`;
+                return `pass ${q.n} would need an extra join`;
+              });
+              line += ` — later passes read ${s.a === s.b ? "it" : "them"} too, but ${why.join("; ")}.`;
+            }
+          }
+          // Later passes that only pick up partway through this segment, on
+          // their restart word: say why that word stayed here.
+          const restarters = g.passes.filter((q) => q.n > s.n && q.from > s.a && q.from <= s.b && !s.manual && s.b === q.from);
+          if (restarters.length)
+            line += ` ${restarters.length > 1 ? "Passes " + restarters.map((q) => q.n).join(", ") + " start their restarts" : "Pass " + restarters[0].n + " starts its restart"} on “${g.words[s.b]}”, so it stays with pass ${s.n}.`;
+          out.push({ cls: "", html: line });
+          for (let i = s.a; i <= s.b; i++) {
+            if (p.div[i]) out.push({ cls: "warnline", html: `⚠ Pass ${s.n} reads “${g.words[i]}” as “${p.div[i]}”.` });
+            if (p.dis[i]) out.push({ cls: "warnline", html: `⚠ Pass ${s.n} has “${p.dis[i]}” before “${g.words[i]}”.` });
+            if (p.trunc && i === p.to - 1) out.push({ cls: "warnline", html: `⚠ Pass ${s.n} is cut off in “${g.words[i]}”.` });
+          }
+          if (Math.abs(p.lufs) > 3) out.push({ cls: "warnline", html: `⚠ Pass ${s.n} is ${p.lufs.toFixed(1)} dB below the rest of the recording.` });
+          if (k > 0 && k < segs.length - 1 && s.b - s.a < 2)
+            out.push({ cls: "warnline", html: `⚠ A ${s.b - s.a + 1}-word segment means two joins close together. Listen to both.` });
+          if (k > 0) {
+            const prev = g.words[s.a - 1];
+            const at = PUNCT.test(prev) ? `after “${prev}”, in a pause` : `between “${prev}” and “${g.words[s.a]}”, mid-phrase`;
+            let jl = `Join ${k}: ${at}.`;
+            if (isRestartWord(p, s.a))
+              jl += ` It lands on the first word of pass ${s.n}'s restart, which often carries sentence-start emphasis. <kbd>⌥→</kbd> moves it a word later.`;
+            else if (s.a - 1 === p.from && p.from > 0 && !s.manual)
+              jl += ` Placed one word into pass ${s.n}, so its restart word “${g.words[p.from]}” comes from pass ${segs[k - 1].n}. <kbd>⌥←</kbd> joins at the restart instead.`;
+            out.push({ cls: "joinline", html: jl });
+          }
+        });
+        out.push({ cls: "", html: `<span class="hint">Detected from ${g.passes.length - 1} backward jump${g.passes.length > 2 ? "s" : ""} in the alignment path, each with a pause or a cut-off word. Confidence ${g.conf.toFixed(2)}.</span>` });
+        return out;
+      }
+
+      function removedSec(g) {
+        const total = g.passes.reduce((a, p) => a + (p.end - p.t), 0);
+        const kept = g.owner.reduce((a, n, i) => a + pass(g, n).dur[i], 0);
+        return total - kept;
+      }
+
       function render() {
         const el = document.getElementById("cards");
         el.innerHTML = "";
         GROUPS.forEach((g, gi) => {
-          const span = g.script.to - g.script.from;
-          const cov = cover(g);
-          const stitched = cov.length > 1;
+          const segs = segments(g);
+          const stitched = segs.length > 1;
           const card = document.createElement("div");
-          card.className = "panel glass card " + state.status[g.id];
-
-          const ticks = [0, 0.25, 0.5, 0.75, 1]
-            .map((f) => {
-              const w = Math.round(g.script.from + f * span);
-              return `<span class="tick" style="left:${f * 100}%">${f === 1 ? "" : "word " + w}</span>`;
-            }).join("");
-
-          const lanes = g.passes.map((p) => {
-            const left = ((p.script[0] - g.script.from) / span) * 100;
-            const width = ((p.script[1] - p.script[0]) / span) * 100;
-            const isKeep = p.id === state.keep[g.id];
-            const isStitch = stitched && cov.some((c) => c.pass === p && c.stitch);
-            return `<div class="lane ${isKeep ? "keep" : isStitch ? "stitched" : ""}" data-g="${g.id}" data-p="${p.id}">
-              <div class="name"><b>Pass ${p.n}${isKeep ? " ✓" : isStitch ? " ⊕" : ""}</b>
-                <span class="hint small mono">${p.audio[0].toFixed(1)}–${p.audio[1].toFixed(1)}s</span></div>
-              <div>
-                <div class="track"><div class="rail"></div>${waveSvg(p.seed, { left, width })}</div>
-                <div class="flags">${p.flags.map(([k, t]) => `<span class="flag ${k}">${t}</span>`).join("")}</div>
-              </div>
-              <div class="meta">
-                words ${p.script[0]}–${p.script[1]}<br />
-                cover ${(p.m.cover * 100) | 0}%<br />
-                score ${p.m.score.toFixed(2)}
-              </div>
-            </div>`;
+          card.className = `panel glass card ${g.status} ${state.active === g.id ? "active" : ""}`;
+          card.dataset.g = g.id;
+          const words = g.words.map((w, i) => {
+            const seam = i > 0 && g.owner[i] !== g.owner[i - 1] ? `<span class="seam" title="join">⋮</span>` : " ";
+            return `${i ? seam : ""}<span class="rw" style="background:${hue(g.owner[i])}33;box-shadow:inset 0 -2px 0 ${hue(g.owner[i])}">${w}</span>`;
           }).join("");
-
-          const keeper = g.passes.find((p) => p.id === state.keep[g.id]);
-          const words = g.text.join(" ").split(/\s+/);
-          // Which pass supplies each word of the span, from the cover.
-          const resultHtml = words
-            .map((w, i) => {
-              const at = g.script.from + Math.floor((i / words.length) * span);
-              const seg = cov.find((c) => at >= c.from && at < c.to);
-              if (!seg) return `<span class="cutout">${w}</span>`;
-              const cls = seg.stitch ? "stitchword" : "kept";
-              const seam = seg.stitch && at + Math.ceil(span / words.length) >= seg.to
-                ? `<span class="seam" title="splice">⋮</span>` : "";
-              return `<span class="${cls}">${w}</span>${seam}`;
-            })
-            .join(" ");
-
           card.innerHTML = `
             <div class="cardhead">
               <h2 class="grow">Retake group ${gi + 1} of ${GROUPS.length}
-                <span class="hint small">— words ${g.script.from}–${g.script.to},
-                ${g.passes.length} passes, ${(g.passes[g.passes.length - 1].audio[1] - g.passes[0].audio[0]).toFixed(1)} s of tape</span></h2>
-              <span class="status ${state.status[g.id]}">${state.status[g.id]}</span>
+                <span class="hint small">— script words ${g.start}–${g.start + g.words.length}, ${g.passes.length} passes,
+                ${fmtTime(g.passes[0].t)}–${fmtTime(g.passes[g.passes.length - 1].end)}</span></h2>
+              <span class="chip ${stitched ? "stitched" : "single"}">${stitched ? "stitched · " + (segs.length - 1) + " join" + (segs.length > 2 ? "s" : "") : "single take"}</span>
+              <span class="status ${g.status}">${g.status}</span>
               <span class="mono hint">conf ${g.conf.toFixed(2)}</span>
             </div>
-            <div class="hint small">Lanes share a <b>script-position</b> axis, not a time axis — that is
-              what makes attempts at the same words line up.</div>
-            <div class="axis">${ticks}</div>
-            <div class="lanes">${lanes}</div>
-            <div class="why metal-inset">
-              <b>Why this take</b>
-              <ul>${reasons(g).map((r) => `<li>${r}</li>`).join("")}</ul>
+            <div class="hint small">${g.note}</div>
+            <div class="comp">
+              ${rulerRow(g)}
+              ${compRow(g, segs)}
+              ${g.passes.map((p) => laneRow(g, p)).join("")}
             </div>
-            ${stitched ? `<div class="warn"><b>Stitched result.</b> Pass ${keeper.n} starts at word
-              ${keeper.script[0]}, so words ${g.script.from}–${keeper.script[0]} come from pass
-              ${cov[0].pass.n}. Listen to the join before applying — a stitched take is the thing most
-              likely to sound wrong.</div>` : ""}
-            <div class="result">${resultHtml}</div>
-            <div class="hint small" style="margin-top:4px">Result after the cut — solid green is the
-              kept take${stitched ? ", dashed is stitched from an earlier pass, ⋮ is the splice" : ""}.</div>
+            <div class="legend hint small">
+              <span><i style="background:#c8443a"></i>misread or skipped</span>
+              <span><i style="background:#d99a1f;border-radius:50%;width:8px"></i>filled pause</span>
+              <span><i style="background:repeating-linear-gradient(135deg, rgba(200,70,60,0.5) 0 3px, transparent 3px 6px)"></i>cut off</span>
+              <span><i style="background:#f0c64a"></i>join on a restart's first word</span>
+              <span>✎ differs from the suggestion</span>
+            </div>
+            <div class="why metal-inset">
+              <b>Why this comp</b>
+              <ul>${reasons(g, segs).map((r) => `<li class="${r.cls}">${r.html}</li>`).join("")}</ul>
+            </div>
+            <div class="result">${words}</div>
             <div class="acts">
-              <button class="aqua-button small" data-act="preview" data-g="${g.id}">▶ Preview join (±1.5 s)</button>
-              <button class="aqua-button small" data-act="whole" data-g="${g.id}">▶ All ${g.passes.length} passes</button>
+              <button class="aqua-button small" data-act="preview" ${g.join === null ? "disabled" : ""}>▶ Preview join <kbd>space</kbd></button>
+              <button class="aqua-button small" data-act="play">▶ Play comp</button>
+              <button class="aqua-button small" data-act="reset">Reset to suggestion</button>
               <span style="flex:1"></span>
-              <button class="aqua-button small danger" data-act="reject" data-g="${g.id}">Reject — not a retake</button>
-              <button class="aqua-button small primary" data-act="apply" data-g="${g.id}">Apply cut <kbd>⏎</kbd></button>
+              <button class="aqua-button small danger" data-act="reject">Reject — not a retake</button>
+              <button class="aqua-button small primary" data-act="apply">Apply comp <kbd>⏎</kbd></button>
             </div>`;
           el.appendChild(card);
         });
-
-        el.querySelectorAll(".lane").forEach((l) => {
-          l.onclick = () => { state.keep[l.dataset.g] = l.dataset.p; state.status[l.dataset.g] = "open"; render(); };
-        });
-        el.querySelectorAll("[data-act]").forEach((b) => {
-          b.onclick = () => {
-            const g = b.dataset.g;
-            if (b.dataset.act === "apply") state.status[g] = "applied";
-            else if (b.dataset.act === "reject") state.status[g] = "rejected";
-            else return; // preview buttons are inert in a mockup
-            render();
-          };
-        });
-
-        const open = GROUPS.filter((g) => state.status[g.id] === "open").length;
+        wire();
+        const open = GROUPS.filter((g) => g.status === "open").length;
         document.getElementById("statOpen").textContent = open;
-        const removed = GROUPS
-          .filter((g) => state.status[g.id] === "applied")
-          .reduce((a, g) => {
-            const k = g.passes.find((p) => p.id === state.keep[g.id]);
-            return a + g.passes.filter((p) => p !== k).reduce((s, p) => s + (p.audio[1] - p.audio[0]), 0);
-          }, 0);
-        document.getElementById("statTime").textContent = removed.toFixed(1) + " s";
+        document.getElementById("statJoins").textContent = GROUPS.filter((g) => g.status !== "rejected")
+          .reduce((a, g) => a + segments(g).length - 1, 0);
+        document.getElementById("statTime").textContent =
+          GROUPS.filter((g) => g.status === "applied").reduce((a, g) => a + removedSec(g), 0).toFixed(1) + " s";
+      }
+
+      // ------------------------------------------------------------------
+      // Interaction
+      // ------------------------------------------------------------------
+      function wordAt(g, track, clientX) {
+        const r = track.getBoundingClientRect();
+        const f = ((clientX - r.left) / r.width) * 100;
+        for (let i = 0; i < g.words.length; i++) if (f < g.x[i + 1]) return i;
+        return g.words.length - 1;
+      }
+
+      function wire() {
+        document.querySelectorAll(".card").forEach((card) => {
+          const g = byId(card.dataset.g);
+          card.addEventListener("mousedown", () => {
+            if (state.active !== g.id) { state.active = g.id; document.querySelectorAll(".card").forEach((c) => c.classList.toggle("active", c === card)); }
+          });
+
+          card.querySelectorAll(".row.lane .track").forEach((track) => {
+            track.addEventListener("mousedown", (e) => {
+              e.preventDefault();
+              const n = +track.dataset.lane;
+              const w = wordAt(g, track, e.clientX);
+              state.drag = { g, n, track, a: w, b: w };
+              showDrag();
+            });
+          });
+          card.querySelectorAll("[data-take]").forEach((el) => {
+            el.onclick = () => { const p = pass(g, +el.dataset.take); take(g, p.n, p.from, p.to - 1); g.sel = null; render(); };
+          });
+          card.querySelectorAll(".ruler .w").forEach((el) => {
+            el.onclick = (e) => {
+              const i = +el.dataset.word;
+              if (e.shiftKey && g.sel) g.sel = [Math.min(g.sel[0], i), Math.max(g.sel[1], i)];
+              else if (g.sel && g.sel[0] === i && g.sel[1] === i) g.sel = null;
+              else g.sel = [i, i];
+              g.join = null;
+              render();
+            };
+          });
+          card.querySelectorAll(".join").forEach((el) => {
+            el.onclick = () => { const j = +el.dataset.join; g.join = g.join === j ? null : j; g.sel = null; render(); };
+          });
+          card.querySelectorAll("[data-act]").forEach((b) => {
+            b.onclick = () => act(g, b.dataset.act);
+          });
+        });
+      }
+
+      function showDrag() {
+        const d = state.drag;
+        const box = d.track.querySelector(".drag");
+        const p = pass(d.g, d.n);
+        const a = Math.max(Math.min(d.a, d.b), p.from), b = Math.min(Math.max(d.a, d.b), p.to - 1);
+        if (a > b) { box.style.display = "none"; return; }
+        box.style.display = "block";
+        box.style.left = d.g.x[a] + "%";
+        box.style.width = d.g.x[b + 1] - d.g.x[a] + "%";
+      }
+      document.addEventListener("mousemove", (e) => {
+        if (!state.drag) return;
+        state.drag.b = wordAt(state.drag.g, state.drag.track, e.clientX);
+        showDrag();
+      });
+      document.addEventListener("mouseup", () => {
+        const d = state.drag;
+        if (!d) return;
+        state.drag = null;
+        take(d.g, d.n, Math.min(d.a, d.b), Math.max(d.a, d.b));
+        d.g.sel = null;
+        render();
+      });
+
+      function act(g, what) {
+        if (what === "apply") { g.status = "applied"; nextOpen(g); }
+        else if (what === "reject") { g.status = "rejected"; nextOpen(g); }
+        else if (what === "reset") { g.owner = g.suggested.slice(); g.join = null; g.sel = null; g.status = "open"; }
+        else if (what === "preview") return previewJoin(g);
+        else if (what === "play") return toast(`Would play the comp: ${segments(g).map((s) => "P" + s.n).join(" → ")}, with the joins crossfaded.`);
+        render();
+      }
+      function nextOpen(g) {
+        const nxt = GROUPS.find((h) => h.status === "open" && h !== g);
+        if (nxt) state.active = nxt.id;
+      }
+      function previewJoin(g) {
+        if (g.join === null) return toast("Click a join in the comp lane first.");
+        const j = g.join;
+        toast(`Would play 1.5 s of pass ${g.owner[j - 1]} up to “${g.words[j - 1]}”, then 1.5 s of pass ${g.owner[j]} from “${g.words[j]}”.`);
+      }
+
+      // Move the selected join a word left (dir −1) or right (+1).
+      function nudge(g, dir) {
+        if (g.join === null) return toast("Click a join in the comp lane first.");
+        const j = g.join;
+        const left = g.owner[j - 1], right = g.owner[j];
+        if (dir < 0) {
+          if (!covers(pass(g, right), j - 1)) return toast(`Pass ${right} starts at “${g.words[j]}”; it did not read “${g.words[j - 1]}”.`);
+          g.owner[j - 1] = right;
+          g.join = j - 1 > 0 && g.owner[j - 2] !== right ? j - 1 : null;
+        } else {
+          if (!covers(pass(g, left), j)) return toast(`Pass ${left} stops before “${g.words[j]}”.`);
+          g.owner[j] = left;
+          g.join = j + 1 < g.words.length && g.owner[j + 1] !== left ? j + 1 : null;
+        }
+        g.status = "open";
+        render();
+      }
+
+      document.addEventListener("keydown", (e) => {
+        if (e.target.tagName === "INPUT") return;
+        const g = byId(state.active);
+        if (!g) return;
+        if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+          e.preventDefault();
+          nudge(g, e.key === "ArrowLeft" ? -1 : 1);
+        } else if (/^[1-9]$/.test(e.key) && !e.metaKey && !e.ctrlKey) {
+          const n = +e.key;
+          if (g.sel) take(g, n, g.sel[0], g.sel[1]);
+          else { const p = pass(g, n); if (!p) return toast(`There is no pass ${n} in this group.`); take(g, n, p.from, p.to - 1); }
+          render();
+        } else if (e.key === " ") {
+          e.preventDefault();
+          previewJoin(g);
+        } else if (e.key === "Escape") {
+          g.sel = null; g.join = null; render();
+        } else if (e.key === "Enter" && e.shiftKey) {
+          e.preventDefault(); bulkApply();
+        } else if (e.key === "Enter") {
+          e.preventDefault(); act(g, "apply");
+        }
+      });
+
+      function bulkApply() {
+        const hits = GROUPS.filter((g) => g.status === "open" && g.conf >= state.floor && segments(g).length === 1);
+        hits.forEach((g) => (g.status = "applied"));
+        const skipped = GROUPS.filter((g) => g.status === "open" && g.conf >= state.floor && segments(g).length > 1).length;
+        toast(`Applied ${hits.length} single-take group${hits.length === 1 ? "" : "s"}.` +
+          (skipped ? ` ${skipped} stitched comp${skipped === 1 ? " needs" : "s need"} listening to first.` : ""));
+        nextOpen({});
+        render();
       }
 
       document.getElementById("floor").oninput = (e) => {
         state.floor = e.target.value / 100;
         document.getElementById("floorval").textContent = state.floor.toFixed(2);
       };
-      document.getElementById("applyall").onclick = () => {
-        GROUPS.forEach((g) => { if (g.conf >= state.floor && state.status[g.id] === "open") state.status[g.id] = "applied"; });
-        render();
-      };
+      document.getElementById("applyall").onclick = bulkApply;
       document.getElementById("render").onclick = () => {
-        alert("Mockup — this would render the EDL to ch03-second-pass_edited.wav,\n" +
+        alert("Mockup — this would render the EDL to ch03_edited.wav,\n" +
               "then run the existing eight-stage mastering chain over it.");
       };
 
