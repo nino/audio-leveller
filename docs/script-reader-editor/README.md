@@ -35,6 +35,9 @@ browser. Fake data throughout, but the interactions that carry the idea work.
   change which take is kept and watch the reasoning and the resulting text
   update; group 2 demonstrates a stitched cover, where the kept pass does not
   span everything the abandoned one did.
+  This predates the decision to make retake review a take-comping view
+  (see PLAN.md, "Retake review: take comping"): the mockup picks whole
+  lanes, where the plan now selects spans within lanes.
 
 Styling follows `listen/src/aqua.css` from before the Rust rewrite (now the
 `aqua` crate), so the screens read as part of the same application. The

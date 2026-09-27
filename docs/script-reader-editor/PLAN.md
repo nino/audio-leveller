@@ -953,29 +953,63 @@ the house style (single letters, `⏎` to commit, `⇥` to step).
 | `s` | keep the script — add to the punch-list |
 | `i` | ignore |
 | `x` | cut |
-| `1`–`9` | in a retake group, make take *n* the keeper |
+| `1`–`9` | in a retake group, take the selected words (or the whole group) from lane *n* |
 | `⏎` | apply the group's decision |
 | `⇧⏎` | apply every remaining high-confidence decision |
 | `z` / `⇧z` | undo / redo |
 | `⌥←` / `⌥→` | move the audio cursor a word |
 | `/` | filter the issue list |
 
-### Retake review
+### Retake review: take comping
 
 A dedicated screen, because it is a comparison task and the main editor's
-one-column-of-text layout is wrong for it.
+one-column-of-text layout is wrong for it. The model is **take comping** as
+DAWs do it (Logic's and Ableton's take lanes): the takes stacked in lanes, a
+comp lane on top showing the result, and the result built by selecting spans
+from whichever lane has the best version of each part. The data model already
+fits: `RetakeGroup.keep` is an ordered list of (pass, script span), which is
+exactly a comp.
 
-One card per group. Inside the card, a shared horizontal axis of **script
-position** (not time — that is the whole trick, and it is why the takes line
-up visually at all), with one lane per pass. Each lane shows its waveform
-thumbnail, its duration, its divergence chips against the script, and its
-score reasons. The keeper is highlighted; clicking a lane makes it the keeper
-and the "why" text updates to explain the new choice, including when it
-disagrees with the default.
+One card per retake group. Between groups there is only one pass, so there is
+nothing to comp.
 
-Below, two things: the resulting text with the cut applied, and a **preview
-join** button that plays exactly the 3 seconds around the splice. Judging a
-cut requires hearing the cut, not the take.
+**The axis is script position, not time.** In a DAW the takes were recorded
+against the same clock, so they line up for free. Here the passes are
+sequential in the recording and each is read at its own speed, so lanes are
+aligned word by word: each script word gets a column, and each lane's audio
+for that word is drawn stretched or squashed to fit it. Column widths follow
+the median duration of the word across the passes, so the stretching is
+small. The script text runs along the top as the ruler. Display only; no audio
+is stretched.
+
+**Lanes.** One per pass, in recording order, each covering only the words it
+actually read. For the usual pattern (whole sentence three times, then the
+second half three more times) the last three lanes start halfway across,
+like the short lanes at the bottom of a DAW's take folder. Each lane shows its
+divergence chips against the script.
+
+**The comp lane** sits on top and shows the result: each span coloured by the
+lane it comes from, and playable as the stitched audio.
+
+**Editing the comp:**
+
+- Drag across a lane to take that span from it. Selection boundaries snap to
+  word boundaries, which fall in the same place in every lane because the axis
+  is the script. The actual cut point is then refined in the audio by the cut
+  mechanics (silence search, zero crossing, crossfade, and later the cut
+  inside a word).
+- Click a lane's name to take the whole lane.
+- Select a comp boundary and nudge it a word left or right (`⌥←` / `⌥→`).
+- With a word span selected, `1`–`9` takes it from lane *n*.
+- Preview a join: plays about 3 seconds around the selected comp boundary.
+  Judging a cut requires hearing the cut, not the take.
+
+**The default comp is the algorithm's answer.** The cover DP from "Nested and
+partial retakes" fills the comp before the user sees it, so comping is how
+the user corrects the tool's choice, not something done from scratch. The
+"why" text explains each segment of the comp ("words 1–11 from pass 3: last
+complete read of this part; words 12–20 from pass 6: last pass, no
+divergences") and says when a manual edit overrides the default.
 
 Two affordances that matter more than they look:
 
@@ -984,7 +1018,8 @@ Two affordances that matter more than they look:
 - **Bulk apply, with a floor.** "Apply all above 0.9 confidence" turns forty
   retakes into four reviews, which is the difference between a tool that gets
   used and one that does not. It must never be the *only* path, and the floor
-  must be visible and adjustable.
+  must be visible and adjustable. Stitched comps should sit below the floor
+  by default until the listening tests show that the joins hold up.
 
 ## Delivery
 
