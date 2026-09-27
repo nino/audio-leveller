@@ -4,6 +4,58 @@ Editing audio by editing text, for the case where the text was written first.
 
 This is a plan, not an implementation. Nothing here is built yet.
 
+## Decisions
+
+These were open questions when the plan was first written (August 2026).
+Nino answered them on 2026-09-27, and the rest of this document has been
+updated to match. Where an older passage and this section disagree, this
+section wins.
+
+- **Scale.** One chapter per output file, an hour at most. Each recording is
+  about half an hour, so a chapter is normally **two or more recordings**, and
+  a later recording usually starts by re-reading the end of the one before.
+  Several recordings per chapter is therefore a v0 requirement, not a v2 one.
+- **How the retakes actually look.** A struggle with a long sentence often
+  goes: the whole sentence three times, then only its second half a few more
+  times. Retake jumps land mid-sentence, and a keeper stitched from two passes
+  is the normal case, not an edge case.
+- **Language.** English only. German is a distant possibility and does not
+  constrain anything now. CC-BY-NC model weights are acceptable, because this
+  is a personal, non-commercial open-source project. The repo already never
+  bundles weights (`crates/leveller-model/src/registry.rs`; they are fetched
+  with `cargo xtask fetch-model`), so a model's licence stays attached to the
+  model file and not to the MIT code. The first choice is still
+  wav2vec2-base-960h, which is Apache-2.0 and was trained on LibriSpeech,
+  i.e. read audiobooks.
+- **Automation.** Review first. The aim is to get faster step by step while
+  keeping quality the same or better, so every automatic decision goes through
+  the review queue, with bulk apply above a visible confidence floor as an
+  option.
+- **The script.** Pasted into a text field in the app. The app keeps a copy in
+  the project folder, holds the original unchanged, and records accepted edits
+  on top of it; the revised text can be copied out. There is no external file
+  for the tool to own or rewrite.
+- **Where it lives.** A separate app in this repo, built like the Audio
+  Leveller app: Rust and AppKit, with the application state in a crate that has
+  no window code so the app can go multi-platform later. See "Where the code
+  goes" under Delivery.
+- **Number and abbreviation expansion.** Yes, in the first version. The
+  first answer was "no rules, approve them as minor divergences", but the
+  model cannot spell digits or symbols at all, so "1984" or "£12.50" breaks
+  the timing pass rather than just producing a divergence. A normalisation
+  step expands numbers, currency and common abbreviations before alignment;
+  anything it does not cover becomes a wildcard. See "Text normalisation"
+  under Open questions.
+- **Cutting inside words.** Manual edits often sound best cut inside a word
+  ("anex|planation") rather than between words. Deferred; see "Where" under
+  Cut mechanics.
+
+The plan was written against the TypeScript/Electron codebase, before the
+Rust rewrite. The data model below is still written as TypeScript interfaces
+because that is the shortest way to show the shapes; they will be Rust
+structs. References to specific TypeScript files name the module whose Rust
+port (under `crates/`) is what would now be reused.
+
 ## The problem
 
 Narrating a script — a podcast read from notes, a book read aloud — produces a
@@ -58,9 +110,10 @@ Descript at one job.
 
 ## Concepts and data model
 
-The types below are proposals in the spirit of `src/listen/types.ts`: plain
-data, doc-commented with *why*, serialisable to JSON, shared between the Node
-side and the browser. They would live in `src/reader/types.ts`.
+The types below are proposals in the spirit of `crates/leveller-listen/src/types.rs`:
+plain data, doc-commented with *why*, serialisable to JSON. They are written
+as TypeScript because that is the compact way to show a shape; they would be
+Rust structs in the `reader` crate (see "Where the code goes").
 
 The pipeline has four artefacts and it is worth naming them before the types,
 because each stage's failure mode is different and mixing them makes the
@@ -342,7 +395,7 @@ transformation of the path. So this decision deserves the space.
 
 Requirements, from the repo's existing constraints: **offline**, **local**,
 **license-compatible** (weights downloadable and redistributable-in-spirit, or
-at least freely usable), **embeddable in Node/Electron without a Python
+at least freely usable), **embeddable in a Rust app without a Python
 runtime**, and accurate enough that a cut placed from a word boundary lands in
 the gap rather than in a consonant. That last one is quantitative: word
 boundaries good to about ±30 ms, because the boundary is only a seed for a
@@ -359,21 +412,27 @@ forced aligner and it is what torchaudio's alignment tutorial does.
 - **Quality:** excellent timings. Frame-accurate to 20 ms, which is better than
   anything else on this list, and the confidence it emits is meaningful.
 - **Offline / licensing:** `facebook/wav2vec2-base-960h` is Apache-2.0 and
-  exports cleanly to ONNX. (`facebook/mms-300m-1130-forced-aligner`, the
-  multilingual one everyone reaches for, is **CC-BY-NC** — not usable here.
-  See the open questions.)
+  exports cleanly to ONNX. It was trained on LibriSpeech, which is read
+  audiobooks, so it matches narration well. (`facebook/mms-300m-1130-forced-aligner`,
+  the multilingual one everyone reaches for, is **CC-BY-NC**. That is
+  acceptable for this project (see Decisions), but English is all that is
+  needed now, so it is the candidate for German later, not the starting
+  point.)
 - **Effort:** *low, for this repo specifically.* The scaffolding already
-  exists. `onnxruntime-node` is already an optional dependency,
-  `scripts/fetch-model.mjs` already downloads-and-verifies a pinned archive,
-  and `src/models/deepfilternet.ts` is already the pattern for "the DSP around
-  a bare graph lives in TypeScript and is tested without weights present".
-  wav2vec2 needs *far* less around it than DeepFilterNet3 did: resample to
-  16 kHz (`src/dsp/resample.ts` exists), normalise the waveform to zero mean
-  and unit variance, run, log-softmax, Viterbi. Call it 300 lines including
-  the trellis.
+  exists. `crates/leveller-model` runs DeepFilterNet3's ONNX graphs on tract,
+  its registry pins every weight file by hash, and `cargo xtask fetch-model`
+  downloads and verifies them. `deepfilternet.rs` is already the pattern for
+  "the DSP around a bare graph lives in Rust and is tested without weights
+  present". wav2vec2 needs *far* less around it than DeepFilterNet3 did:
+  resample to 16 kHz (`leveller-dsp` has `resample.rs`), normalise the
+  waveform to zero mean and unit variance, run, log-softmax, Viterbi. Call it
+  300 lines including the trellis.
+- **Unverified:** that tract runs the wav2vec2 ONNX export. It is a
+  convolutional front end plus a transformer, which tract generally supports,
+  but nobody has tried it here. This is the first step of the spike.
 - **Cost:** roughly 0.05–0.2× real time on Apple silicon CPU for the base
-  model; a 3-hour book is minutes, not hours, and the emissions cache means it
-  is paid once.
+  model; a half-hour recording is a few minutes at most, and the emissions
+  cache means it is paid once.
 - **The catch:** plain CTC forced alignment is *total and monotone* — it must
   consume all the audio and all the text, in order. A recording with retakes
   and asides violates both. Feeding it a script it cannot satisfy does not
@@ -400,7 +459,7 @@ word sequence to the script word sequence with Needleman–Wunsch.
   the events this tool exists to find. A retake that Whisper transcribes as
   one fluent sentence is a retake this tool cannot see.
 - **Offline / licensing:** excellent. whisper.cpp is MIT, the weights are MIT,
-  ggml builds are small and there are prebuilt Node bindings. Nothing to argue
+  ggml builds are small and there are Rust bindings (`whisper-rs`). Nothing to argue
   about.
 - **Where it earns its place:** *naming insertions*. When the reader improvises
   a sentence that is not in the script, a character-level CTC greedy decode
@@ -416,7 +475,7 @@ word sequence to the script word sequence with Needleman–Wunsch.
 The best phone-level forced aligner there is, MIT-licensed, well documented,
 and completely unshippable here: it is a Python/Kaldi/conda ecosystem with a
 pronunciation-dictionary and acoustic-model download story of its own. Making
-an Electron app depend on a conda environment is not local-first, it is
+a desktop app depend on a conda environment is not local-first, it is
 someone else's install problem. Worth using **offline, as ground truth**, to
 score whatever we do ship — the same role the commercial before/after pair
 played for the compressor.
@@ -424,15 +483,15 @@ played for the compressor.
 ### Option D — Vosk
 
 Apache-2.0, Kaldi under the hood, genuinely offline, small models (~50 MB),
-prebuilt Node bindings, per-word timestamps with confidences, and — the
+bindings for most languages, per-word timestamps with confidences, and — the
 interesting part — a **grammar mode** that constrains decoding to a supplied
 word list or phrase set. Constraining the decoder to the script's vocabulary
 is a cheap approximation of forced alignment and would sharpen recognition a
 lot.
 
 Against it: the small English models are noticeably weaker than wav2vec2, the
-timings are word-level with no sub-word detail, the Node binding is a prebuilt
-native `.node` (another binary to trust and to ship per-platform), and the
+timings are word-level with no sub-word detail, it is a prebuilt
+native library (another binary to trust and to ship per-platform), and the
 grammar mode is all-or-nothing — constrain to the script and an improvised
 aside comes out as the nearest script words, which destroys divergence
 detection. Reasonable fallback, wrong foundation.
@@ -451,8 +510,8 @@ targets first, and a bad thing to build the data model around.
 ### The recommendation
 
 **Start with A, keep B as an optional second opinion, use C offline as ground
-truth.** Concretely: wav2vec2-base-960h through `onnxruntime-node`, fetched by
-the existing hash-pinned script, with the classical fallback being "no
+truth.** Concretely: wav2vec2-base-960h on tract through `leveller-model`,
+registered and fetched the same hash-pinned way as DeepFilterNet3, with the classical fallback being "no
 alignment, tell the user what is missing" — exactly how the denoiser's ONNX
 backend behaves today.
 
@@ -477,14 +536,32 @@ penalty for how far — is a small change to the recurrence and turns the
 alignment into exactly the object we want: *script position as a function of
 audio time, allowed to go back*.
 
-Two implementation notes that matter. First, the full jump transition is
-O(n²) in script length, which is fine for a chapter and not for a book — so
-restrict jump targets to sentence starts and to positions within a window
-(retakes back up a phrase or a sentence, essentially never a page), which
-makes it linear again. Second, the cost `J` is the single knob that trades
+Three implementation notes that matter.
+
+**Jumps may land on any word.** An earlier draft restricted jump targets to
+sentence starts to keep the search linear. That would miss the most common
+retake in practice: repeating only the second half of a sentence (see
+Decisions). The restriction is also unnecessary. If a jump from `j'` back to
+`j` costs `J + λ·(j' − j)`, the best jump into cell `(i, j)` is
+`min over j' ≥ j of (D[i][j'] + λ·j') − λ·j + J`, and that minimum is a running
+suffix minimum along the row, so the whole grid stays O(audio words × script
+words). At the sizes in the Decisions section — a half-hour recording decodes
+to roughly 5,000 words, an hour-long chapter is roughly 9,000 script words —
+that is about 45 million cells, which is small. Sentence and clause starts can
+still be made slightly cheaper to land on, as a prior rather than a rule.
+
+**A recording covers only part of the script.** A chapter is two or more
+recordings, and each one starts and ends somewhere in the middle of the
+script, usually with some overlap at the boundary. So the alignment is free at
+both ends of the script dimension (semi-global): starting at any script word
+and stopping at any script word costs nothing. The passes from all of a
+chapter's recordings then go into the same grouping and keeper selection
+below, which already do not care which recording a pass came from.
+
+**The jump cost is calibrated, not chosen.** `J` is the single knob that trades
 missed retakes against false ones, and it should be *calibrated on the
-labelled fixture*, not chosen — the same discipline the rest of this repo
-applies to every threshold.
+labelled fixture* — the same discipline the rest of this repo applies to every
+threshold.
 
 The output is a coarse path: for every audio region, which script region it is
 attempting, and where the backward jumps are.
@@ -540,8 +617,8 @@ pairwise across the whole group, but they are one editing decision.
 
 The default is **the last complete pass**, and it is worth being explicit about
 why, because "score all the takes and pick the best" is the tempting design and
-it is wrong. The reader stopped re-reading when he was satisfied. That is a
-judgement made in the room, with the text in front of him, by the person whose
+it is wrong. The reader stopped re-reading once satisfied. That is a
+judgement made in the room, with the text in front of them, by the person whose
 recording it is. A scorer that overrules it because take 2 was 0.3 dB more
 consistent is second-guessing the only ground truth available. "Complete" here
 means: covers the group's script span to its right edge, and continues past it
@@ -565,8 +642,8 @@ verbatim in the UI ("kept pass 3 of 3 — last complete pass; 0 divergences;
 - **lead-in silence** — a long pause before a pass means a deliberate restart,
   and separately means there is somewhere clean to cut.
 - **loudness offset** — measured with the existing BS.1770 machinery in
-  `src/dsp/loudness.ts`. A pass 6 dB below programme is usually the reader
-  muttering to himself, not a take.
+  `leveller-dsp` (`loudness.rs`). A pass 6 dB below programme is usually the reader
+  muttering an aside, not a take.
 - **truncated tail** — a pass whose last word is chopped is not a candidate
   keeper for the region containing that word.
 - **mean acoustic confidence** — mumbling, turning away from the mic.
@@ -594,8 +671,28 @@ differ. That last term is what stops the DP from producing an optimal-on-paper
 Frankenstein splice in the middle of a word.
 
 The output is `RetakeGroup.keep`: an ordered list of (pass, script sub-span).
-Usually one entry. Sometimes two, and when it is two the UI has to say so
-loudly, because a stitched take is the thing most likely to sound wrong.
+For this reader, two entries is common, and the UI has to say so loudly,
+because a stitched take is the thing most likely to sound wrong.
+
+**The pattern this has to handle.** The usual way a hard sentence gets
+recorded (see Decisions): the whole sentence three times (P1–P3), then only
+its second half three more times (P4–P6). All six passes form one group. The
+expected keeper is the first half from P3 and the second half from P6, joined
+somewhere in the words both of them cover. The labelled fixture must contain
+this pattern deliberately.
+
+The risk in that join is intonation, not the cut itself. When the reader
+restarts mid-sentence, the first word of the restart often carries the pitch
+reset and emphasis of a sentence start, so a join placed exactly at the
+restart point can sound like a restart even when the cut is clean. So:
+
+- the DP is free to place the join a word or two *into* the later pass, where
+  both passes cover the same words, rather than at the restart point;
+- `spliceCost` should include a term for a pitch reset across the join, once
+  there is a pitch track to measure it with; until then the listening test is
+  what catches it;
+- the listening tests in v0.5 should score stitched keepers separately from
+  single-pass ones.
 
 ### False positives, which are the whole risk
 
@@ -709,13 +806,13 @@ about 20 ms and it sits at the acoustic onset, which is inside the breath and
 the coarticulation, not in the gap. Four refinements, in order:
 
 1. **Silence search.** Around the seed, find the quietest point using a
-   short-window loudness scan. `src/dsp/silence.ts` already does this — but its
-   defaults (`windowSec: 0.1`, `hopSec: 0.025`, `minSilenceSec: 1.0`) are tuned
+   short-window loudness scan. `leveller-dsp`'s `silence.rs` already does this — but its
+   defaults (`window_sec: 0.1`, `hop_sec: 0.025`, `min_silence_sec: 1.0`) are tuned
    for finding the *pauses between paragraphs* that segment levelling needs.
-   Inter-word gaps are 50–200 ms. The scan wants `windowSec: 0.02`,
-   `hopSec: 0.005` and no minimum-duration filter. That is the same code with
+   Inter-word gaps are 50–200 ms. The scan wants `window_sec: 0.02`,
+   `hop_sec: 0.005` and no minimum-duration filter. That is the same code with
    different parameters, which is a good sign the abstraction is right, but it
-   is worth stating that reusing `analyzeSilence` at its defaults here would
+   is worth stating that reusing `silence::analyze` at its defaults here would
    simply find nothing.
 2. **Sentence and phrase preference.** Given several acceptable points, prefer
    the one at a sentence boundary in the script; that is where a listener
@@ -724,9 +821,21 @@ the coarticulation, not in the gap. Four refinements, in order:
    with the same slope sign on both sides of the join. Free, and it removes the
    step that a crossfade would otherwise have to hide.
 4. **Crossfade.** Equal-power, 5–15 ms — short enough not to smear a consonant,
-   long enough to kill the click. `src/dsp/roomtone.ts` already builds
+   long enough to kill the click. `roomtone.rs` already builds
    equal-power crossfades (at 50 ms, for concatenating tone clips); the same
    helper, shorter.
+
+**Later: cutting inside a word.** In manual editing the best cut is often not
+between words at all. "an explanation" cut between the words tends to sound
+wrong because the words run into each other; cut as "anex|planation" it
+usually sounds right. The likely reason is that a stop consonant (p, t, k, b,
+d, g) is preceded by a closure: 20–80 ms of near-silence *inside* the word
+before the burst. So this probably does not need a separate transient
+detector. It is the same silence search, extended to look for closures
+before stops, using the character-level timings pass 3 already produces to
+find where the stops are. For a retake splice the join then lands at the same
+closure in both passes. Deferred until the between-word cuts work and the
+listening tests show where they fall short; nothing in v0 depends on it.
 
 ### The two things that make an edit *sound* edited
 
@@ -734,7 +843,7 @@ the coarticulation, not in the gap. Four refinements, in order:
 underneath them. If the two sides have even slightly different noise floors —
 and they will, because the reader moved between takes — the join is an audible
 step in the background. Defence: measure the floor on both sides (the
-`scoreRange` machinery in `roomtone.ts` is already a "how clean is this range"
+`score_range` in `roomtone.rs` is already a "how clean is this range"
 function), and when they differ by more than ~1.5 dB, or when the seam needs
 to be lengthened, splice in a gain-matched patch from the room-tone bed the
 level stage already builds. This is the one place where the existing room-tone
@@ -790,7 +899,7 @@ viewer, and it is worth the layout work.
 Below it, pinned, a **transport strip**:
 
 - The waveform of the whole recording, drawn from a multi-resolution peak
-  cache — `listen/src/peaks.ts` already exists and already handles a
+  cache — `leveller-listen`'s `peaks.rs` already exists and already handles a
   20-minute file smoothly.
 - Above the waveform, the **alignment ribbon**: script position plotted
   against audio time. A clean read is a rising staircase. Every retake is a
@@ -858,21 +967,44 @@ Two affordances that matter more than they look:
 ### v0 — the reading report (read-only)
 
 **Nothing is edited. Nothing is cut. Nothing is rendered.** v0 aligns a
-recording to a script and tells the user what happened, and that alone is
+chapter's recordings (usually two or more) to a pasted script and tells the
+user what happened, and that alone is
 worth having: a punch-list of spans to re-record, and a map of where the
 retakes are, is most of a session's editing decisions made.
 
-- `src/reader/` — normalisation, the three-pass aligner, pass splitting,
-  divergence classification, retake grouping and scoring. Pure, no Electron,
-  unit-tested, like `src/dsp/`.
-- `pnpm align script.txt take.wav --report out.json` — a CLI, in the shape of
-  the existing one, printing what it found and how sure it is.
-- A `/read` route in `listen/`, reusing `peaks.ts` and `player.ts`: the script
-  with divergences highlighted, the alignment ribbon, the issue list, the
-  punch-list. Aqua-styled, same as everything else there.
-- Model fetching through `scripts/fetch-model.mjs` with a pinned hash, and the
-  same "say exactly what is missing and decline" behaviour the ONNX denoise
-  backend has.
+- The `reader` crate — tokenising, normalisation (numbers, currency,
+  abbreviations) with a wildcard fallback for anything it misses, the three-pass aligner, pass splitting, divergence
+  classification, retake grouping and scoring. Pure, no platform, unit-tested,
+  like `leveller-dsp`.
+- An `align` subcommand of `apps/leveller-cli`
+  (`leveller align script.txt take1.wav take2.wav --report out.json`),
+  printing what it found and how sure it is. This is the tool the spike and the
+  eval bounds run against, before any UI exists.
+- The reader app: a text field to paste the script into, then the script with
+  divergences highlighted, the alignment ribbon (one per recording), the issue
+  list and the punch-list. Aqua-styled, like the other two apps.
+- wav2vec2 added to the `leveller-model` registry with pinned hashes and
+  fetched by `cargo xtask fetch-model`, with the same "say exactly what is
+  missing and decline" behaviour the denoiser has when its weights are absent.
+
+### Where the code goes
+
+A separate app in this repo, built the way the Audio Leveller app is built, so
+that a later non-macOS front end only has to replace the window code:
+
+| piece | role | modelled on |
+| ----- | ---- | ----------- |
+| `crates/reader` | the algorithms and the data model above; no IO, no platform | `leveller-dsp` |
+| `crates/reader-ui` | the app as state and messages, with no window code | `leveller-ui` |
+| `apps/reader` | the AppKit window | `apps/audio-leveller` |
+| `crates/leveller-model` | gains wav2vec2 next to DeepFilterNet3 | — |
+
+Reused as they are: `aqua` for the look, `leveller-listen`'s `peaks.rs` for
+waveforms, `leveller-audio` for gapless playback, `leveller-wav` for reading
+recordings, and `leveller-dsp` for resampling, silence, loudness and room
+tone. The project folder (pasted script, edits on top of it, alignments,
+decisions, emissions cache) is plain JSON next to the recordings, like
+`listening/sessions/<name>/`. Crate names are placeholders.
 
 Read-only is a deliberate constraint, not a lack of ambition. It means v0 can
 be wrong without costing anything, which is the only way to find out how good
@@ -880,8 +1012,11 @@ the alignment actually is.
 
 **Build this first, before any of the above: the labelled fixture.** Record
 one 10–15 minute read of a known script with retakes and misreadings made
-*deliberately and logged as they happen*. Annotate it in the existing
-`/annotate` editor. Then bound alignment quality in `eval/` the way every
+*deliberately and logged as they happen*, including the "whole sentence
+three times, then the second half three more times" pattern, and split across
+two recordings with an overlap, the way a real chapter is. Annotate it in the
+annotation mode of `apps/listen`. Then bound alignment quality in
+`leveller-eval` the way every
 other stage in this repo is bounded — word-boundary error in ms, retake
 recall, retake precision, divergence F1 — with the bounds stated as reasons,
 not snapshots. Two things follow from the repo's own history here: the
@@ -908,16 +1043,16 @@ metric will.
 Deleting words in the script deletes the audio. Accepting a read rewrites the
 script. And **punch-in recording**: select a script span, record it, the new
 audio is aligned to that exact span and spliced with the same cut machinery.
-Needs audio input in the Electron app, which does not exist yet, and a way to
+Needs audio input in the reader app, which no app in the repo has yet, and a way to
 match the new recording's level and tone to the old one — where the existing
 EQ stage's long-term-average-spectrum fitter is suddenly the right tool for a
 completely different job (fit the new take's spectrum to the old take's).
 
 ### v2 — projects
 
-A book is many chapters, many sessions, many recordings, recorded over weeks
-with different room tone and different distances to the microphone. Chapter
-assembly, per-chapter export through the chain, consistency checks across
+A book is many chapters, recorded over weeks with different room tone and
+different distances to the microphone. (Several recordings per *chapter* is
+already v0.) Book-level assembly, per-chapter export through the chain, consistency checks across
 sessions, breath-aware cuts once the breath detector the annotator is
 collecting data for exists, Whisper for naming asides, and a
 reader-specific pronunciation lexicon built from confirmed alignments — which
@@ -927,13 +1062,15 @@ part of this plan, considerably less weak.
 ### The de-risking spike, in order
 
 1. Record and label the fixture. (Half a day. Do it first.)
-2. Export wav2vec2-base-960h to ONNX; run it from Node on 60 s of the fixture;
-   print per-word timings from a plain forced alignment against the true text
+2. Export wav2vec2-base-960h to ONNX and check that tract loads and runs it
+   (if it does not, that is the first thing to solve, before any accuracy
+   question). Run it on 60 s of the fixture; print per-word timings from a plain forced alignment against the true text
    of that 60 s. Compare against hand-marked boundaries. **If the median
    boundary error is not under ~30 ms, stop and reconsider the whole option.**
 3. Greedy decode plus the jump-permitting alignment over a 5-minute stretch
-   with known retakes. Measure recall and precision of the backward jumps.
-   Calibrate `J`.
+   with known retakes, including the half-sentence ones. Measure recall and
+   precision of the backward jumps. Calibrate `J`. Then run it across the
+   boundary between the two fixture recordings.
 4. Only then build anything with a UI.
 
 Steps 2 and 3 are a few days and they settle the largest risk in the project.
@@ -942,43 +1079,50 @@ is ordinary work whose difficulty is known.
 
 ## Open questions and risks
 
-**Language.** wav2vec2-base-960h is English-only, and the obvious multilingual
-forced-alignment model (`mms-300m-1130-forced-aligner`) is CC-BY-NC, which
-this project cannot use. If German narration is in scope, the alignment
-recommendation needs revisiting *before* anything is built — the candidates
-would be a German wav2vec2 fine-tune with a permissive licence (several exist,
-of varying quality), Whisper (multilingual, MIT, but with the timing problems
-above), or Vosk's German model. This is the question with the largest blast
-radius on the plan.
+Language, the script format, where the app lives and how much to automate
+were open here and are now settled; see Decisions. What remains:
 
-**Model size and cost over a book.** A 10-hour audiobook is 10 hours of
-inference plus re-alignments after script edits. The emissions cache makes
-re-alignment nearly free, but the first pass is not, and the UI needs to be
-honest about it (a progress report per chapter, resumable).
+**German, one day.** Out of scope now. If it comes, the candidates are
+`mms-300m-1130-forced-aligner` (CC-BY-NC, acceptable for this project), a
+German wav2vec2 fine-tune, or Whisper with its timing problems. The data model
+does not change; the tokeniser, the vocabulary and the divergence rules do.
 
-**What is a script, as a file?** Plain text is the easy answer and probably the
-right v0 answer. Markdown, EPUB and Word all carry structure worth keeping
-(chapters, emphasis, footnotes that must *not* be read) and all need a parser.
-Related: does the reader want the tool to edit the script file in place when
-he accepts a read, or to emit a diff? If the script is a book with a publisher,
-in-place is wrong.
+**Text normalisation.** "1984", "Dr.", "£12.50", "i.e.", "3–4". wav2vec2's
+vocabulary is A–Z, apostrophe and space, so a script word containing anything
+else cannot be force-aligned at all, and a word spelled differently from how
+it is said ("Dr.") reads as a misreading. So v0 has a normalisation step,
+English only, hand-written and tested as its own unit, that fills in
+`ScriptWord.spoken`:
 
-**Text normalisation is unglamorous and load-bearing.** "1984", "Dr.", "£12.50",
-"i.e.", "3–4". Every one of those, unexpanded, becomes a false divergence, and
-false divergences in the first ten minutes of use are how a tool loses its
-user. There is no dependency to add here (the constraint says none), so it is
-hand-written rules, per language, and it should be tested as its own unit.
+- cardinals, ordinals ("3rd"), decimals, and years ("1984" as "nineteen
+  eighty four");
+- currency ("£12.50" as "twelve pounds fifty") and percentages;
+- ranges ("3–4" as "three to four");
+- a short list of abbreviations ("Dr.", "Mr.", "St.", "e.g.", "i.e.", "etc.").
 
-**Where does the app live?** v0 as a `/read` route in `listen/` is much the
-fastest path and reuses the peak cache, the player and the Aqua chrome. But
-`listen/` is a dev tool served by the Vite dev server, and this is a product.
-The v1 decision — promote it into the Electron app, or promote `listen/` into
-something shippable — should be made consciously rather than by drift.
+Some of these have several correct readings: "1984" can be a year or a
+number, "£12.50" can be "twelve pounds fifty" or "twelve pounds and fifty
+pence". Rather than guess, a rule may produce several candidates, and pass 3
+picks whichever the audio supports best. Every expansion is logged in
+`ScriptDoc.normalisations` so a surprising alignment can be traced back to it.
 
-**How much automation does Nino actually want?** The plan assumes review-first
-with opt-in bulk apply. If the real preference is "cut everything and let me
-listen to the result", the confidence calibration matters much more and the
-review UI matters much less. Worth deciding early; it changes what v0.5 is.
+Two fallbacks for what the rules miss:
+
+- A word still containing characters outside the vocabulary becomes a
+  **wildcard** that absorbs whatever audio sits between its neighbours
+  (torchaudio's forced-alignment tutorial does the same with a star token),
+  reported as minor, "not checked", with what the decoder heard.
+- A letters-only word read differently from any expansion comes out as a
+  substitution. Approving it must not rewrite the script, so the resolutions
+  need a "this reading is fine, keep the text" choice alongside
+  accept-the-read, and the approval should apply to every later occurrence of
+  the same written word in the chapter. That remembered list is a first,
+  small version of the v2 pronunciation lexicon.
+
+**Inference time.** A chapter is an hour at most and a recording about half an
+hour, so the first pass over a recording is minutes at most, and the emissions
+cache makes re-alignment nearly free. The UI still needs a progress report per
+recording.
 
 **The asymmetry of a wrong cut.** Stated once more because it should govern
 every threshold: a missed retake costs a minute of manual work, a wrong cut
@@ -990,9 +1134,8 @@ above recall.
 distance, voice, time of day. Splicing it in is easy; making it inaudible is
 the hard part, and it may turn out that punch-in only works within a session.
 
-**Multi-take sessions.** Some readers record a whole chapter twice rather than
-retaking phrases. That is a different problem (align two full recordings to
-one script and choose per sentence) which this data model actually supports —
-`Project.recordings` is a list and the DP over covers does not care which
-recording a pass came from — but it is not v0, and pretending otherwise would
-be scope creep.
+**Whole-chapter second takes.** Several recordings per chapter is v0, because
+each recording covers part of the chapter. Recording the *same* part twice in
+full and choosing per sentence is the same machinery (the DP over covers does
+not care which recording a pass came from), but the UI for choosing between
+two complete reads is not v0.

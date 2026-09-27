@@ -14,7 +14,8 @@ exploit that everywhere has no reason to exist next to Descript.
 - **[PLAN.md](PLAN.md)** — the plan. Problem statement, data model, the
   alignment options with their trade-offs and the recommendation, the retake
   algorithm, divergence classification, cut mechanics, UI, and a staged
-  delivery plan with a de-risking spike.
+  delivery plan with a de-risking spike. Its **Decisions** section records
+  the answers to the original open questions (2026-09-27).
 
 ## Mockups
 
@@ -35,5 +36,7 @@ browser. Fake data throughout, but the interactions that carry the idea work.
   update; group 2 demonstrates a stitched cover, where the kept pass does not
   span everything the abandoned one did.
 
-Styling follows `listen/src/aqua.css` so the screens read as part of the same
-application.
+Styling follows `listen/src/aqua.css` from before the Rust rewrite (now the
+`aqua` crate), so the screens read as part of the same application. The
+mockups are design references only; no code from them carries over to the
+AppKit app.
