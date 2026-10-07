@@ -1,9 +1,10 @@
 name: Release
 
 # Signed, notarised macOS build of the Rust apps. Tag a version and the DMG
-# lands on a GitHub release page you can send someone; a manual run does the
-# same work and leaves the DMG as a run artifact instead, which is how you test
-# the pipeline without burning a version number.
+# lands on a GitHub release page you can send someone, next to the update
+# archives and appcasts the apps' Sparkle updaters read; a manual run does the
+# same work and leaves all of it as a run artifact instead, which is how you
+# test the pipeline without burning a version number.
 on:
   push:
     tags: ["v*"]
@@ -47,6 +48,34 @@ jobs:
             echo "::error::tag $GITHUB_REF_NAME does not match workspace version $version"
             exit 1
           fi
+
+      # The framework the bundles carry and the tool that signs updates, pinned
+      # by hash in xtask.
+      - name: Fetch Sparkle
+        run: cargo xtask fetch-sparkle
+
+      # Every update is signed with this key, and every copy of the apps checks
+      # updates against its public half, which is derived here and written into
+      # the bundles. A tag cannot go out without the real key: apps that carry
+      # any other would never accept an update again. A manual run without it
+      # makes a key up for the run, so the whole path is still exercised.
+      - name: Sparkle signing key
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          umask 077
+          key="$RUNNER_TEMP/sparkle-private-key"
+          if [ -n "$SPARKLE_PRIVATE_KEY" ]; then
+            printf '%s\n' "$SPARKLE_PRIVATE_KEY" > "$key"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "::error::SPARKLE_PRIVATE_KEY is not set (see README, 'Signed releases')"
+            exit 1
+          else
+            echo "::warning::SPARKLE_PRIVATE_KEY is not set, so this run's updates are signed with a throwaway key"
+            openssl rand -base64 32 > "$key"
+          fi
+          public_key=$(cargo xtask sparkle-public-key < "$key")
+          echo "SPARKLE_PUBLIC_KEY=$public_key" >> "$GITHUB_ENV"
 
       # notarytool wants the App Store Connect key as a file, so the secret has
       # to land on disk. RUNNER_TEMP dies with the runner, and the last step
@@ -103,7 +132,10 @@ jobs:
 
       # Both bundles, release profile, signed with the hardened runtime. No
       # entitlements: a statically linked Rust binary needs none of the JIT and
-      # library-validation exceptions Electron did.
+      # library-validation exceptions Electron did, and Sparkle is signed with
+      # the same identity, so library validation lets it load. The bundles pick
+      # up SPARKLE_PUBLIC_KEY from the step before, and with it the framework
+      # and the feed.
       - name: Build and sign the apps
         run: |
           cargo xtask bundle
@@ -121,6 +153,21 @@ jobs:
           for app in target/bundle/*.app; do
             xcrun stapler staple "$app"
           done
+
+      # One zip per app, of the stapled bundle, signed with the Sparkle key, and
+      # an appcast pointing at it on this tag's release. Then each signature is
+      # checked against the key inside the bundle it is for, which is the check
+      # a copy of the app will make.
+      - name: Sign the updates and write the appcasts
+        run: |
+          cargo xtask archive > "$RUNNER_TEMP/archives"
+          while IFS= read -r archive <&3; do
+            signature=$(target/sparkle/bin/sign_update -p --ed-key-file - "$archive" \
+              < "$RUNNER_TEMP/sparkle-private-key")
+            cargo xtask appcast "$archive" "$signature"
+          done 3< "$RUNNER_TEMP/archives"
+          cargo xtask verify-update
+          cat target/updates/*.xml
 
       # The disk image is made from the stapled apps, so someone who drags them
       # out offline still has the tickets. Then the image is signed and
@@ -142,7 +189,8 @@ jobs:
       - name: Verify the signatures and the tickets
         run: |
           for app in target/bundle/*.app; do
-            codesign --verify --strict --verbose=2 "$app"
+            # --deep reaches the Sparkle framework and the helpers inside it.
+            codesign --verify --deep --strict --verbose=2 "$app"
 
             signature=$(codesign --display --verbose=4 "$app" 2>&1)
             echo "$signature" | grep -E "Authority|TeamIdentifier|flags="
@@ -176,7 +224,10 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: audio-leveller-macos-arm64
-          path: ${{ env.DMG }}
+          path: |
+            ${{ env.DMG }}
+            target/updates/*.zip
+            target/updates/*.xml
           if-no-files-found: error
 
       - name: Publish the release
@@ -184,12 +235,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "$DMG" \
+          gh release create "$GITHUB_REF_NAME" "$DMG" target/updates/*.zip target/updates/*.xml \
             --title "$GITHUB_REF_NAME" \
             --generate-notes
 
       - name: Remove the signing material
         if: always()
         run: |
-          rm -f "$RUNNER_TEMP/apple-api-key.p8" "$RUNNER_TEMP/certificate.p12"
+          rm -f "$RUNNER_TEMP/apple-api-key.p8" "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/sparkle-private-key"
           security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true

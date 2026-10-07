@@ -20,6 +20,7 @@ use objc2_core_foundation::{CGPoint, CGRect, CGSize};
 use objc2_foundation::{NSString, ns_string};
 
 use crate::palette;
+use crate::updater::Updater;
 
 /// How a window is set up.
 pub struct WindowDesc {
@@ -126,7 +127,10 @@ impl From<palette::Light> for WindowCommand {
 /// here — as they would in any AppKit app. The Edit menu is what makes Cut,
 /// Copy, Paste and Select All work in a text field, since those are sent up the
 /// responder chain by the menu rather than handled by the field itself.
-pub fn install_menu(mtm: MainThreadMarker, app_name: &str) {
+///
+/// With an updater, the application menu gets "Check for Updates…" under About,
+/// where every Sparkle app puts it.
+pub fn install_menu(mtm: MainThreadMarker, app_name: &str, updater: Option<&Updater>) {
     let app = NSApplication::sharedApplication(mtm);
     let main = NSMenu::new(mtm);
 
@@ -139,6 +143,12 @@ pub fn install_menu(mtm: MainThreadMarker, app_name: &str) {
         "orderFrontStandardAboutPanel:",
         "",
     );
+    if let Some(updater) = updater {
+        let item = add(mtm, &app_menu, "Check for Updates…", "checkForUpdates:", "");
+        // SAFETY: the controller answers `checkForUpdates:`, and the caller
+        // keeps it alive for as long as the menu, which holds it weakly.
+        unsafe { item.setTarget(Some(updater.controller())) };
+    }
     app_menu.addItem(&NSMenuItem::separatorItem(mtm));
     add(mtm, &app_menu, &format!("Hide {app_name}"), "hide:", "h");
     add(mtm, &app_menu, "Hide Others", "hideOtherApplications:", "");
@@ -181,7 +191,13 @@ pub fn install_menu(mtm: MainThreadMarker, app_name: &str) {
     app.setWindowsMenu(Some(&window_menu));
 }
 
-fn add(mtm: MainThreadMarker, menu: &NSMenu, title: &str, selector: &str, key: &str) {
+fn add(
+    mtm: MainThreadMarker,
+    menu: &NSMenu,
+    title: &str,
+    selector: &str,
+    key: &str,
+) -> Retained<NSMenuItem> {
     let item = NSMenuItem::new(mtm);
     item.setTitle(&NSString::from_str(title));
     // Registered by name rather than written as `sel!(...)`, because these are
@@ -194,6 +210,7 @@ fn add(mtm: MainThreadMarker, menu: &NSMenu, title: &str, selector: &str, key: &
     }
     item.setKeyEquivalent(&NSString::from_str(key));
     menu.addItem(&item);
+    item
 }
 
 /// Bring the app up as a regular, dock-visible application and run it.

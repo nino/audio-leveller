@@ -442,6 +442,16 @@ image that is itself signed, notarised and stapled. The apps and the DMG open
 on someone else's Mac with no Gatekeeper warning and no network round-trip.
 The Electron app is no longer part of a release.
 
+Both apps update themselves with [Sparkle](https://sparkle-project.org). Each
+has **Check for Updates…** in its application menu, and Sparkle asks on the
+second launch whether to check automatically. The feed is an appcast attached
+to the release (`appcast-audio-leveller.xml`, `appcast-listen.xml`), read
+through GitHub's `releases/latest/download/` URL, so the newest release is
+always the one the apps see. Each appcast points at a zip of the stapled app on
+the same release, signed with the project's EdDSA key; the apps carry the
+public half and refuse anything it did not sign. v0.2.0 has no updater, so
+anyone on it installs the next release by hand once.
+
 Only arm64 is built, because the bundles are built for the runner's own
 architecture. Nothing stands in the way of a universal build now that the
 ONNX runtime is gone; it would mean building both targets and joining them
@@ -457,9 +467,11 @@ cargo xtask dmg
 ```
 
 That leaves the apps signed but not notarised; notarising needs the App Store
-Connect key the workflow uses.
+Connect key the workflow uses. It also leaves them without an updater, which
+goes in only when `SPARKLE_PUBLIC_KEY` is set and `cargo xtask fetch-sparkle`
+has been run.
 
-Five repository secrets, under Settings → Secrets and variables → Actions:
+Six repository secrets, under Settings → Secrets and variables → Actions:
 
 | secret | what it is |
 | ------ | ---------- |
@@ -468,6 +480,7 @@ Five repository secrets, under Settings → Secrets and variables → Actions:
 | `APPLE_API_KEY_P8` | The whole contents of the `.p8` App Store Connect key, `-----BEGIN PRIVATE KEY-----` line included. Created under App Store Connect → Users and Access → Integrations → App Store Connect API, and downloadable exactly once. |
 | `APPLE_API_KEY_ID` | The ten-character key ID shown next to that key. |
 | `APPLE_API_ISSUER_ID` | The issuer UUID shown above the key list. |
+| `SPARKLE_PRIVATE_KEY` | The key that signs updates. Make it once with Sparkle's `generate_keys` (in `target/sparkle/bin` after `cargo xtask fetch-sparkle`), which keeps it in the login keychain, then `generate_keys -x sparkle-key.txt` and paste that file's one line in. The workflow derives the public key from it. Keep the keychain copy: with the key lost, the apps already out there can never be updated again. |
 
 Cutting a release is a bump of `version` under `[workspace.package]` in
 `Cargo.toml` and a tag — the workflow refuses to build if the two disagree:
@@ -476,10 +489,12 @@ Cutting a release is a bump of `version` under `[workspace.package]` in
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-The DMG is attached to a GitHub release named after the tag. Running the
-workflow by hand from the Actions tab does everything except publish, leaving
-the DMG as a run artifact, which is how to test a change to the signing setup
-without spending a version number.
+The DMG, the update zips and the appcasts are attached to a GitHub release
+named after the tag. Running the workflow by hand from the Actions tab does
+everything except publish, leaving them as a run artifact, which is how to
+test a change to the signing setup without spending a version number. A manual
+run without `SPARKLE_PRIVATE_KEY` signs its updates with a key made up for the
+run; a tag refuses to build without it.
 
 ### Tuning
 

@@ -25,8 +25,10 @@ leveller-wav = { path = "crates/leveller-wav" }
 
 anyhow = "1.0"
 aqua = { path = "crates/aqua" }
+base64 = "0.23"
 block2 = "0.6"
 dispatch2 = "0.3"
+ed25519-dalek = "3.0"
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "objc2-core-foundation"] }
 objc2-core-foundation = { version = "0.3", features = ["CFCGTypes"] }

@@ -8,6 +8,8 @@ publish = false
 
 [dependencies]
 anyhow.workspace = true
+base64.workspace = true
+ed25519-dalek.workspace = true
 leveller-model.workspace = true
 serde.workspace = true
 serde_json.workspace = true

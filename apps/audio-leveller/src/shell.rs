@@ -673,7 +673,10 @@ pub fn run() -> ! {
     let mtm = MainThreadMarker::new().expect("the main thread");
     let app = NSApplication::sharedApplication(mtm);
     app.setActivationPolicy(objc2_app_kit::NSApplicationActivationPolicy::Regular);
-    aqua::window::install_menu(mtm, "Audio Leveller");
+    // Lives as long as `run`, which is as long as the app: the menu item for it
+    // holds it weakly.
+    let updater = aqua::updater::start(mtm);
+    aqua::window::install_menu(mtm, "Audio Leveller", updater.as_ref());
 
     let window = aqua::window::make_window(
         mtm,
