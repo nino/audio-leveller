@@ -31,6 +31,9 @@ If a change can move the processed audio, also run the evaluation corpus
 Rust, `pnpm eval -- --baseline eval/baseline.json` for Node) and say in the PR
 body what moved.
 
+On Linux the full Rust workspace does not build; use the `--exclude` list in
+`CLAUDE.md` under "Commands" and rely on CI for the macOS-only crates.
+
 Fix every failure before going on.
 
 ## 3. Review the diff
