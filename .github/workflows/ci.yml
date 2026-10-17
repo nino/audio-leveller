@@ -61,9 +61,9 @@ jobs:
 
   rust:
     name: Rust workspace
-    # macOS, because the two app crates are AppKit and are not yet gated for
-    # anything else. A Linux runner would fail in `apps/` before it reached the
-    # DSP it could actually check.
+    # macOS, because the two AppKit app crates are not yet gated for anything
+    # else. A Linux runner would fail in `apps/` before it reached the DSP it
+    # could actually check. The Tauri app builds on either.
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -74,6 +74,16 @@ jobs:
         run: rustup update --no-self-update stable && rustup default stable && rustc --version
 
       - uses: Swatinem/rust-cache@v2
+
+      # The Tauri app embeds the built frontend at compile time, so it has to
+      # exist before anything in the workspace is checked.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ui/.bun-version
+
+      - name: Build the frontend
+        working-directory: ui
+        run: bun install --frozen-lockfile && bun run build
 
       # Warnings are errors here and nowhere else: a developer's build should
       # not stop for a lint, but a merge should not carry one.
@@ -93,6 +103,28 @@ jobs:
       # are what fail the build.
       - name: Evaluation corpus
         run: cargo run --release --bin leveller-eval -- --baseline eval/baseline.json
+
+  ui:
+    name: Frontend typecheck and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ui/.bun-version
+
+      - name: Install dependencies
+        working-directory: ui
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: ui
+        run: bun run typecheck
+
+      - name: Tests
+        working-directory: ui
+        run: bun test
 
   reaper:
     name: REAPER script

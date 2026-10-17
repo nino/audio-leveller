@@ -1,0 +1,24 @@
+{
+  "name": "audio-leveller-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --port 1420 audio-leveller/index.html",
+    "build": "bun build audio-leveller/index.html --outdir dist/audio-leveller --production",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "tauri": "TAURI_APP_PATH=../apps/leveller-tauri TAURI_FRONTEND_PATH=. tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.12.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.3",
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}

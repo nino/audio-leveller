@@ -12,4 +12,5 @@ repository.workspace = true
 leveller-io.workspace = true
 leveller-pipeline.workspace = true
 leveller-stages.workspace = true
+serde.workspace = true
 serde_json.workspace = true
