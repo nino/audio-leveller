@@ -273,8 +273,6 @@ fn sign(bundle: &Path, identity: &str) -> Result<()> {
     Ok(())
 }
 
-/// The disk image, named for the version and the architecture it was built on,
-/// since that is what goes up on the release page.
 /// The Tauri-built Audio Leveller, which the release workflow (or the README's
 /// local steps) copies into `target/bundle`.
 const TAURI_BUNDLE: &str = "Audio Leveller.app";
@@ -295,6 +293,8 @@ fn shipped_bundles() -> Result<Vec<PathBuf>> {
     Ok(bundles)
 }
 
+/// The disk image, named for the version and the architecture it was built on,
+/// since that is what goes up on the release page.
 fn dmg() -> Result<PathBuf> {
     let arch = match std::env::consts::ARCH {
         "aarch64" => "arm64",

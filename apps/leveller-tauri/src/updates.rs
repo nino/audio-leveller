@@ -45,124 +45,149 @@ pub enum UpdateView {
     },
 }
 
-pub struct Updates {
-    view: Mutex<UpdateView>,
-    /// The update the strip offers, kept to install it from.
-    pending: Mutex<Option<Update>>,
+struct State {
+    view: UpdateView,
+    /// The update the strip offers. Kept after a failed install, so the strip
+    /// can offer it again.
+    pending: Option<Update>,
 }
+
+/// One lock over both, so deciding to install and marking the install as
+/// started happen together: two clicks, or a check landing mid-install, can't
+/// start a second download over the first.
+pub struct Updates(Mutex<State>);
 
 impl Updates {
     pub fn new() -> Self {
-        Self {
-            view: Mutex::new(UpdateView::None),
-            pending: Mutex::new(None),
-        }
+        Self(Mutex::new(State {
+            view: UpdateView::None,
+            pending: None,
+        }))
     }
 }
 
-fn show(app: &AppHandle, view: UpdateView) {
-    *app.state::<Updates>().view.lock().expect("the update lock") = view.clone();
+fn state(app: &AppHandle) -> std::sync::MutexGuard<'_, State> {
+    app.state::<Updates>()
+        .inner()
+        .0
+        .lock()
+        .expect("the update lock")
+}
+
+fn emit(app: &AppHandle, view: UpdateView) {
     let _ = app.emit("update", view);
+}
+
+fn note(app: &AppHandle, title: &str, message: String, kind: MessageDialogKind) {
+    app.dialog()
+        .message(message)
+        .title(title)
+        .kind(kind)
+        .show(|_| {});
+}
+
+pub fn is_installing(app: &AppHandle) -> bool {
+    matches!(state(app).view, UpdateView::Installing { .. })
 }
 
 /// Look for an update. A check the person asked for always answers; the one at
 /// start-up stays quiet unless there is something to offer, since being
 /// offline is not worth a dialog.
 pub async fn check(app: AppHandle, asked: bool) {
-    if is_installing(&app) {
-        return;
-    }
     let found = match app.updater() {
         Ok(updater) => updater.check().await,
         Err(error) => Err(error),
     };
     match found {
-        // An install may have started while the check was out.
-        Ok(Some(_)) if is_installing(&app) => {}
         Ok(Some(update)) => {
             let view = UpdateView::Available {
                 version: update.version.clone(),
                 notes: update.body.clone(),
             };
-            *app.state::<Updates>()
-                .pending
-                .lock()
-                .expect("the update lock") = Some(update);
-            show(&app, view);
+            let installing = {
+                let mut state = state(&app);
+                // An install may have started while the check was out.
+                let installing = matches!(state.view, UpdateView::Installing { .. });
+                if !installing {
+                    state.view = view.clone();
+                    state.pending = Some(update);
+                }
+                installing
+            };
+            if !installing {
+                emit(&app, view);
+            } else if asked {
+                note(
+                    &app,
+                    "Check for Updates",
+                    "An update is already being installed.".into(),
+                    MessageDialogKind::Info,
+                );
+            }
         }
         Ok(None) => {
             if asked {
                 let version = app.package_info().version.to_string();
-                app.dialog()
-                    .message(format!("Audio Leveller {version} is the newest version."))
-                    .title("You're up to date")
-                    .show(|_| {});
+                note(
+                    &app,
+                    "You're up to date",
+                    format!("Audio Leveller {version} is the newest version."),
+                    MessageDialogKind::Info,
+                );
             }
         }
         Err(error) => {
             eprintln!("update check failed: {error}");
             if asked {
-                app.dialog()
-                    .message(format!("Couldn't check for updates: {error}"))
-                    .title("Check for Updates")
-                    .kind(MessageDialogKind::Warning)
-                    .show(|_| {});
+                note(
+                    &app,
+                    "Check for Updates",
+                    format!("Couldn't check for updates: {error}"),
+                    MessageDialogKind::Warning,
+                );
             }
         }
     }
 }
 
-fn is_installing(app: &AppHandle) -> bool {
-    matches!(
-        *app.state::<Updates>().view.lock().expect("the update lock"),
-        UpdateView::Installing { .. }
-    )
-}
-
 #[tauri::command]
 pub fn update_view(app: AppHandle) -> UpdateView {
-    app.state::<Updates>()
-        .view
-        .lock()
-        .expect("the update lock")
-        .clone()
+    state(&app).view.clone()
 }
 
 /// Download and install the offered update, then restart into it.
 ///
-/// Not while a file is being levelled: the restart would kill the run and
-/// leave a half-written output next to the input.
+/// Not while a file is being levelled, since the restart would kill the run
+/// and leave a half-written output next to the input. Files are refused while
+/// an install is going (see `open` in `main.rs`) for the same reason.
 #[tauri::command]
 pub async fn install_update(app: AppHandle) {
     if crate::is_working(&app) {
-        app.dialog()
-            .message("Audio Leveller will install the update once the current file is finished. Try again then.")
-            .title("A file is being levelled")
-            .show(|_| {});
+        note(
+            &app,
+            "A file is being levelled",
+            "Install the update once the current file is finished.".into(),
+            MessageDialogKind::Info,
+        );
         return;
     }
-    if is_installing(&app) {
-        return;
-    }
-    // Kept, not taken: after a failed download the strip offers it again.
-    let Some(update) = app
-        .state::<Updates>()
-        .pending
-        .lock()
-        .expect("the update lock")
-        .clone()
-    else {
-        return;
-    };
-    let version = update.version.clone();
-    show(
-        &app,
-        UpdateView::Installing {
-            version: version.clone(),
+    let (update, view) = {
+        let mut state = state(&app);
+        if matches!(state.view, UpdateView::Installing { .. }) {
+            return;
+        }
+        let Some(update) = state.pending.clone() else {
+            return;
+        };
+        state.view = UpdateView::Installing {
+            version: update.version.clone(),
             fraction: None,
-        },
-    );
+        };
+        (update, state.view.clone())
+    };
+    emit(&app, view);
 
+    let version = update.version.clone();
     let mut received = 0u64;
     let mut last: Option<Instant> = None;
     let installed = update
@@ -173,15 +198,14 @@ pub async fn install_update(app: AppHandle) {
                     return;
                 }
                 last = Some(Instant::now());
-                show(
-                    &app,
-                    UpdateView::Installing {
-                        version: version.clone(),
-                        fraction: total
-                            .filter(|&t| t > 0)
-                            .map(|t| (received as f64 / t as f64).min(1.0)),
-                    },
-                );
+                let view = UpdateView::Installing {
+                    version: version.clone(),
+                    fraction: total
+                        .filter(|&t| t > 0)
+                        .map(|t| (received as f64 / t as f64).min(1.0)),
+                };
+                state(&app).view = view.clone();
+                emit(&app, view);
             },
             || {},
         )
@@ -189,24 +213,29 @@ pub async fn install_update(app: AppHandle) {
 
     match installed {
         Ok(()) => app.restart(),
-        Err(error) => show(
-            &app,
-            UpdateView::Failed {
+        Err(error) => {
+            let view = UpdateView::Failed {
                 message: error.to_string(),
-            },
-        ),
+            };
+            state(&app).view = view.clone();
+            emit(&app, view);
+        }
     }
 }
 
-/// "Later", or closing a failure.
+/// "Later", or closing a failure. Not during an install, which can't be
+/// called back.
 #[tauri::command]
 pub fn dismiss_update(app: AppHandle) {
-    app.state::<Updates>()
-        .pending
-        .lock()
-        .expect("the update lock")
-        .take();
-    show(&app, UpdateView::None);
+    {
+        let mut state = state(&app);
+        if matches!(state.view, UpdateView::Installing { .. }) {
+            return;
+        }
+        state.view = UpdateView::None;
+        state.pending = None;
+    }
+    emit(&app, UpdateView::None);
 }
 
 #[cfg(test)]

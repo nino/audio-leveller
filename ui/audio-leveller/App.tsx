@@ -119,7 +119,9 @@ function useUpdates(): UpdateView {
       heard = true;
       setView(next);
     });
+    // If listening fails, still show what the shell has now.
     unlisten
+      .catch((error: unknown) => console.error(error))
       .then(() => updates.view())
       .then((next) => {
         if (!heard) setView(next);

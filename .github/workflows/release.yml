@@ -141,9 +141,10 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
-          pubkey=$(jq -r .plugins.updater.pubkey apps/leveller-tauri/tauri.conf.json)
-          if [[ "$GITHUB_REF" == refs/tags/v* && "$pubkey" == *PLACEHOLDER* ]]; then
-            echo "::error::plugins.updater.pubkey in tauri.conf.json is still a placeholder"
+          # The real key is only any use with its public half in the app.
+          pubkey=$(jq -r '.plugins.updater.pubkey // ""' apps/leveller-tauri/tauri.conf.json)
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ] && [[ -z "$pubkey" || "$pubkey" == *PLACEHOLDER* ]]; then
+            echo "::error::plugins.updater.pubkey in tauri.conf.json is not set (see README, 'Signed releases')"
             exit 1
           fi
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then

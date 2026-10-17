@@ -68,8 +68,14 @@ pub(crate) fn is_working(app: &AppHandle) -> bool {
         .is_working()
 }
 
-/// A file to start a run on. The model ignores it while a run is going.
+/// A file to start a run on. The model ignores it while a run is going, and
+/// it is refused here while an update installs, since the restart that ends
+/// the install would kill the run.
 fn open(app: &AppHandle, path: PathBuf) {
+    if updates::is_installing(app) {
+        publish(app, Msg::DragOver(false));
+        return;
+    }
     publish(app, Msg::Dropped(path));
 }
 
