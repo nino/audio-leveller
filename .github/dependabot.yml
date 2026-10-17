@@ -13,4 +13,14 @@ updates:
       js-dependencies:
         patterns:
           - "*"
+  # The Tauri frontend, which Bun manages on its own lockfile.
+  - package-ecosystem: "bun"
+    directory: "/ui"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      ui-dependencies:
+        patterns:
+          - "*"
   # No github-actions block: this repo has no .github/workflows to update.

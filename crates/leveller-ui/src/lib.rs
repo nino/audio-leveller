@@ -15,6 +15,9 @@ use leveller_stages::params::{ParamSpec, Schema};
 use leveller_stages::{ChainOptions, build_chain, default_registry, params};
 use serde_json::{Map, Value};
 
+mod view;
+pub use view::{Input, View};
+
 /// What the app is doing.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Status {
@@ -45,7 +48,8 @@ impl Status {
 /// A summary rather than the whole report, because the interface needs a dozen
 /// numbers and the report is thousands of lines — including one entry per
 /// detected click.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Summary {
     pub output_path: PathBuf,
     pub room_tone_path: Option<PathBuf>,
@@ -63,7 +67,8 @@ pub struct Summary {
     pub room_tone_sec: f64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StageLine {
     pub name: String,
     pub enabled: bool,

@@ -419,6 +419,31 @@ pnpm icon           # rebuild build/icon.icns from the SVG artwork
 `dist/` — the packaged app copies `dist/`, so the two directories cannot be the
 same one without the app swallowing its own build products.
 
+### The Tauri app
+
+The interface is moving from AppKit to [Tauri](https://tauri.app), keeping the
+Rust DSP as it is. The plan is in five steps; this is the first, the leveller
+window, in `apps/leveller-tauri` with its frontend in `ui/`. The AppKit apps
+still build and still ship until the Tauri ones have caught up.
+
+The frontend is React and TypeScript, bundled by [Bun](https://bun.sh). The
+state stays in Rust: `leveller-ui`'s `Model` decides what every click means,
+and the webview draws the `View` it serialises (`crates/leveller-ui/src/view.rs`)
+and sends clicks back as `Input`s.
+
+```bash
+cd ui
+bun install
+bun run tauri dev                              # the window, with the frontend hot-reloading
+bun run tauri build                            # an .app and a .dmg in target/release/bundle
+bun run typecheck && bun test                  # the frontend's own checks
+```
+
+The `tauri` commands find the app through `--config`'s default search, so run
+them as `bun run tauri dev -- --config ../apps/leveller-tauri/tauri.conf.json`
+if the CLI does not pick it up from `ui/`. The Tauri crate embeds `ui/dist` when
+it compiles, so `cargo build --workspace` needs `bun run build` in `ui/` first.
+
 ### The icon
 
 `build/icon.svg` is the artwork: the window's own materials — brushed

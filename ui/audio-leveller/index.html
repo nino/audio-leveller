@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audio Leveller</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script>
+      // Only macOS gets the painted title bar: there the shell hides the
+      // system's. Elsewhere the system draws a real one, and the painted strip
+      // would sit below it. Set before the first paint so it never flashes.
+      document.documentElement.classList.toggle("native-frame", !navigator.userAgent.includes("Mac"));
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>
