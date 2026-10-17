@@ -51,7 +51,9 @@ impl Status {
 #[derive(Clone, Debug, PartialEq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Summary {
+    #[serde(serialize_with = "view::lossy_path")]
     pub output_path: PathBuf,
+    #[serde(serialize_with = "view::lossy_optional_path")]
     pub room_tone_path: Option<PathBuf>,
     pub input_lufs: f64,
     pub output_lufs: f64,
@@ -142,6 +144,9 @@ pub struct Model {
     last_input: Option<PathBuf>,
     window_active: bool,
     drag_over: bool,
+    /// How many messages have been applied. A shell that delivers views over
+    /// more than one channel orders them by this.
+    revision: u64,
 }
 
 impl Default for Model {
@@ -187,7 +192,12 @@ impl Model {
             last_input: None,
             window_active: true,
             drag_over: false,
+            revision: 0,
         }
+    }
+
+    pub fn revision(&self) -> u64 {
+        self.revision
     }
 
     pub fn schema(&self) -> &Schema {
@@ -286,7 +296,12 @@ impl Model {
     }
 
     pub fn update(&mut self, msg: Msg) -> Option<Effect> {
+        self.revision += 1;
         match msg {
+            // One run at a time: a second would race the first to the status
+            // line. The drop zone is greyed out while one is going, but a file
+            // can still arrive from Finder or the open panel.
+            Msg::Dropped(_) if self.status.is_working() => None,
             Msg::Dropped(path) => {
                 self.last_input = Some(path.clone());
                 self.drag_over = false;
@@ -646,6 +661,18 @@ mod tests {
         let chain = model.chain();
         let level = chain.iter().find(|s| s.name == "level").unwrap();
         assert_eq!(level.params.get("targetLufs"), Some(&json!(-23.0)));
+    }
+
+    #[test]
+    fn a_second_file_waits_for_the_first_run() {
+        let mut model = model();
+        model.update(Msg::Dropped(PathBuf::from("/tmp/first.wav")));
+        assert!(
+            model
+                .update(Msg::Dropped(PathBuf::from("/tmp/second.wav")))
+                .is_none()
+        );
+        assert_eq!(model.last_input(), Some(&PathBuf::from("/tmp/first.wav")));
     }
 
     #[test]

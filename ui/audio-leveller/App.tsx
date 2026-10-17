@@ -8,7 +8,7 @@
  * always what `leveller-ui` decided, and its tests cover the behaviour.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { shell, type Input, type ParamView, type StageView, type Summary, type View } from "./ipc";
 import { basename, formatValue, pluralize } from "./format";
@@ -16,28 +16,26 @@ import { basename, formatValue, pluralize } from "./format";
 /** The latest view, and a way to send an input and draw its reply. */
 function useShell(): [View | null, (input: Input) => void, () => void] {
   const [view, setView] = useState<View | null>(null);
-  // Replies and events can interleave. Each carries the whole view, so the
-  // newest one to arrive is drawn and a stale reply is dropped.
-  const latest = useRef(0);
-  const apply = useCallback((promise: Promise<View>) => {
-    const ticket = ++latest.current;
-    promise
-      .then((next) => {
-        if (ticket === latest.current) setView(next);
-      })
-      .catch((error: unknown) => console.error(error));
+  // Replies and events can arrive in either order. Each carries the whole
+  // view and the model's revision, so the newest is drawn and an older one
+  // that turns up late is dropped.
+  const show = useCallback((next: View) => {
+    setView((current) => (current && current.revision > next.revision ? current : next));
   }, []);
+  const apply = useCallback(
+    (promise: Promise<View>) => {
+      promise.then(show).catch((error: unknown) => console.error(error));
+    },
+    [show],
+  );
 
   useEffect(() => {
-    const unlisten = shell.onView((next) => {
-      latest.current++;
-      setView(next);
-    });
+    const unlisten = shell.onView(show);
     apply(shell.view());
     return () => {
       void unlisten.then((stop) => stop());
     };
-  }, [apply]);
+  }, [apply, show]);
 
   const send = useCallback((input: Input) => apply(shell.send(input)), [apply]);
   const choose = useCallback(() => apply(shell.chooseFile()), [apply]);
@@ -99,25 +97,40 @@ function TitleBar() {
   );
 }
 
+/**
+ * A div acting as a button rather than a `<button>`, because a button may only
+ * hold inline content and this one holds the window's heading.
+ */
 function DropZone({ view, onChoose }: { view: View; onChoose: () => void }) {
   const busy = view.status.kind === "working";
   const classes = ["dropzone", view.dragOver && !busy ? "hover" : "", busy ? "busy" : ""];
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (!busy && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      onChoose();
+    }
+  };
   return (
-    <button
+    <div
       className={classes.filter(Boolean).join(" ")}
-      disabled={busy}
-      onClick={onChoose}
-      aria-label="Choose a .wav file to level, or drop one here"
+      role="button"
+      tabIndex={busy ? -1 : 0}
+      aria-disabled={busy}
+      aria-describedby="dropzone-sub"
+      onClick={busy ? undefined : onChoose}
+      onKeyDown={onKeyDown}
     >
       <div className="icon" aria-hidden>
         🎚️
       </div>
       <h1>Audio Leveller</h1>
       <p className="lede">
-        Drop a <strong>.wav</strong> file here
+        Drop a <strong>.wav</strong> file here, or click to choose one
       </p>
-      <p className="sub">Each speech segment is normalised to its target loudness</p>
-    </button>
+      <p className="sub" id="dropzone-sub">
+        Each speech segment is normalised to its target loudness
+      </p>
+    </div>
   );
 }
 
@@ -246,7 +259,7 @@ function Stage({
   const note = !line
     ? stage.description
     : line.enabled
-      ? `${line.decision} · ${line.elapsedMs.toFixed(0)} ms`
+      ? [line.decision, `${line.elapsedMs.toFixed(0)} ms`].filter(Boolean).join(" · ")
       : "bypassed";
   return (
     <li>
@@ -285,11 +298,16 @@ function Stage({
 function Param({ stage, param, send }: { stage: string; param: ParamView; send: (input: Input) => void }) {
   const set = (value: unknown) => send({ kind: "setParam", stage, key: param.key, value });
   const id = `${stage}-${param.key}`;
+  // A slider's position while its value is on the way to the shell and back.
+  // Without it React would put the thumb back under the pointer on every
+  // move, until the reply caught up.
+  const [draft, setDraft] = useState<number | null>(null);
+  useEffect(() => setDraft(null), [param.value]);
 
   let control;
   switch (param.kind) {
     case "number": {
-      const value = Number(param.value);
+      const value = draft ?? Number(param.value);
       control = (
         <>
           <input
@@ -299,7 +317,11 @@ function Param({ stage, param, send }: { stage: string; param: ParamView; send: 
             max={param.max}
             step={param.step}
             value={value}
-            onChange={(event) => set(Number(event.target.value))}
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              setDraft(next);
+              set(next);
+            }}
           />
           <span className="value">{formatValue(value, param.step, param.unit)}</span>
         </>

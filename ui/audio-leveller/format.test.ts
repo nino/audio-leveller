@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { basename, formatNumber, formatValue, pluralize, signed } from "./format";
+import { basename, formatNumber, formatValue, pluralize } from "./format";
 
 describe("format", () => {
   test("basename takes the last component on either separator", () => {
@@ -12,12 +12,6 @@ describe("format", () => {
     expect(pluralize(1, "segment")).toBe("1 segment");
     expect(pluralize(0, "segment")).toBe("0 segments");
     expect(pluralize(2, "clean clip")).toBe("2 clean clips");
-  });
-
-  test("signed always shows a sign and one decimal", () => {
-    expect(signed(3)).toBe("+3.0");
-    expect(signed(-1.25)).toBe("-1.3");
-    expect(signed(0)).toBe("+0.0");
   });
 
   test("a slider's step decides its decimals", () => {

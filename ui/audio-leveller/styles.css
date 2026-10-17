@@ -361,10 +361,7 @@ h2 {
     inset 0 1px 0 rgba(255, 255, 255, 1),
     inset 0 -12px 22px rgba(160, 190, 230, 0.22);
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
-  /* It is a button, so a click opens the file panel; it should not look like one. */
-  width: 100%;
-  font: inherit;
-  color: inherit;
+  /* A click opens the file panel, but it should not look like a button. */
   cursor: default;
 }
 
