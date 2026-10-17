@@ -65,15 +65,21 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  /* brushed metal */
+  /*
+   * Brushed metal: a 3px tile of grain repeated down the window, over the
+   * metal's own gradient. Not a repeating-linear-gradient: WebKit, which is the
+   * webview Tauri uses on macOS and Linux, draws one with a period this small
+   * many times too coarse, as wide bands instead of a fine grain.
+   */
   background:
-    repeating-linear-gradient(
+    linear-gradient(
       to bottom,
       rgba(255, 255, 255, 0.07) 0px,
       rgba(255, 255, 255, 0.07) 1px,
       rgba(0, 0, 0, 0.035) 2px,
       rgba(0, 0, 0, 0.035) 3px
-    ),
+    )
+      0 0 / 100% 3px repeat-y,
     linear-gradient(to bottom, #d6d6d6 0%, #c3c3c3 50%, #b9b9b9 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
@@ -688,13 +694,14 @@ body.inactive {
 /* The brushed grain all but disappears, and the metal settles to one tone. */
 body.inactive .window {
   background:
-    repeating-linear-gradient(
+    linear-gradient(
       to bottom,
       rgba(255, 255, 255, 0.03) 0px,
       rgba(255, 255, 255, 0.03) 1px,
       rgba(0, 0, 0, 0.015) 2px,
       rgba(0, 0, 0, 0.015) 3px
-    ),
+    )
+      0 0 / 100% 3px repeat-y,
     linear-gradient(to bottom, #cdcdcd 0%, #c6c6c6 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
