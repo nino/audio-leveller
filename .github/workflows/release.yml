@@ -141,6 +141,11 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
+          pubkey=$(jq -r .plugins.updater.pubkey apps/leveller-tauri/tauri.conf.json)
+          if [[ "$GITHUB_REF" == refs/tags/v* && "$pubkey" == *PLACEHOLDER* ]]; then
+            echo "::error::plugins.updater.pubkey in tauri.conf.json is still a placeholder"
+            exit 1
+          fi
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
             echo '{"bundle": {"createUpdaterArtifacts": true}}' > "$RUNNER_TEMP/updater-config.json"
             exit 0
@@ -174,6 +179,7 @@ jobs:
             export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
           fi
           bun run tauri build --bundles app --config "$RUNNER_TEMP/updater-config.json"
+          rm -rf "../target/bundle/Audio Leveller.app"
           ditto "../target/release/bundle/macos/Audio Leveller.app" "../target/bundle/Audio Leveller.app"
 
       # The feed the installed app reads, through

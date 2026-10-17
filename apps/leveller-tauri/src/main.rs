@@ -59,7 +59,7 @@ fn publish(app: &AppHandle, msg: Msg) {
     let _ = app.emit("view", view);
 }
 
-fn is_working(app: &AppHandle) -> bool {
+pub(crate) fn is_working(app: &AppHandle) -> bool {
     app.state::<Shell>()
         .model
         .lock()

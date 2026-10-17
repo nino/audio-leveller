@@ -85,8 +85,8 @@ fn main() -> Result<()> {
             Ok(())
         }
         Some("verify") => {
-            for app in APPS {
-                verify(&bundle_path(app))?;
+            for bundle in shipped_bundles()? {
+                verify(&bundle)?;
             }
             Ok(())
         }
@@ -275,6 +275,26 @@ fn sign(bundle: &Path, identity: &str) -> Result<()> {
 
 /// The disk image, named for the version and the architecture it was built on,
 /// since that is what goes up on the release page.
+/// The Tauri-built Audio Leveller, which the release workflow (or the README's
+/// local steps) copies into `target/bundle`.
+const TAURI_BUNDLE: &str = "Audio Leveller.app";
+
+/// Every bundle that goes in the disk image: xtask's own and the Tauri one.
+/// Refuses if any is missing, so a DMG can't quietly ship without one.
+fn shipped_bundles() -> Result<Vec<PathBuf>> {
+    let mut bundles: Vec<PathBuf> = APPS.iter().map(bundle_path).collect();
+    bundles.push(bundle_root().join(TAURI_BUNDLE));
+    for bundle in &bundles {
+        if !bundle.exists() {
+            bail!(
+                "{} is not there — run `cargo xtask bundle`, and copy in the Tauri build (see README, 'Signed releases')",
+                bundle.display()
+            );
+        }
+    }
+    Ok(bundles)
+}
+
 fn dmg() -> Result<PathBuf> {
     let arch = match std::env::consts::ARCH {
         "aarch64" => "arm64",
@@ -293,21 +313,7 @@ fn dmg() -> Result<PathBuf> {
         std::fs::remove_dir_all(&staging)?;
     }
     std::fs::create_dir_all(&staging)?;
-    let mut bundles: Vec<PathBuf> = std::fs::read_dir(bundle_root())
-        .with_context(|| format!("reading {}", bundle_root().display()))?
-        .map(|entry| entry.map(|e| e.path()))
-        .collect::<std::io::Result<_>>()?;
-    bundles.retain(|path| path.extension().is_some_and(|e| e == "app"));
-    bundles.sort();
-    for app in APPS {
-        if !bundles.contains(&bundle_path(app)) {
-            bail!(
-                "{} is not there — run `cargo xtask bundle` first",
-                bundle_path(app).display()
-            );
-        }
-    }
-    for bundle in &bundles {
+    for bundle in &shipped_bundles()? {
         let target = staging.join(bundle.file_name().expect("a bundle has a name"));
         run(
             "ditto",

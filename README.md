@@ -490,6 +490,7 @@ keychain:
 cargo xtask bundle                     # Listen
 cargo xtask sign "Developer ID Application: …"
 (cd ui && APPLE_SIGNING_IDENTITY="Developer ID Application: …" bun run tauri build --bundles app)
+rm -rf "target/bundle/Audio Leveller.app"    # an older AppKit build would mix with it
 ditto "target/release/bundle/macos/Audio Leveller.app" "target/bundle/Audio Leveller.app"
 cargo xtask dmg
 ```

@@ -107,22 +107,20 @@ function TitleBar() {
   );
 }
 
-/**
- * A div acting as a button rather than a `<button>`, because a button may only
- * hold inline content and this one holds the window's heading.
- */
 /** The latest word on updates, from the shell. */
 function useUpdates(): UpdateView {
   const [view, setView] = useState<UpdateView>({ kind: "none" });
   useEffect(() => {
-    // An event that lands before the first reply is the newer of the two.
+    // Listen first, then ask: an event sent before the listener is in place
+    // would be lost, and the start-up check can finish at any moment. An
+    // event that lands before the reply is the newer of the two.
     let heard = false;
     const unlisten = updates.onChange((next) => {
       heard = true;
       setView(next);
     });
-    updates
-      .view()
+    unlisten
+      .then(() => updates.view())
       .then((next) => {
         if (!heard) setView(next);
       })
@@ -176,11 +174,18 @@ function UpdateStrip() {
           <button className="aqua-button small" onClick={() => void updates.dismiss().catch(fail)}>
             Dismiss
           </button>
+          <button className="aqua-button small" onClick={() => void updates.install().catch(fail)}>
+            Try Again
+          </button>
         </section>
       );
   }
 }
 
+/**
+ * A div acting as a button rather than a `<button>`, because a button may only
+ * hold inline content and this one holds the window's heading.
+ */
 function DropZone({ view, onChoose }: { view: View; onChoose: () => void }) {
   const busy = view.status.kind === "working";
   const classes = ["dropzone", view.dragOver && !busy ? "hover" : "", busy ? "busy" : ""];

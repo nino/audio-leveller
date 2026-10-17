@@ -69,11 +69,16 @@ fn show(app: &AppHandle, view: UpdateView) {
 /// start-up stays quiet unless there is something to offer, since being
 /// offline is not worth a dialog.
 pub async fn check(app: AppHandle, asked: bool) {
+    if is_installing(&app) {
+        return;
+    }
     let found = match app.updater() {
         Ok(updater) => updater.check().await,
         Err(error) => Err(error),
     };
     match found {
+        // An install may have started while the check was out.
+        Ok(Some(_)) if is_installing(&app) => {}
         Ok(Some(update)) => {
             let view = UpdateView::Available {
                 version: update.version.clone(),
@@ -107,6 +112,13 @@ pub async fn check(app: AppHandle, asked: bool) {
     }
 }
 
+fn is_installing(app: &AppHandle) -> bool {
+    matches!(
+        *app.state::<Updates>().view.lock().expect("the update lock"),
+        UpdateView::Installing { .. }
+    )
+}
+
 #[tauri::command]
 pub fn update_view(app: AppHandle) -> UpdateView {
     app.state::<Updates>()
@@ -117,14 +129,28 @@ pub fn update_view(app: AppHandle) -> UpdateView {
 }
 
 /// Download and install the offered update, then restart into it.
+///
+/// Not while a file is being levelled: the restart would kill the run and
+/// leave a half-written output next to the input.
 #[tauri::command]
 pub async fn install_update(app: AppHandle) {
+    if crate::is_working(&app) {
+        app.dialog()
+            .message("Audio Leveller will install the update once the current file is finished. Try again then.")
+            .title("A file is being levelled")
+            .show(|_| {});
+        return;
+    }
+    if is_installing(&app) {
+        return;
+    }
+    // Kept, not taken: after a failed download the strip offers it again.
     let Some(update) = app
         .state::<Updates>()
         .pending
         .lock()
         .expect("the update lock")
-        .take()
+        .clone()
     else {
         return;
     };
