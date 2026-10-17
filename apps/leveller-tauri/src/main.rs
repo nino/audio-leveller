@@ -165,10 +165,12 @@ fn main() {
                     let over = first_wav(paths).is_some() && !is_working(app);
                     publish(app, Msg::DragOver(over));
                 }
-                WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }) => match first_wav(paths) {
-                    Some(path) => open(app, path),
-                    None => publish(app, Msg::DragOver(false)),
-                },
+                WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }) => {
+                    match first_wav(paths) {
+                        Some(path) => open(app, path),
+                        None => publish(app, Msg::DragOver(false)),
+                    }
+                }
                 WindowEvent::DragDrop(DragDropEvent::Leave) => publish(app, Msg::DragOver(false)),
                 WindowEvent::Focused(active) => publish(app, Msg::WindowActive(*active)),
                 _ => {}

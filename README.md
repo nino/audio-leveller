@@ -439,10 +439,13 @@ bun run tauri build                            # an .app and a .dmg in target/re
 bun run typecheck && bun test                  # the frontend's own checks
 ```
 
-The `tauri` commands find the app through `--config`'s default search, so run
-them as `bun run tauri dev -- --config ../apps/leveller-tauri/tauri.conf.json`
-if the CLI does not pick it up from `ui/`. The Tauri crate embeds `ui/dist` when
-it compiles, so `cargo build --workspace` needs `bun run build` in `ui/` first.
+The `tauri` script points the CLI at `apps/leveller-tauri` through
+`TAURI_APP_PATH`, since it only looks for an app below the directory it runs
+in. The Tauri crate embeds `ui/dist` when it compiles, so `cargo build
+--workspace` needs `bun run build` in `ui/` first. A plain `cargo run` of the
+debug binary loads the page from the dev server instead, so start `bun run
+dev` alongside it. A path given on the command line is opened as if it had been
+dropped on the window.
 
 ### The icon
 

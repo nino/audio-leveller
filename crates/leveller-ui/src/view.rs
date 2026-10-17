@@ -87,10 +87,20 @@ pub enum StatusView {
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Input {
-    Preset { name: String },
-    ToggleStage { index: usize },
-    ToggleExpanded { index: usize },
-    SetParam { stage: String, key: String, value: Value },
+    Preset {
+        name: String,
+    },
+    ToggleStage {
+        index: usize,
+    },
+    ToggleExpanded {
+        index: usize,
+    },
+    SetParam {
+        stage: String,
+        key: String,
+        value: Value,
+    },
     Revert,
     Rerender,
 }
@@ -109,8 +119,10 @@ impl From<Input> for Msg {
 }
 
 fn file_name(path: &Path) -> String {
-    path.file_name()
-        .map_or_else(|| path.display().to_string(), |n| n.to_string_lossy().into_owned())
+    path.file_name().map_or_else(
+        || path.display().to_string(),
+        |n| n.to_string_lossy().into_owned(),
+    )
 }
 
 impl Model {
@@ -280,7 +292,8 @@ mod tests {
     #[test]
     fn switched_off_stages_are_listed_by_name() {
         let mut model = Model::new();
-        let input: Input = serde_json::from_value(json!({ "kind": "toggleStage", "index": 1 })).unwrap();
+        let input: Input =
+            serde_json::from_value(json!({ "kind": "toggleStage", "index": 1 })).unwrap();
         model.update(input.into());
         assert_eq!(model.view().bypassed, vec!["denoise"]);
     }

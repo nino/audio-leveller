@@ -163,10 +163,11 @@ function Status({ view }: { view: View }) {
       return (
         <section className="panel glass status done" role="status">
           <div className="done">Wrote {basename(s.outputPath)}</div>
+          {/* No preset name here: the presets can change after the run, and
+              the line would then name settings the file was not made with. */}
           <div className="meta">
-            {view.preset}
-            {view.edited ? " (edited)" : ""} · {s.inputLufs.toFixed(1)} LUFS → {s.outputLufs.toFixed(1)} LUFS ·
-            peak {s.outputPeakDbfs.toFixed(1)} dBFS · {s.sampleRate} Hz · {s.durationSec.toFixed(1)}s
+            {s.inputLufs.toFixed(1)} LUFS → {s.outputLufs.toFixed(1)} LUFS · peak {s.outputPeakDbfs.toFixed(1)} dBFS ·{" "}
+            {s.sampleRate} Hz · {s.durationSec.toFixed(1)}s
           </div>
           <div className="meta">
             {pluralize(s.silences, "silence")} · {pluralize(s.segments, "segment")}

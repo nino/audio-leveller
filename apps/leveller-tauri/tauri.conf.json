@@ -3,8 +3,8 @@
   "productName": "Audio Leveller",
   "identifier": "com.ninoan.audioleveller",
   "build": {
-    "beforeDevCommand": "bun run --cwd ../../ui dev",
-    "beforeBuildCommand": "bun run --cwd ../../ui build",
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bun run build",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../../ui/dist/audio-leveller"
   },
