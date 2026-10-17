@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reader — main editor (mockup)</title>
+    <style>
+      /* Aqua, circa 10.2 — the same visual language as listen/src/aqua.css. */
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; }
+      body {
+        font-family: "Lucida Grande", "Lucida Sans Unicode", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-size: 13px;
+        color: #1c1c1c;
+        background-color: #dfe6ef;
+        background-image: repeating-linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0.55) 0px, rgba(255, 255, 255, 0.55) 1px,
+          rgba(120, 140, 170, 0.14) 1px, rgba(120, 140, 170, 0.14) 2px);
+      }
+      .desktop { min-height: 100vh; padding: 24px 20px 40px; display: flex; justify-content: center; align-items: flex-start; }
+      .window {
+        width: 100%; max-width: 1240px; border-radius: 8px 8px 6px 6px; overflow: hidden;
+        background:
+          repeating-linear-gradient(to bottom,
+            rgba(255,255,255,0.07) 0px, rgba(255,255,255,0.07) 1px,
+            rgba(0,0,0,0.035) 2px, rgba(0,0,0,0.035) 3px),
+          linear-gradient(to bottom, #d6d6d6 0%, #c3c3c3 50%, #b9b9b9 100%);
+        border: 1px solid #6f6f6f;
+        box-shadow: 0 22px 45px rgba(0,0,0,0.42), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.55);
+      }
+      .titlebar {
+        height: 24px; position: relative; display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(to bottom, #e6e6e6 0%, #cfcfcf 45%, #bdbdbd 55%, #c8c8c8 100%);
+        border-bottom: 1px solid #8a8a8a; box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);
+      }
+      .title { font-size: 13px; color: #2b2b2b; text-shadow: 0 1px 0 rgba(255,255,255,0.7); }
+      .lights { position: absolute; left: 9px; top: 5px; display: flex; gap: 8px; }
+      .light {
+        width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.35);
+        box-shadow: inset 0 -2px 3px rgba(0,0,0,0.25), inset 0 2px 2px rgba(255,255,255,0.85), 0 1px 1px rgba(255,255,255,0.5);
+      }
+      .light.red { background: radial-gradient(circle at 50% 30%, #ffb2ad, #ee5b52 45%, #d3372f); }
+      .light.yellow { background: radial-gradient(circle at 50% 30%, #fff1a8, #f5c33a 45%, #d99f1a); }
+      .light.green { background: radial-gradient(circle at 50% 30%, #c8f7b0, #62c655 45%, #3d9b33); }
+
+      .toolbar {
+        display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+        border-bottom: 1px solid rgba(0,0,0,0.25);
+        background: linear-gradient(to bottom, rgba(255,255,255,0.4), rgba(255,255,255,0.06));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+        flex-wrap: wrap;
+      }
+      .toolbar .spacer { margin-left: auto; }
+      .content { padding: 14px 16px 18px; }
+
+      .aqua-button {
+        font: inherit; font-size: 13px; color: #111; padding: 4px 14px; min-height: 24px;
+        border-radius: 12px; border: 1px solid #6a6a6a; cursor: pointer; position: relative;
+        background: linear-gradient(to bottom, #fdfdfd 0%, #e6e6e6 45%, #d1d1d1 50%, #ececec 100%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 1px 1px rgba(0,0,0,0.35);
+        text-shadow: 0 1px 0 rgba(255,255,255,0.8); text-decoration: none;
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      }
+      .aqua-button:hover:not(:disabled) { filter: brightness(1.04); }
+      .aqua-button:active:not(:disabled) { background: linear-gradient(to bottom, #d0d0d0, #bcbcbc); box-shadow: inset 0 1px 3px rgba(0,0,0,0.35); }
+      .aqua-button:disabled { opacity: 0.5; cursor: default; }
+      .aqua-button.small { font-size: 11px; padding: 2px 10px; min-height: 20px; }
+      .aqua-button.primary {
+        color: #fff; border-color: #3a5c9c; text-shadow: 0 -1px 0 rgba(0,0,0,0.35);
+        background: linear-gradient(to bottom, #b8d4ff 0%, #6aa2f5 45%, #3d82ea 50%, #77b3fb 100%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 1px 2px rgba(0,0,0,0.35), 0 0 8px rgba(80,140,240,0.55);
+      }
+      .aqua-button.round { width: 34px; height: 34px; min-height: 34px; border-radius: 50%; padding: 0; font-size: 14px; }
+
+      .panel { padding: 12px 14px; border-radius: 6px; }
+      .glass {
+        background: linear-gradient(to bottom, rgba(255,255,255,0.85) 0%, rgba(230,238,250,0.75) 100%);
+        border: 1px solid rgba(60,80,120,0.35);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,1), inset 0 -14px 24px rgba(160,190,230,0.25), 0 1px 2px rgba(0,0,0,0.25);
+      }
+      .metal-inset {
+        background: linear-gradient(to bottom, rgba(255,255,255,0.35), rgba(255,255,255,0.15));
+        border: 1px solid rgba(0,0,0,0.22);
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.18), 0 1px 0 rgba(255,255,255,0.6);
+      }
+      .hint { color: #555; text-shadow: 0 1px 0 rgba(255,255,255,0.5); }
+      .hint.small { font-size: 11px; }
+      kbd {
+        font: bold 10px Monaco, Menlo, monospace; background: rgba(0,0,0,0.12);
+        border-radius: 3px; padding: 1px 4px;
+      }
+      .mono { font: 11px Monaco, Menlo, monospace; }
+
+      /* ---- layout ---- */
+      .cols { display: grid; grid-template-columns: minmax(0, 1fr) 316px; gap: 14px; align-items: start; }
+      @media (max-width: 900px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+
+      /* ---- the script ---- */
+      .script {
+        max-height: 46vh; min-height: 260px; overflow-y: auto; padding: 18px 22px;
+        background: #fdfdfb;
+        border: 1px solid rgba(0,0,0,0.3);
+        border-radius: 5px;
+        box-shadow: inset 0 1px 4px rgba(0,0,0,0.22);
+        font-family: "Palatino", "Palatino Linotype", Georgia, serif;
+        font-size: 16.5px; line-height: 2.05; color: #191919;
+      }
+      .script p { margin: 0 0 1em; }
+      .w { padding: 1px 0; border-radius: 2px; cursor: pointer; position: relative; }
+      .w.read { background: rgba(120, 190, 130, 0.13); }
+      .w:hover { background: rgba(90,150,240,0.16); }
+      .w.sel { background: rgba(90,150,240,0.34); box-shadow: 0 0 0 2px rgba(90,150,240,0.5); }
+
+      /* divergence marks */
+      .w.sub { border-bottom: 2px solid #d98a12; }
+      .w.del { text-decoration: line-through; color: #8d8d8d; text-decoration-color: #c2413a; }
+      .w.unc { border-bottom: 2px dotted #7a6bbd; }
+      .w.ins {
+        color: #a3160f; background: rgba(220, 120, 110, 0.16);
+        border-bottom: 2px solid #c2413a; font-style: italic; padding: 1px 3px;
+      }
+      .w.retake, .w.retake.read {
+        background: rgba(191, 143, 232, 0.34);
+        box-shadow: 0 2px 0 rgba(142, 92, 196, 0.75);
+      }
+      .w.done { border-bottom-style: solid; border-bottom-color: rgba(60,150,70,0.55); }
+      .w.done.del { color: #9d9d9d; }
+      .ghost {
+        display: block; position: absolute; left: 50%; transform: translateX(-50%);
+        top: -1.02em; white-space: nowrap;
+        font: italic 11.5px "Lucida Grande", sans-serif; color: #a35c04;
+        text-decoration: none; pointer-events: none;
+      }
+      .w.done .ghost { color: #3f7a45; }
+      .caret {
+        display: inline-block; width: 0; overflow: visible; position: relative; cursor: pointer;
+      }
+      .caret i {
+        position: absolute; left: -4px; top: -0.45em; font-style: normal; font-size: 13px;
+        color: #c2413a; font-weight: bold;
+      }
+
+      /* ---- transport ---- */
+      .transport { margin-top: 12px; }
+      .ribbonwrap { position: relative; }
+      .ribbon, .wave {
+        display: block; width: 100%;
+        background: linear-gradient(to bottom, #f9fbff, #e7edf7);
+        border: 1px solid rgba(60,80,120,0.35);
+        border-radius: 4px;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
+      }
+      .ribbon { height: 96px; }
+      .wave { height: 78px; margin-top: 6px; cursor: crosshair; }
+      .playhead {
+        position: absolute; top: 0; bottom: 0; width: 1px; background: #c2413a;
+        box-shadow: 0 0 4px rgba(194,65,58,0.8); pointer-events: none;
+      }
+      .tcontrols { display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+      .time { font: 12px Monaco, Menlo, monospace; color: #333; min-width: 120px; }
+      .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: #444; margin-left: auto; }
+      .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; border: 1px solid rgba(0,0,0,0.3); }
+
+      /* ---- issue rail ---- */
+      .rail h2 { font-size: 13px; margin: 0 0 8px; text-shadow: 0 1px 0 rgba(255,255,255,0.7); }
+      .filters { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+      .chip {
+        font: inherit; font-size: 11px; padding: 1px 9px; border-radius: 10px;
+        border: 1px solid #7a7a7a; cursor: pointer;
+        background: linear-gradient(to bottom, #fdfdfd, #e2e2e2);
+        box-shadow: 0 1px 1px rgba(0,0,0,0.25);
+      }
+      .chip.on {
+        color: #fff; border-color: #2b4f93; text-shadow: 0 -1px 0 rgba(0,0,0,0.35);
+        background: linear-gradient(to bottom, #a9cbff 0%, #5c98f3 45%, #2f74e6 50%, #6cabfa 100%);
+      }
+      .issues { max-height: 34vh; overflow-y: auto; margin: 0; padding: 0; list-style: none;
+        background: rgba(255,255,255,0.55); border: 1px solid rgba(0,0,0,0.2); border-radius: 4px; }
+      .issue {
+        padding: 6px 9px; border-bottom: 1px solid rgba(0,0,0,0.1); cursor: pointer;
+        display: grid; grid-template-columns: 46px minmax(0,1fr) 30px; gap: 7px; align-items: baseline;
+      }
+      .issue:hover { background: rgba(255,255,255,0.6); }
+      .issue.sel { background: rgba(90,150,240,0.28); }
+      .issue.resolved { opacity: 0.5; }
+      .issue .at { font: 10px Monaco, Menlo, monospace; color: #555; }
+      .issue .what { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .issue .what b { font-weight: bold; }
+      .issue .conf { font: 10px Monaco, Menlo, monospace; text-align: right; color: #444; }
+      .issue .kindbar { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
+
+      .detail { margin-top: 12px; }
+      .detail .row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; padding: 2px 0; }
+      .detail .row span:first-child { color: #555; }
+      .heard { font-size: 15px; margin: 6px 0; }
+      .heard .a { color: #7a7a7a; text-decoration: line-through; }
+      .heard .b { color: #a35c04; font-weight: bold; }
+      .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+      .statusline {
+        margin-top: 12px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+        font-size: 11px; color: #444;
+      }
+      .badge {
+        display: inline-block; font: 10px Monaco, Menlo, monospace; padding: 1px 6px; border-radius: 8px;
+        background: rgba(0,0,0,0.1);
+      }
+      .badge.ok { background: rgba(70,160,80,0.28); }
+      .badge.warn { background: rgba(230,170,40,0.35); }
+      a.aqua-link { color: #2653a5; }
+    </style>
+  </head>
+  <body>
+    <div class="desktop">
+      <div class="window">
+        <div class="titlebar">
+          <div class="lights">
+            <span class="light red"></span><span class="light yellow"></span><span class="light green"></span>
+          </div>
+          <div class="title">Reader — <span class="mono">ch03-second-pass.wav</span></div>
+        </div>
+
+        <div class="toolbar">
+          <button class="aqua-button round" id="play" title="Play / pause (space)">▶</button>
+          <span class="time" id="clock">00:24.6 / 01:18.0</span>
+          <button class="aqua-button small" id="prev">◀ prev <kbd>k</kbd></button>
+          <button class="aqua-button small" id="next">next <kbd>j</kbd> ▶</button>
+          <span class="spacer"></span>
+          <span class="hint small">script <span class="mono">chapter-03.txt</span> · 1,214 words · aligned <span class="mono">wav2vec2-base-960h</span></span>
+          <a class="aqua-button small" href="retakes.html">Retakes (3) →</a>
+          <button class="aqua-button small primary">Export edit…</button>
+        </div>
+
+        <div class="content">
+          <div class="cols">
+            <!-- ---------------- left: the script ---------------- -->
+            <div>
+              <div class="script" id="script"></div>
+
+              <div class="transport">
+                <div class="ribbonwrap">
+                  <svg class="ribbon" id="ribbon" viewBox="0 0 1000 96" preserveAspectRatio="none"></svg>
+                  <svg class="wave" id="wave" viewBox="0 0 1000 78" preserveAspectRatio="none"></svg>
+                  <div class="playhead" id="playhead" style="left: 31.5%"></div>
+                </div>
+                <div class="tcontrols">
+                  <span class="hint small">
+                    Alignment ribbon: script position against time. A clean read climbs; every
+                    step <b>back</b> is a retake.
+                  </span>
+                  <span class="legend">
+                    <span><span class="sw" style="background:#d98a12"></span>misreading</span>
+                    <span><span class="sw" style="background:#c2413a"></span>insertion</span>
+                    <span><span class="sw" style="background:#8d8d8d"></span>skip</span>
+                    <span><span class="sw" style="background:#7a6bbd"></span>uncertain</span>
+                    <span><span class="sw" style="background:#b98ede"></span>retake</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- ---------------- right: the issue rail ---------------- -->
+            <div class="rail">
+              <div class="panel glass">
+                <h2>Issues <span class="hint small" id="issuecount"></span></h2>
+                <div class="filters" id="filters"></div>
+                <ul class="issues" id="issues"></ul>
+              </div>
+
+              <div class="panel glass detail" id="detail"></div>
+
+              <div class="statusline">
+                <span><span class="badge ok" id="doneBadge">0 resolved</span></span>
+                <span><span class="badge warn" id="openBadge">0 open</span></span>
+                <span class="hint small">
+                  <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>a</kbd> accept read ·
+                  <kbd>s</kbd> keep script · <kbd>i</kbd> ignore · <kbd>x</kbd> cut ·
+                  <kbd>space</kbd> play
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ------------------------------------------------------------------
+      // Fake, but shaped exactly like the data model in ../PLAN.md.
+      // ------------------------------------------------------------------
+      const DURATION = 78;
+
+      const SCRIPT = [
+        "There is a moment, somewhere in the third hour of any recording session, when the " +
+          "voice stops being an instrument you are playing and becomes a thing that is " +
+          "happening to you.",
+        "The words are still arriving. The sentences still end where they should. But some " +
+          "part of the machinery has gone over to autopilot, and you find that you have read " +
+          "half a page without hearing a word of it.",
+        "Every narrator knows the feeling. Nobody has ever found a reliable way to notice it " +
+          "from the inside, which is why the second pass exists, and why the second pass is " +
+          "always longer than anyone plans for.",
+      ];
+
+      // Divergences, anchored by the first matching word at or after a cursor.
+      const ISSUES = [
+        { id: "d1", kind: "substitution", klass: "misreading", anchor: "third",
+          heard: "fourth", t: 4.9, conf: 0.94,
+          why: "Spoken form is phonetically distant from the script word." },
+        { id: "d2", kind: "insertion", klass: "disfluency", anchor: "when",
+          heard: "uh", t: 8.2, conf: 0.88,
+          why: "Filled pause. Default action is cut." },
+        { id: "d3", kind: "deletion", klass: "minor", anchor: "still", nth: 2,
+          heard: "—", t: 21.4, conf: 0.72,
+          why: "One function word skipped; the sentence still parses." },
+        { id: "d4", kind: "substitution", klass: "misreading", anchor: "machinery",
+          heard: "mechanism", t: 28.7, conf: 0.91,
+          why: "Spoken form is phonetically distant from the script word." },
+        { id: "d5", kind: "insertion", klass: "aside", anchor: "the", after: "knows",
+          heard: "— and I do mean every narrator —", t: 47.0, conf: 0.63,
+          why: "Improvised run of 7 words. Text recovered by the optional Whisper pass." },
+        { id: "d6", kind: "substitution", klass: "uncertain", anchor: "reliable",
+          heard: "(unclear)", t: 55.1, conf: 0.31,
+          why: "Acoustic confidence is low here — this is the aligner failing, not the read. " +
+               "A truck passes at 00:54." },
+        { id: "r1", kind: "retake", klass: "retake", anchor: "which", takes: 3,
+          span: 7, heard: "3 attempts", t: 62.0, conf: 0.96,
+          why: "Two backward jumps to the same sentence start, both with >0.4 s of silence " +
+               "and a truncated final word. Keeping pass 3 of 3." },
+      ];
+
+      const KINDCOLOR = {
+        misreading: "#d98a12", disfluency: "#c2413a", aside: "#c2413a",
+        minor: "#8d8d8d", uncertain: "#7a6bbd", retake: "#b98ede",
+      };
+      const CLASSES = ["misreading", "disfluency", "aside", "minor", "uncertain", "retake"];
+
+      const state = {
+        sel: "d1",
+        filter: new Set(CLASSES),
+        resolved: {},   // id -> resolution
+        playing: false,
+        pos: 24.6,
+      };
+
+      // ------------------------------------------------------------------
+      // Render the script, patching in the divergence marks.
+      // ------------------------------------------------------------------
+      const scriptEl = document.getElementById("script");
+
+      function buildScript() {
+        scriptEl.innerHTML = "";
+        // Flat token list with paragraph breaks.
+        const paras = SCRIPT.map((p) => p.split(/\s+/));
+        // Resolve each issue to (paragraph, wordIndex).
+        const marks = new Map(); // "p:i" -> issue
+        const seen = {};
+        let afterHit = {};
+        for (const iss of ISSUES) {
+          const want = (iss.nth || 1);
+          let count = 0, gate = !iss.after;
+          outer: for (let p = 0; p < paras.length; p++) {
+            for (let i = 0; i < paras[p].length; i++) {
+              const bare = paras[p][i].toLowerCase().replace(/[^a-z']/g, "");
+              if (!gate) { if (bare === iss.after) gate = true; continue; }
+              if (bare === iss.anchor) {
+                count++;
+                if (count === want) { marks.set(p + ":" + i, iss); break outer; }
+              }
+            }
+          }
+        }
+
+        paras.forEach((words, p) => {
+          const para = document.createElement("p");
+          words.forEach((word, i) => {
+            const iss = marks.get(p + ":" + i);
+            // an insertion renders as a caret + the heard text, before the anchor word
+            if (iss && iss.kind === "insertion") {
+              const car = document.createElement("span");
+              car.className = "caret";
+              car.innerHTML = "<i>⌃</i>";
+              para.appendChild(car);
+              const ins = document.createElement("span");
+              ins.className = "w ins";
+              ins.dataset.issue = iss.id;
+              ins.textContent = iss.heard;
+              para.appendChild(ins);
+              para.appendChild(document.createTextNode(" "));
+            }
+            const span = document.createElement("span");
+            span.className = "w read";
+            span.textContent = word;
+            if (iss && iss.kind === "substitution") {
+              span.classList.add(iss.klass === "uncertain" ? "unc" : "sub");
+              span.dataset.issue = iss.id;
+              const g = document.createElement("span");
+              g.className = "ghost";
+              g.textContent = iss.heard;
+              span.appendChild(g);
+            } else if (iss && iss.kind === "deletion") {
+              span.classList.add("del");
+              span.dataset.issue = iss.id;
+            } else if (iss && iss.kind === "retake") {
+              span.dataset.issue = iss.id;
+            }
+            // shade the whole retake span
+            const r = ISSUES.find((x) => x.kind === "retake");
+            const rm = [...marks.entries()].find(([, v]) => v === r);
+            if (rm) {
+              const [rp, ri] = rm[0].split(":").map(Number);
+              if (p === rp && i >= ri && i < ri + r.span) span.classList.add("retake");
+            }
+            para.appendChild(span);
+            para.appendChild(document.createTextNode(" "));
+          });
+          scriptEl.appendChild(para);
+        });
+        paintScript();
+      }
+
+      function paintScript() {
+        scriptEl.querySelectorAll(".w").forEach((el) => {
+          el.classList.toggle("sel", el.dataset.issue === state.sel);
+          el.classList.toggle("done", !!state.resolved[el.dataset.issue]);
+        });
+      }
+
+      scriptEl.addEventListener("click", (e) => {
+        const el = e.target.closest(".w");
+        if (el && el.dataset.issue) select(el.dataset.issue);
+      });
+
+      // ------------------------------------------------------------------
+      // The alignment ribbon: script position against audio time.
+      // ------------------------------------------------------------------
+      // (time, scriptWord) knots. Every descending pair is a retake.
+      const KNOTS = [
+        [0, 0], [18, 300], [21.1, 372],
+        [21.6, 296],               // retake 1: back 76 words
+        [30.5, 512], [34.1, 596],
+        [34.7, 512],               // retake 2
+        [39.2, 604],
+        [39.6, 524],               // retake 2, third attempt
+        [47.4, 812], [51.5, 902],
+        [51.9, 806],               // retake 3
+        [60.4, 980], [62.2, 1030],
+        [62.6, 980],               // retake 4, second attempt
+        [64.3, 1044],
+        [65.0, 980],               // retake 4, third attempt
+        [72, 1130], [78, 1214],
+      ];
+      const MAXW = 1214;
+      const wordAt = (t) => {
+        for (let i = 1; i < KNOTS.length; i++) {
+          if (t <= KNOTS[i][0]) {
+            const [t0, w0] = KNOTS[i - 1], [t1, w1] = KNOTS[i];
+            return w0 + ((t - t0) / (t1 - t0 || 1)) * (w1 - w0);
+          }
+        }
+        return MAXW;
+      };
+
+      function buildRibbon() {
+        const svg = document.getElementById("ribbon");
+        const W = 1000, H = 96, pad = 7;
+        const x = (t) => pad + (t / DURATION) * (W - 2 * pad);
+        const y = (w) => H - pad - (w / MAXW) * (H - 2 * pad);
+        const parts = [];
+        for (let t = 10; t < DURATION; t += 10) {
+          parts.push(`<line x1="${x(t)}" y1="0" x2="${x(t)}" y2="${H}" stroke="rgba(60,80,120,0.13)"/>`);
+        }
+        // Shade each re-read: from the jump until the path climbs back to
+        // where it was when the reader gave up.
+        for (let i = 1; i < KNOTS.length; i++) {
+          if (KNOTS[i][1] >= KNOTS[i - 1][1]) continue;
+          const from = KNOTS[i - 1][1];
+          let end = DURATION;
+          for (let j = i; j < KNOTS.length; j++) {
+            if (KNOTS[j][1] >= from) { end = KNOTS[j][0]; break; }
+          }
+          const x0 = x(KNOTS[i][0]), x1 = x(end);
+          parts.push(`<rect x="${x0.toFixed(1)}" y="1" width="${Math.max(4, x1 - x0).toFixed(1)}"
+            height="${H - 2}" fill="rgba(185,142,222,0.30)"/>`);
+          parts.push(`<line x1="${x0.toFixed(1)}" y1="${y(from).toFixed(1)}"
+            x2="${x0.toFixed(1)}" y2="${y(KNOTS[i][1]).toFixed(1)}"
+            stroke="#8e5cc4" stroke-width="2.4" stroke-dasharray="3 2"/>`);
+          parts.push(`<polygon points="${(x0 - 3.4).toFixed(1)},${(y(KNOTS[i][1]) - 5).toFixed(1)}
+            ${(x0 + 3.4).toFixed(1)},${(y(KNOTS[i][1]) - 5).toFixed(1)}
+            ${x0.toFixed(1)},${y(KNOTS[i][1]).toFixed(1)}" fill="#8e5cc4"/>`);
+        }
+        const d = KNOTS.map(([t, w], i) => `${i ? "L" : "M"}${x(t).toFixed(1)},${y(w).toFixed(1)}`).join(" ");
+        parts.push(`<path d="${d}" fill="none" stroke="#2f74e6" stroke-width="2.2" stroke-linejoin="round"/>`);
+        for (const iss of ISSUES) {
+          parts.push(`<circle cx="${x(iss.t).toFixed(1)}" cy="${y(wordAt(iss.t)).toFixed(1)}" r="3.6"
+            fill="${KINDCOLOR[iss.klass]}" stroke="#fff" stroke-width="1.2"/>`);
+        }
+        parts.push(`<text x="9" y="13" font-size="9" fill="#4a5a72" font-family="Monaco,monospace">word 1214</text>`);
+        parts.push(`<text x="9" y="${H - 4}" font-size="9" fill="#4a5a72" font-family="Monaco,monospace">word 0</text>`);
+        svg.innerHTML = parts.join("");
+      }
+
+      // ------------------------------------------------------------------
+      // Waveform (deterministic pseudo-audio; it is a mockup).
+      // ------------------------------------------------------------------
+      function buildWave() {
+        const svg = document.getElementById("wave");
+        const W = 1000, H = 78, mid = H / 2;
+        let seed = 20260815;
+        const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+        const bars = 460;
+        let d = "";
+        for (let b = 0; b < bars; b++) {
+          const t = (b / bars) * DURATION;
+          // syllable-rate envelope with pauses
+          const pause =
+            (t > 21.1 && t < 21.6) || (t > 34.1 && t < 34.7) || (t > 39.2 && t < 39.6) ||
+            (t > 51.5 && t < 51.9) || (t > 62.2 && t < 62.6) || (t > 64.3 && t < 65.0) || (t > 76.9);
+          const syl = 0.55 + 0.45 * Math.sin(t * 9.1) * Math.sin(t * 2.3);
+          const amp = pause ? 0.05 + rnd() * 0.04 : (0.32 + 0.62 * Math.abs(syl)) * (0.55 + 0.6 * rnd());
+          const h = Math.min(0.96, amp) * (mid - 3);
+          const x = 3 + (b / bars) * (W - 6);
+          d += `M${x.toFixed(1)},${(mid - h).toFixed(1)}L${x.toFixed(1)},${(mid + h).toFixed(1)}`;
+        }
+        let extra = "";
+        // hatched cut regions = the retake passes that will be removed
+        const cuts = [[18, 21.6], [30.5, 39.6], [47.4, 51.9], [60.4, 65.0]];
+        const xt = (t) => 3 + (t / DURATION) * (W - 6);
+        extra += `<defs><pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"><rect width="7" height="7" fill="rgba(185,142,222,0.42)"/>
+          <line x1="0" y1="0" x2="0" y2="7" stroke="rgba(112,60,166,0.75)" stroke-width="2.6"/></pattern></defs>`;
+        for (const [a, b] of cuts) {
+          extra += `<rect x="${xt(a)}" y="1" width="${xt(b) - xt(a)}" height="${H - 2}"
+            fill="url(#hatch)" stroke="rgba(112,60,166,0.6)"/>`;
+        }
+        svg.innerHTML = extra + `<path d="${d}" stroke="#41618f" stroke-width="1.6" opacity="0.85"/>`;
+      }
+
+      document.getElementById("wave").addEventListener("click", (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        seek(((e.clientX - r.left) / r.width) * DURATION);
+      });
+
+      // ------------------------------------------------------------------
+      // Issue rail
+      // ------------------------------------------------------------------
+      const issuesEl = document.getElementById("issues");
+      const filtersEl = document.getElementById("filters");
+
+      function buildFilters() {
+        filtersEl.innerHTML = "";
+        for (const c of CLASSES) {
+          const b = document.createElement("button");
+          b.className = "chip" + (state.filter.has(c) ? " on" : "");
+          b.textContent = c + " (" + ISSUES.filter((i) => i.klass === c).length + ")";
+          b.onclick = () => {
+            state.filter.has(c) ? state.filter.delete(c) : state.filter.add(c);
+            buildFilters(); renderIssues();
+          };
+          filtersEl.appendChild(b);
+        }
+      }
+
+      const fmt = (t) => {
+        const m = Math.floor(t / 60);
+        return String(m).padStart(2, "0") + ":" + (t - m * 60).toFixed(1).padStart(4, "0");
+      };
+
+      function visible() {
+        return ISSUES.filter((i) => state.filter.has(i.klass));
+      }
+
+      function renderIssues() {
+        issuesEl.innerHTML = "";
+        for (const iss of visible()) {
+          const li = document.createElement("li");
+          li.className = "issue" +
+            (iss.id === state.sel ? " sel" : "") +
+            (state.resolved[iss.id] ? " resolved" : "");
+          const label =
+            iss.kind === "retake"
+              ? `<b>Retake ×${iss.takes}</b> — “which is why the second…”`
+              : iss.kind === "deletion"
+              ? `<b>skipped</b> “still”`
+              : iss.kind === "insertion"
+              ? `<b>added</b> “${iss.heard.length > 22 ? iss.heard.slice(0, 22) + "…" : iss.heard}”`
+              : `read <b>“${iss.heard}”</b>`;
+          li.innerHTML =
+            `<span class="at">${fmt(iss.t)}</span>` +
+            `<span class="what"><span class="kindbar" style="background:${KINDCOLOR[iss.klass]}"></span>${label}</span>` +
+            `<span class="conf">${iss.conf.toFixed(2)}</span>`;
+          li.onclick = () => select(iss.id);
+          issuesEl.appendChild(li);
+        }
+        document.getElementById("issuecount").textContent =
+          `— ${visible().length} of ${ISSUES.length}`;
+        const done = Object.keys(state.resolved).length;
+        document.getElementById("doneBadge").textContent = done + " resolved";
+        document.getElementById("openBadge").textContent = (ISSUES.length - done) + " open";
+      }
+
+      // ------------------------------------------------------------------
+      // Detail panel
+      // ------------------------------------------------------------------
+      const RESOLUTION_LABEL = {
+        acceptRead: "accepted the read — script updated",
+        keepScript: "kept the script — on the punch-list",
+        ignore: "ignored",
+        cut: "cut from the audio",
+        applied: "retake cut applied",
+      };
+
+      function renderDetail() {
+        const iss = ISSUES.find((i) => i.id === state.sel);
+        const el = document.getElementById("detail");
+        if (!iss) { el.innerHTML = "<span class='hint'>No issue selected.</span>"; return; }
+        const res = state.resolved[iss.id];
+        const scriptWord = iss.kind === "insertion" ? "—" : iss.anchor;
+        el.innerHTML = `
+          <h2 style="margin:0 0 6px">${iss.klass}<span class="hint small"> · ${iss.kind}</span></h2>
+          <div class="heard">
+            ${iss.kind === "insertion"
+              ? `<span class="b">${iss.heard}</span> <span class="hint small">(not in the script)</span>`
+              : iss.kind === "deletion"
+              ? `<span class="a">${scriptWord}</span> <span class="hint small">(never said)</span>`
+              : iss.kind === "retake"
+              ? `<span class="hint">3 passes over words 980–1040</span>`
+              : `<span class="a">${scriptWord}</span> → <span class="b">${iss.heard}</span>`}
+          </div>
+          <div class="row"><span>at</span><span class="mono">${fmt(iss.t)}</span></div>
+          <div class="row"><span>confidence</span><span class="mono">${iss.conf.toFixed(2)}</span></div>
+          <div class="row"><span>script words</span><span class="mono">${iss.kind === "retake" ? "980–1040" : "412"}</span></div>
+          <p class="hint small" style="margin:8px 0 0">${iss.why}</p>
+          ${res ? `<p class="hint small" style="margin:6px 0 0"><span class="badge ok">✓ ${RESOLUTION_LABEL[res]}</span></p>` : ""}
+          <div class="acts">
+            ${iss.kind === "retake"
+              ? `<a class="aqua-button small primary" href="retakes.html">Review takes →</a>
+                 <button class="aqua-button small" data-act="applied">Apply cut <kbd>⏎</kbd></button>`
+              : `<button class="aqua-button small" data-act="acceptRead">Accept read <kbd>a</kbd></button>
+                 <button class="aqua-button small" data-act="keepScript">Keep script <kbd>s</kbd></button>
+                 <button class="aqua-button small" data-act="ignore">Ignore <kbd>i</kbd></button>
+                 ${iss.kind === "insertion" ? `<button class="aqua-button small" data-act="cut">Cut <kbd>x</kbd></button>` : ""}`}
+            <button class="aqua-button small" data-act="play">▶ ±1.5 s</button>
+          </div>`;
+        el.querySelectorAll("[data-act]").forEach((b) => {
+          b.onclick = () => {
+            const a = b.dataset.act;
+            if (a === "play") { seek(iss.t); return; }
+            resolve(iss.id, a);
+          };
+        });
+      }
+
+      function resolve(id, how) {
+        state.resolved[id] = how;
+        paintScript(); renderIssues(); renderDetail();
+      }
+
+      function select(id) {
+        state.sel = id;
+        const iss = ISSUES.find((i) => i.id === id);
+        if (iss) seek(iss.t);
+        paintScript(); renderIssues(); renderDetail();
+        const row = [...issuesEl.children][visible().findIndex((i) => i.id === id)];
+        if (row) row.scrollIntoView({ block: "nearest" });
+      }
+
+      function step(delta) {
+        const v = visible();
+        const i = v.findIndex((x) => x.id === state.sel);
+        const n = Math.max(0, Math.min(v.length - 1, (i < 0 ? 0 : i) + delta));
+        if (v[n]) select(v[n].id);
+      }
+
+      function seek(t) {
+        state.pos = Math.max(0, Math.min(DURATION, t));
+        document.getElementById("playhead").style.left =
+          (0.3 + (state.pos / DURATION) * 99.4) + "%";
+        document.getElementById("clock").textContent = fmt(state.pos) + " / " + fmt(DURATION);
+      }
+
+      let timer = null;
+      function togglePlay() {
+        state.playing = !state.playing;
+        document.getElementById("play").textContent = state.playing ? "❙❙" : "▶";
+        clearInterval(timer);
+        if (state.playing) {
+          timer = setInterval(() => {
+            seek(state.pos + 0.1 >= DURATION ? 0 : state.pos + 0.1);
+          }, 100);
+        }
+      }
+      document.getElementById("play").onclick = togglePlay;
+      document.getElementById("next").onclick = () => step(1);
+      document.getElementById("prev").onclick = () => step(-1);
+
+      document.addEventListener("keydown", (e) => {
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        const k = e.key.toLowerCase();
+        if (k === "j") { step(1); e.preventDefault(); }
+        else if (k === "k") { step(-1); e.preventDefault(); }
+        else if (k === "a") resolve(state.sel, "acceptRead");
+        else if (k === "s") resolve(state.sel, "keepScript");
+        else if (k === "i") resolve(state.sel, "ignore");
+        else if (k === "x") resolve(state.sel, "cut");
+        else if (k === " ") { togglePlay(); e.preventDefault(); }
+      });
+
+      buildScript(); buildRibbon(); buildWave(); buildFilters(); renderIssues(); renderDetail(); seek(24.6);
+    </script>
+  </body>
+</html>
