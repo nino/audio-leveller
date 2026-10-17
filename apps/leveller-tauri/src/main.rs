@@ -10,6 +10,7 @@
 // No console window behind the app on Windows, in a release build.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -61,13 +62,9 @@ fn is_working(app: &AppHandle) -> bool {
         .is_working()
 }
 
-/// A file to start a run on, unless one is already going: the drop zone is
-/// greyed out while it is, and a second run would race the first to the
-/// status line.
+/// A file to start a run on. The model ignores it while a run is going.
 fn open(app: &AppHandle, path: PathBuf) {
-    if !is_working(app) {
-        publish(app, Msg::Dropped(path));
-    }
+    publish(app, Msg::Dropped(path));
 }
 
 fn is_wav(path: &Path) -> bool {
@@ -84,26 +81,41 @@ fn start_worker(app: AppHandle, path: PathBuf, stages: Vec<StageSpec>) {
     std::thread::spawn(move || {
         let registry = leveller_model::registry();
         let mut last: Option<Instant> = None;
-        let result = leveller_io::process_file(&path, &stages, &registry, |p| {
-            if last.is_some_and(|at| at.elapsed() < PROGRESS_INTERVAL) {
-                return;
-            }
-            last = Some(Instant::now());
-            publish(
-                &app,
-                Msg::Progress {
-                    stage: p.stage.to_string(),
-                    index: p.index,
-                    total: p.total,
-                    overall: p.overall,
-                },
-            );
-        });
-        publish(
-            &app,
-            Msg::Finished(result.map(Box::new).map_err(|e| e.to_string())),
-        );
+        // A panic in a stage must still end the run, or the window would show
+        // it working for good and refuse every file after it.
+        let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
+            leveller_io::process_file(&path, &stages, &registry, |p| {
+                if last.is_some_and(|at| at.elapsed() < PROGRESS_INTERVAL) {
+                    return;
+                }
+                last = Some(Instant::now());
+                publish(
+                    &app,
+                    Msg::Progress {
+                        stage: p.stage.to_string(),
+                        index: p.index,
+                        total: p.total,
+                        overall: p.overall,
+                    },
+                );
+            })
+            .map(Box::new)
+            .map_err(|e| e.to_string())
+        }))
+        .unwrap_or_else(|panic| Err(panic_message(panic.as_ref())));
+        publish(&app, Msg::Finished(result));
     });
+}
+
+fn panic_message(panic: &(dyn std::any::Any + Send)) -> String {
+    let detail = panic
+        .downcast_ref::<&str>()
+        .map(|s| (*s).to_string())
+        .or_else(|| panic.downcast_ref::<String>().cloned());
+    match detail {
+        Some(detail) => format!("the run stopped unexpectedly: {detail}"),
+        None => "the run stopped unexpectedly".to_string(),
+    }
 }
 
 #[tauri::command]
@@ -213,5 +225,14 @@ mod tests {
         assert_eq!(first_wav(&paths), Some(PathBuf::from("/tmp/talk.WAV")));
         assert_eq!(first_wav(&paths[..1]), None);
         assert_eq!(first_wav(&[]), None);
+    }
+
+    #[test]
+    fn a_panic_becomes_a_failure_message() {
+        let panic = std::panic::catch_unwind(|| panic!("index out of bounds")).unwrap_err();
+        assert_eq!(
+            panic_message(panic.as_ref()),
+            "the run stopped unexpectedly: index out of bounds"
+        );
     }
 }

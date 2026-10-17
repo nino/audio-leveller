@@ -23,4 +23,12 @@ updates:
       ui-dependencies:
         patterns:
           - "*"
-  # No github-actions block: this repo has no .github/workflows to update.
+  # The actions the workflows in .github/workflows use.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

@@ -9,7 +9,7 @@
 use std::path::{Path, PathBuf};
 
 use leveller_stages::params::ParamSpec;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_json::Value;
 
 use crate::{Model, Msg, Status, Summary};
@@ -18,6 +18,9 @@ use crate::{Model, Msg, Status, Summary};
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct View {
+    /// [`Model::revision`] when this was drawn, so the newest view wins
+    /// whichever way it reached the window.
+    pub revision: u64,
     pub preset: String,
     pub presets: Vec<PresetView>,
     pub preset_description: &'static str,
@@ -28,6 +31,7 @@ pub struct View {
     pub stages: Vec<StageView>,
     pub status: StatusView,
     pub can_rerender: bool,
+    #[serde(serialize_with = "lossy_optional_path")]
     pub last_input: Option<PathBuf>,
     pub window_active: bool,
     pub drag_over: bool,
@@ -118,6 +122,23 @@ impl From<Input> for Msg {
     }
 }
 
+/// A path as text, with any bytes that are not UTF-8 replaced. Serde refuses
+/// such a path outright, which would stop every view after it from reaching
+/// the window; a name with a replacement character is only cosmetic.
+pub(crate) fn lossy_path<S: Serializer>(path: &Path, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_str(&path.to_string_lossy())
+}
+
+pub(crate) fn lossy_optional_path<S: Serializer>(
+    path: &Option<PathBuf>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    match path {
+        Some(path) => lossy_path(path, serializer),
+        None => serializer.serialize_none(),
+    }
+}
+
 fn file_name(path: &Path) -> String {
     path.file_name().map_or_else(
         || path.display().to_string(),
@@ -129,6 +150,7 @@ impl Model {
     pub fn view(&self) -> View {
         let schema = self.schema();
         View {
+            revision: self.revision(),
             preset: self.preset().to_string(),
             presets: schema
                 .presets
@@ -287,6 +309,27 @@ mod tests {
             .find(|p| p.spec.key() == "targetLufs")
             .unwrap();
         assert!(edited.edited);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_path_that_is_not_utf8_still_serialises() {
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+
+        let mut model = Model::new();
+        let path = Path::new(OsStr::from_bytes(b"/tmp/Aufnahme-\xE4.wav"));
+        model.update(Msg::Dropped(path.to_path_buf()));
+        let view = serde_json::to_value(model.view()).unwrap();
+        assert_eq!(view["lastInput"], "/tmp/Aufnahme-\u{FFFD}.wav");
+    }
+
+    #[test]
+    fn every_message_moves_the_revision_on() {
+        let mut model = Model::new();
+        let before = model.view().revision;
+        model.update(Msg::WindowActive(false));
+        assert!(model.view().revision > before);
     }
 
     #[test]

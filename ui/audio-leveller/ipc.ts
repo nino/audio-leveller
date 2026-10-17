@@ -71,6 +71,8 @@ export type StatusView =
   | { kind: "failed"; message: string };
 
 export interface View {
+  /** Counts the messages the model has applied; a higher one is newer. */
+  revision: number;
   preset: string;
   presets: { name: string; description: string }[];
   presetDescription: string;
