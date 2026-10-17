@@ -422,9 +422,10 @@ same one without the app swallowing its own build products.
 ### The Tauri app
 
 The interface is moving from AppKit to [Tauri](https://tauri.app), keeping the
-Rust DSP as it is. The plan is in five steps; this is the first, the leveller
-window, in `apps/leveller-tauri` with its frontend in `ui/`. The AppKit apps
-still build and still ship until the Tauri ones have caught up.
+Rust DSP as it is. The leveller window has moved: it is `apps/leveller-tauri`,
+with its frontend in `ui/`, and it is the Audio Leveller a release ships.
+Listen is still the AppKit app until it moves too. The AppKit Audio Leveller
+still builds with `cargo run -p audio-leveller-app` until it is deleted.
 
 The frontend is React and TypeScript, bundled by [Bun](https://bun.sh). The
 state stays in Rust: `leveller-ui`'s `Model` decides what every click means,
@@ -435,7 +436,7 @@ and sends clicks back as `Input`s.
 cd ui
 bun install
 bun run tauri dev                              # the window, with the frontend hot-reloading
-bun run tauri build                            # an .app and a .dmg in target/release/bundle
+bun run tauri build                            # an unsigned .app and .dmg in target/release/bundle
 bun run typecheck && bun test                  # the frontend's own checks
 ```
 
@@ -446,6 +447,12 @@ in. The Tauri crate embeds `ui/dist` when it compiles, so `cargo build
 debug binary loads the page from the dev server instead, so start `bun run
 dev` alongside it. A path given on the command line is opened as if it had been
 dropped on the window.
+
+The app checks for updates at start-up and from "Check for Updates…" in the app
+menu, using Tauri's updater plugin. It reads `latest-audio-leveller.json` from
+the latest GitHub release, and installs only an archive signed with the key
+whose public half is under `plugins.updater` in `tauri.conf.json`. Debug
+builds don't check at start-up.
 
 ### The icon
 
@@ -463,12 +470,13 @@ project does — the `.icns` is committed, so a build never runs it.
 
 ### Signed releases
 
-`.github/workflows/release.yml` builds the two Rust apps, Audio Leveller and
-Listen, with `cargo xtask bundle`, signs them with a Developer ID certificate
-and the hardened runtime, notarises and staples them, then puts them in a disk
-image that is itself signed, notarised and stapled. The apps and the DMG open
-on someone else's Mac with no Gatekeeper warning and no network round-trip.
-The Electron app is no longer part of a release.
+`.github/workflows/release.yml` builds the two apps: Audio Leveller with the
+Tauri bundler, and Listen with `cargo xtask bundle`. Both are signed with a
+Developer ID certificate and the hardened runtime, notarised and stapled, then
+put in a disk image that is itself signed, notarised and stapled. The apps and
+the DMG open on someone else's Mac with no Gatekeeper warning and no network
+round-trip. The release also carries Audio Leveller's update: a signed
+`.app.tar.gz` and the `latest-audio-leveller.json` feed that points at it.
 
 Only arm64 is built, because the bundles are built for the runner's own
 architecture. Nothing stands in the way of a universal build now that the
@@ -479,15 +487,17 @@ The same steps work locally, given a Developer ID certificate in the login
 keychain:
 
 ```bash
-cargo xtask bundle
+cargo xtask bundle                     # Listen
 cargo xtask sign "Developer ID Application: …"
+(cd ui && APPLE_SIGNING_IDENTITY="Developer ID Application: …" bun run tauri build --bundles app)
+ditto "target/release/bundle/macos/Audio Leveller.app" "target/bundle/Audio Leveller.app"
 cargo xtask dmg
 ```
 
 That leaves the apps signed but not notarised; notarising needs the App Store
 Connect key the workflow uses.
 
-Five repository secrets, under Settings → Secrets and variables → Actions:
+Seven repository secrets, under Settings → Secrets and variables → Actions:
 
 | secret | what it is |
 | ------ | ---------- |
@@ -496,6 +506,16 @@ Five repository secrets, under Settings → Secrets and variables → Actions:
 | `APPLE_API_KEY_P8` | The whole contents of the `.p8` App Store Connect key, `-----BEGIN PRIVATE KEY-----` line included. Created under App Store Connect → Users and Access → Integrations → App Store Connect API, and downloadable exactly once. |
 | `APPLE_API_KEY_ID` | The ten-character key ID shown next to that key. |
 | `APPLE_API_ISSUER_ID` | The issuer UUID shown above the key list. |
+| `TAURI_SIGNING_PRIVATE_KEY` | The updater's private key: the contents of the file `tauri signer generate` writes (below). |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | The password chosen when generating it. |
+
+The updater key is made once, with `cd ui && bun run tauri signer generate -w
+~/.tauri/audio-leveller.key`. Keep the private key and its password somewhere
+safe as well as in the secrets: losing it means no installed copy can be
+updated again. The public key, from `audio-leveller.key.pub`, goes in
+`plugins.updater.pubkey` in `apps/leveller-tauri/tauri.conf.json`. A tag build
+fails without the private key; a manual run without it signs with a throwaway
+key, so its update archive is only good for checking the pipeline.
 
 Cutting a release is a bump of `version` under `[workspace.package]` in
 `Cargo.toml` and a tag — the workflow refuses to build if the two disagree:

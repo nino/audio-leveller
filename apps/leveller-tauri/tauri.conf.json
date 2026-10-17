@@ -1,6 +1,7 @@
 {
   "$schema": "../../ui/node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Audio Leveller",
+  "mainBinaryName": "Audio Leveller",
   "identifier": "com.ninoan.audioleveller",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -51,6 +52,15 @@
     ],
     "macOS": {
       "minimumSystemVersion": "13.0"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "PUBKEY_PLACEHOLDER",
+      "endpoints": [
+        "https://github.com/nino/audio-leveller/releases/latest/download/latest-audio-leveller.json"
+      ],
+      "requireSignedVersion": true
     }
   }
 }

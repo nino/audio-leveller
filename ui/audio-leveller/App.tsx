@@ -10,7 +10,16 @@
 
 import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { shell, type Input, type ParamView, type StageView, type Summary, type View } from "./ipc";
+import {
+  shell,
+  updates,
+  type Input,
+  type ParamView,
+  type StageView,
+  type Summary,
+  type UpdateView,
+  type View,
+} from "./ipc";
 import { basename, formatValue, pluralize } from "./format";
 
 /** The latest view, and a way to send an input and draw its reply. */
@@ -52,6 +61,7 @@ export function App() {
   return (
     <div className="window">
       <TitleBar />
+      <UpdateStrip />
       {view && (
         <div className="content">
           <DropZone view={view} onChoose={choose} />
@@ -101,6 +111,76 @@ function TitleBar() {
  * A div acting as a button rather than a `<button>`, because a button may only
  * hold inline content and this one holds the window's heading.
  */
+/** The latest word on updates, from the shell. */
+function useUpdates(): UpdateView {
+  const [view, setView] = useState<UpdateView>({ kind: "none" });
+  useEffect(() => {
+    // An event that lands before the first reply is the newer of the two.
+    let heard = false;
+    const unlisten = updates.onChange((next) => {
+      heard = true;
+      setView(next);
+    });
+    updates
+      .view()
+      .then((next) => {
+        if (!heard) setView(next);
+      })
+      .catch((error: unknown) => console.error(error));
+    return () => {
+      void unlisten.then((stop) => stop());
+    };
+  }, []);
+  return view;
+}
+
+/** An update on offer, or one being installed. Nothing when there is neither. */
+function UpdateStrip() {
+  const view = useUpdates();
+  const fail = (error: unknown) => console.error(error);
+  switch (view.kind) {
+    case "none":
+      return null;
+
+    case "available":
+      return (
+        <section className="panel glass update" role="status">
+          <span className="update-text" title={view.notes ?? undefined}>
+            Audio Leveller <strong>{view.version}</strong> is available.
+          </span>
+          <button className="aqua-button small" onClick={() => void updates.dismiss().catch(fail)}>
+            Later
+          </button>
+          <button className="aqua-button small primary" onClick={() => void updates.install().catch(fail)}>
+            Install and Restart
+          </button>
+        </section>
+      );
+
+    case "installing": {
+      const percent = view.fraction === null ? null : Math.round(view.fraction * 100);
+      return (
+        <section className="panel glass update" role="status">
+          <span className="update-text">
+            Installing Audio Leveller <strong>{view.version}</strong>
+            {percent === null ? "…" : ` – ${percent}%`}
+          </span>
+        </section>
+      );
+    }
+
+    case "failed":
+      return (
+        <section className="panel glass update error" role="alert">
+          <span className="update-text">The update failed: {view.message}</span>
+          <button className="aqua-button small" onClick={() => void updates.dismiss().catch(fail)}>
+            Dismiss
+          </button>
+        </section>
+      );
+  }
+}
+
 function DropZone({ view, onChoose }: { view: View; onChoose: () => void }) {
   const busy = view.status.kind === "working";
   const classes = ["dropzone", view.dragOver && !busy ? "hover" : "", busy ? "busy" : ""];

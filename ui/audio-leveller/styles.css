@@ -583,6 +583,24 @@ ul.chain > li:last-child {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
+/* The update offer: a strip between the title bar and the drop zone. */
+.update {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 20px 0;
+  padding: 8px 12px;
+}
+
+.update-text {
+  flex: 1;
+}
+
+.update.error {
+  border-color: rgba(140, 20, 15, 0.55);
+  color: #a3160f;
+}
+
 .status.error {
   border-color: rgba(140, 20, 15, 0.55);
   color: #a3160f;

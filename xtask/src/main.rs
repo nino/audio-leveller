@@ -32,26 +32,20 @@ struct App {
     opens_wav: bool,
 }
 
-const APPS: &[App] = &[
-    App {
-        package: "audio-leveller-app",
-        binary: "audio-leveller-app",
-        display_name: "Audio Leveller",
-        identifier: "com.ninoan.audioleveller",
-        icon: Some("icon.icns"),
-        opens_wav: true,
-    },
-    App {
-        package: "listen-app",
-        binary: "listen-app",
-        display_name: "Listen",
-        identifier: "com.ninoan.listen",
-        icon: None,
-        // It reads whole sessions out of a folder rather than one file at a
-        // time, so a WAV dropped on its icon would have nowhere to go.
-        opens_wav: false,
-    },
-];
+/// The apps xtask bundles. Audio Leveller is not one of them any more: the
+/// Tauri bundler builds it (`bun run tauri build` in `ui/`), and the release
+/// workflow copies it into `target/bundle` beside these before `dmg`. Listen
+/// stays here until it moves to Tauri too.
+const APPS: &[App] = &[App {
+    package: "listen-app",
+    binary: "listen-app",
+    display_name: "Listen",
+    identifier: "com.ninoan.listen",
+    icon: None,
+    // It reads whole sessions out of a folder rather than one file at a
+    // time, so a WAV dropped on its icon would have nowhere to go.
+    opens_wav: false,
+}];
 
 const USAGE: &str = "\
 Usage: cargo xtask <task>
@@ -59,7 +53,7 @@ Usage: cargo xtask <task>
 Tasks:
   bundle [--debug]        assemble the .app bundles into target/bundle
   sign <identity>         codesign the bundles with the hardened runtime
-  dmg                     build a disk image from the bundles
+  dmg                     build a disk image from every .app in target/bundle
   verify                  check the signatures and the notarisation
   fetch-model [<id>]      download and verify the DeepFilterNet3 weights
   fetch-fixtures [<id>]   download and verify the evaluation recordings";
@@ -299,14 +293,21 @@ fn dmg() -> Result<PathBuf> {
         std::fs::remove_dir_all(&staging)?;
     }
     std::fs::create_dir_all(&staging)?;
+    let mut bundles: Vec<PathBuf> = std::fs::read_dir(bundle_root())
+        .with_context(|| format!("reading {}", bundle_root().display()))?
+        .map(|entry| entry.map(|e| e.path()))
+        .collect::<std::io::Result<_>>()?;
+    bundles.retain(|path| path.extension().is_some_and(|e| e == "app"));
+    bundles.sort();
     for app in APPS {
-        let bundle = bundle_path(app);
-        if !bundle.exists() {
+        if !bundles.contains(&bundle_path(app)) {
             bail!(
                 "{} is not there — run `cargo xtask bundle` first",
-                bundle.display()
+                bundle_path(app).display()
             );
         }
+    }
+    for bundle in &bundles {
         let target = staging.join(bundle.file_name().expect("a bundle has a name"));
         run(
             "ditto",

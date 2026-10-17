@@ -1,9 +1,10 @@
 name: Release
 
-# Signed, notarised macOS build of the Rust apps. Tag a version and the DMG
-# lands on a GitHub release page you can send someone; a manual run does the
-# same work and leaves the DMG as a run artifact instead, which is how you test
-# the pipeline without burning a version number.
+# Signed, notarised macOS build of the apps: Audio Leveller from the Tauri
+# bundler, Listen from `cargo xtask bundle` until it moves to Tauri too. Tag a
+# version and the DMG and Audio Leveller's update feed land on a GitHub release
+# page; a manual run does the same work and leaves them as a run artifact
+# instead, which is how you test the pipeline without burning a version number.
 on:
   push:
     tags: ["v*"]
@@ -34,6 +35,14 @@ jobs:
         run: rustup update --no-self-update stable && rustup default stable && rustc --version
 
       - uses: Swatinem/rust-cache@v2
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ui/.bun-version
+
+      - name: Install the frontend's dependencies
+        working-directory: ui
+        run: bun install --frozen-lockfile
 
       # A tag that disagrees with the workspace version produces a release
       # called v0.3.0 holding a DMG called 0.2.0. Catch it before anything is
@@ -101,17 +110,16 @@ jobs:
           fi
           echo "SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
 
-      # Both bundles, release profile, signed with the hardened runtime. No
+      # Listen, release profile, signed with the hardened runtime. No
       # entitlements: a statically linked Rust binary needs none of the JIT and
       # library-validation exceptions Electron did.
-      - name: Build and sign the apps
+      - name: Build and sign Listen
         run: |
           cargo xtask bundle
           cargo xtask sign "$SIGNING_IDENTITY"
 
-      # Apple's service takes a zip. One submission covers both apps, since the
-      # ticket is looked up per bundle when stapling.
-      - name: Notarise and staple the apps
+      # Apple's service takes a zip.
+      - name: Notarise and staple Listen
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
@@ -121,6 +129,76 @@ jobs:
           for app in target/bundle/*.app; do
             xcrun stapler staple "$app"
           done
+
+      # The updater archive is made only here, so a local `tauri build` needs
+      # no key. Every update is signed with the updater key, and the app
+      # refuses one whose signature does not match the public key it was built
+      # with. A tag build needs the real key. A manual run without it makes a
+      # throwaway pair and builds against that public key, so the pipeline can
+      # be tested before the secret exists; what it produces can't update
+      # anyone.
+      - name: Choose the update signing key
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo '{"bundle": {"createUpdaterArtifacts": true}}' > "$RUNNER_TEMP/updater-config.json"
+            exit 0
+          fi
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set (see README, 'Signed releases')"
+            exit 1
+          fi
+          echo "::warning::no TAURI_SIGNING_PRIVATE_KEY, so this build signs its update with a throwaway key"
+          (cd ui && bun run tauri signer generate --ci -p "" -w "$RUNNER_TEMP/throwaway.key" -f)
+          jq -n --arg key "$(cat "$RUNNER_TEMP/throwaway.key.pub")" \
+            '{bundle: {createUpdaterArtifacts: true}, plugins: {updater: {pubkey: $key}}}' \
+            > "$RUNNER_TEMP/updater-config.json"
+          echo "THROWAWAY_UPDATER_KEY=$RUNNER_TEMP/throwaway.key" >> "$GITHUB_ENV"
+
+      # The Tauri bundler builds the frontend, then the app, signs it with the
+      # hardened runtime, notarises and staples it, and packs the stapled app
+      # into a signed .app.tar.gz for the updater.
+      - name: Build, sign and notarise Audio Leveller
+        working-directory: ui
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          export APPLE_SIGNING_IDENTITY="$SIGNING_IDENTITY"
+          export APPLE_API_KEY_PATH="$RUNNER_TEMP/apple-api-key.p8"
+          if [ -n "${THROWAWAY_UPDATER_KEY:-}" ]; then
+            export TAURI_SIGNING_PRIVATE_KEY=$(cat "$THROWAWAY_UPDATER_KEY")
+            export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
+          fi
+          bun run tauri build --bundles app --config "$RUNNER_TEMP/updater-config.json"
+          ditto "../target/release/bundle/macos/Audio Leveller.app" "../target/bundle/Audio Leveller.app"
+
+      # The feed the installed app reads, through
+      # releases/latest/download/latest-audio-leveller.json. The archive is
+      # renamed because GitHub turns the space in an asset's name into a dot,
+      # and the feed has to name the URL exactly.
+      - name: Write the update feed
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "audio-leveller-tauri") | .version')
+          mkdir -p target/updates
+          archive="Audio-Leveller-$version-arm64.app.tar.gz"
+          cp "target/release/bundle/macos/Audio Leveller.app.tar.gz" "target/updates/$archive"
+          jq -n \
+            --arg version "$version" \
+            --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg signature "$(cat "target/release/bundle/macos/Audio Leveller.app.tar.gz.sig")" \
+            --arg url "https://github.com/$GITHUB_REPOSITORY/releases/download/v$version/$archive" \
+            '{
+              version: $version,
+              notes: "See the release page for what changed.",
+              pub_date: $date,
+              platforms: { "darwin-aarch64": { signature: $signature, url: $url } }
+            }' > target/updates/latest-audio-leveller.json
+          cat target/updates/latest-audio-leveller.json
 
       # The disk image is made from the stapled apps, so someone who drags them
       # out offline still has the tickets. Then the image is signed and
@@ -176,7 +254,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: audio-leveller-macos-arm64
-          path: ${{ env.DMG }}
+          path: |
+            ${{ env.DMG }}
+            target/updates/*
           if-no-files-found: error
 
       - name: Publish the release
@@ -184,12 +264,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "$DMG" \
+          gh release create "$GITHUB_REF_NAME" "$DMG" target/updates/* \
             --title "$GITHUB_REF_NAME" \
             --generate-notes
 
       - name: Remove the signing material
         if: always()
         run: |
-          rm -f "$RUNNER_TEMP/apple-api-key.p8" "$RUNNER_TEMP/certificate.p12"
+          rm -f "$RUNNER_TEMP/apple-api-key.p8" "$RUNNER_TEMP/certificate.p12" \
+            "$RUNNER_TEMP/throwaway.key" "$RUNNER_TEMP/throwaway.key.pub"
           security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true

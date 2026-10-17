@@ -103,3 +103,19 @@ export const shell = {
   onView: (callback: (view: View) => void): Promise<UnlistenFn> =>
     listen<View>("view", (event) => callback(event.payload)),
 };
+
+/** The strip that offers an update. Mirrors `UpdateView` in `updates.rs`. */
+export type UpdateView =
+  | { kind: "none" }
+  | { kind: "available"; version: string; notes: string | null }
+  | { kind: "installing"; version: string; fraction: number | null }
+  | { kind: "failed"; message: string };
+
+export const updates = {
+  view: (): Promise<UpdateView> => invoke("update_view"),
+  /** Download and install the offered update; the app restarts when it is in. */
+  install: (): Promise<void> => invoke("install_update"),
+  dismiss: (): Promise<void> => invoke("dismiss_update"),
+  onChange: (callback: (view: UpdateView) => void): Promise<UnlistenFn> =>
+    listen<UpdateView>("update", (event) => callback(event.payload)),
+};

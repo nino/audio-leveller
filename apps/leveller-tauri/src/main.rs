@@ -19,9 +19,15 @@ use leveller_pipeline::StageSpec;
 use leveller_ui::{Effect, Input, Model, Msg, View};
 use tauri::{AppHandle, DragDropEvent, Emitter, Manager, RunEvent, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
+use updates::Updates;
+
+/// The app menu's "Check for Updates…".
+#[cfg(target_os = "macos")]
+const CHECK_FOR_UPDATES: &str = "check-for-updates";
 
 #[cfg(target_os = "macos")]
 mod chrome;
+mod updates;
 
 /// How often a running chain repaints its progress. Progress arrives
 /// thousands of times a second from inside the DSP, and a view is a few
@@ -152,14 +158,30 @@ async fn choose_file(app: AppHandle) -> View {
 fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Shell {
             model: Mutex::new(Model::new()),
         })
-        .invoke_handler(tauri::generate_handler![view, send, choose_file])
+        .manage(Updates::new())
+        .invoke_handler(tauri::generate_handler![
+            view,
+            send,
+            choose_file,
+            updates::update_view,
+            updates::install_update,
+            updates::dismiss_update,
+        ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
-            if let Some(window) = app.get_webview_window("main") {
-                chrome::hide_system_buttons(&window);
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    chrome::hide_system_buttons(&window);
+                }
+                app.set_menu(menu(app.handle())?)?;
+            }
+            // Not from a debug build, whose version means nothing to the feed.
+            if !cfg!(debug_assertions) {
+                tauri::async_runtime::spawn(updates::check(app.handle().clone(), false));
             }
             // A file named on the command line, which is also how Windows and
             // Linux hand over a file opened from the file manager. macOS sends
@@ -169,6 +191,14 @@ fn main() {
                 open(app.handle(), path);
             }
             Ok(())
+        })
+        .on_menu_event(|app, event| {
+            #[cfg(target_os = "macos")]
+            if event.id() == CHECK_FOR_UPDATES {
+                tauri::async_runtime::spawn(updates::check(app.clone(), true));
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
         })
         .on_window_event(|window, event| {
             let app = window.app_handle();
@@ -192,6 +222,26 @@ fn main() {
         .expect("building the app");
 
     app.run(on_run_event);
+}
+
+/// The standard macOS menus, with "Check for Updates…" under About in the app
+/// menu, where Mac apps keep it.
+#[cfg(target_os = "macos")]
+fn menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{Menu, MenuItem, MenuItemKind};
+
+    let menu = Menu::default(app)?;
+    if let Some(MenuItemKind::Submenu(app_menu)) = menu.items()?.into_iter().next() {
+        let check = MenuItem::with_id(
+            app,
+            CHECK_FOR_UPDATES,
+            "Check for Updates…",
+            true,
+            None::<&str>,
+        )?;
+        app_menu.insert(&check, 1)?;
+    }
+    Ok(menu)
 }
 
 /// Finder's Open With, and a file dropped on the Dock icon.

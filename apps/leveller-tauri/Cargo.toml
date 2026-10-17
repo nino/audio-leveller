@@ -20,9 +20,11 @@ leveller-io.workspace = true
 leveller-model.workspace = true
 leveller-pipeline.workspace = true
 leveller-ui.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+tauri-plugin-updater = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2.workspace = true
