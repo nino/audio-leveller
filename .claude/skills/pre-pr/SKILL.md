@@ -16,23 +16,17 @@ that belongs in the PR first. Check with `git status` that nothing is left out.
 
 ## 2. Run the checks for the code you touched
 
-Run the same checks CI runs for each area your diff touches
-(`.github/workflows/ci.yml` is the source of truth if this list goes stale):
-
-| area | commands |
-| ---- | -------- |
-| Rust (`crates/`, `apps/`, `xtask/`) | `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` |
-| Tauri frontend (`ui/`) | `bun run typecheck` and `bun test`, from `ui/` |
-| Node pipeline (`src/`, `test/`, `eval/`) | `pnpm typecheck` and `pnpm test` |
-| REAPER script (`reaper/`) | `lua reaper/test_dsp.lua` |
+Run the checks listed in `CLAUDE.md` under "Commands" for each area your diff
+touches (Rust, the Tauri frontend in `ui/`, the Node pipeline, the REAPER
+script). That section also covers the two things that trip a fresh checkout:
+on Linux the full Rust workspace does not build, so use its `--exclude` list;
+on macOS, build `ui/` before any workspace-wide Rust check.
+`.github/workflows/ci.yml` is the source of truth if the two disagree.
 
 If a change can move the processed audio, also run the evaluation corpus
 (`cargo run --release --bin leveller-eval -- --baseline eval/baseline.json` for
 Rust, `pnpm eval -- --baseline eval/baseline.json` for Node) and say in the PR
 body what moved.
-
-On Linux the full Rust workspace does not build; use the `--exclude` list in
-`CLAUDE.md` under "Commands" and rely on CI for the macOS-only crates.
 
 Fix every failure before going on.
 

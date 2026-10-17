@@ -28,8 +28,8 @@ The tree holds several generations of the app. Know which one you are changing.
 ## Rust layout
 
 Dependencies point strictly downward: `leveller-dsp` depends on nothing in the
-workspace, `leveller-ui` never mentions AppKit or Tauri, and `aqua` never
-mentions a stage.
+workspace, `leveller-ui` has no dependency on AppKit or Tauri, and `aqua` has
+none on the pipeline or the stages.
 
 | crate | what it holds |
 | ----- | ------------- |
@@ -42,7 +42,17 @@ mentions a stage.
 | `leveller-corpus` / `leveller-eval` | synthetic test material, and the evaluation harness |
 | `leveller-listen` / `leveller-audio` | listening-test data model, and the gapless player |
 | `leveller-ui` | each app as state and messages, with no window |
-| `apps/leveller-cli` | two binaries: `audio-leveller` (the CLI) and `leveller-eval` |
+| `aqua` | the Aqua look drawn with Core Graphics (macOS only, to be deleted) |
+
+Apps, with their package names (which differ from the directory names):
+
+| directory | package | what it is |
+| --------- | ------- | ---------- |
+| `apps/leveller-cli` | `leveller-cli` | two binaries: `audio-leveller` (the CLI) and `leveller-eval` |
+| `apps/leveller-tauri` | `audio-leveller-tauri` | the Tauri leveller window |
+| `apps/audio-leveller` | `audio-leveller-app` | the AppKit leveller window |
+| `apps/listen` | `listen-app` | the AppKit listening-test app |
+| `xtask` | `xtask` | bundling, signing, the DMG, fetching weights and fixtures |
 
 The chain order in `DEFAULT_CHAIN` is deliberate (declick → denoise → dereverb
 → eq → dyneq → expand → compress → level); the module docs in
@@ -63,14 +73,17 @@ Linux the Tauri crate needs GTK and `leveller-audio` needs ALSA. On a Linux
 machine (including cloud agent sessions) run the checks on everything else:
 
 ```bash
-EXCL="--exclude audio-leveller-app --exclude listen-app --exclude aqua --exclude audio-leveller-tauri --exclude leveller-audio"
-cargo clippy --workspace --all-targets $EXCL -- -D warnings
-cargo test --workspace $EXCL
+cargo clippy --workspace --all-targets \
+  --exclude audio-leveller-app --exclude listen-app --exclude aqua \
+  --exclude audio-leveller-tauri --exclude leveller-audio -- -D warnings
+cargo test --workspace \
+  --exclude audio-leveller-app --exclude listen-app --exclude aqua \
+  --exclude audio-leveller-tauri --exclude leveller-audio
 ```
 
 CI runs the whole workspace on macOS, so it still catches what that skips.
-`audio-leveller-tauri` embeds `ui/dist` at compile time, so run `bun run build`
-in `ui/` before building it.
+`audio-leveller-tauri` embeds `ui/dist` at compile time, so on macOS run
+`bun install && bun run build` in `ui/` before any workspace-wide Rust check.
 
 Other commands:
 
