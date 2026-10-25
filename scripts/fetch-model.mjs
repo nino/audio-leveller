@@ -15,8 +15,7 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { execFile } from "node:child_process";
-import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
@@ -48,7 +47,11 @@ async function fetchModel(spec) {
   }
   console.log(`${spec.id}: archive verified (${(archive.length / 1e6).toFixed(1)} MB)`);
 
-  const scratch = await mkdtemp(join(tmpdir(), "audio-leveller-model-"));
+  // Unpack beside the model directory rather than in the system temp
+  // directory: the install step renames files into place, and a rename fails
+  // with EXDEV when /tmp is another filesystem, as it is on GitHub's runners.
+  await mkdir(dirname(target), { recursive: true });
+  const scratch = await mkdtemp(join(dirname(target), ".download-"));
   try {
     const archivePath = join(scratch, basename(spec.archive.url));
     await writeFile(archivePath, archive);
