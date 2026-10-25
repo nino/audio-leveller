@@ -28,7 +28,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 24.22.1
           cache: pnpm
 
       # Electron is a devDependency but nothing here launches the app, and its
