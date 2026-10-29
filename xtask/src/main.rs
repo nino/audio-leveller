@@ -32,26 +32,20 @@ struct App {
     opens_wav: bool,
 }
 
-const APPS: &[App] = &[
-    App {
-        package: "audio-leveller-app",
-        binary: "audio-leveller-app",
-        display_name: "Audio Leveller",
-        identifier: "com.ninoan.audioleveller",
-        icon: Some("icon.icns"),
-        opens_wav: true,
-    },
-    App {
-        package: "listen-app",
-        binary: "listen-app",
-        display_name: "Listen",
-        identifier: "com.ninoan.listen",
-        icon: None,
-        // It reads whole sessions out of a folder rather than one file at a
-        // time, so a WAV dropped on its icon would have nowhere to go.
-        opens_wav: false,
-    },
-];
+/// The apps xtask bundles. Audio Leveller is not one of them any more: the
+/// Tauri bundler builds it (`bun run tauri build` in `ui/`), and the release
+/// workflow copies it into `target/bundle` beside these before `dmg`. Listen
+/// stays here until it moves to Tauri too.
+const APPS: &[App] = &[App {
+    package: "listen-app",
+    binary: "listen-app",
+    display_name: "Listen",
+    identifier: "com.ninoan.listen",
+    icon: None,
+    // It reads whole sessions out of a folder rather than one file at a
+    // time, so a WAV dropped on its icon would have nowhere to go.
+    opens_wav: false,
+}];
 
 const USAGE: &str = "\
 Usage: cargo xtask <task>
@@ -59,7 +53,7 @@ Usage: cargo xtask <task>
 Tasks:
   bundle [--debug]        assemble the .app bundles into target/bundle
   sign <identity>         codesign the bundles with the hardened runtime
-  dmg                     build a disk image from the bundles
+  dmg                     build a disk image from every .app in target/bundle
   verify                  check the signatures and the notarisation
   fetch-model [<id>]      download and verify the DeepFilterNet3 weights
   fetch-fixtures [<id>]   download and verify the evaluation recordings";
@@ -91,8 +85,8 @@ fn main() -> Result<()> {
             Ok(())
         }
         Some("verify") => {
-            for app in APPS {
-                verify(&bundle_path(app))?;
+            for bundle in shipped_bundles()? {
+                verify(&bundle)?;
             }
             Ok(())
         }
@@ -279,6 +273,26 @@ fn sign(bundle: &Path, identity: &str) -> Result<()> {
     Ok(())
 }
 
+/// The Tauri-built Audio Leveller, which the release workflow (or the README's
+/// local steps) copies into `target/bundle`.
+const TAURI_BUNDLE: &str = "Audio Leveller.app";
+
+/// Every bundle that goes in the disk image: xtask's own and the Tauri one.
+/// Refuses if any is missing, so a DMG can't quietly ship without one.
+fn shipped_bundles() -> Result<Vec<PathBuf>> {
+    let mut bundles: Vec<PathBuf> = APPS.iter().map(bundle_path).collect();
+    bundles.push(bundle_root().join(TAURI_BUNDLE));
+    for bundle in &bundles {
+        if !bundle.exists() {
+            bail!(
+                "{} is not there — run `cargo xtask bundle`, and copy in the Tauri build (see README, 'Signed releases')",
+                bundle.display()
+            );
+        }
+    }
+    Ok(bundles)
+}
+
 /// The disk image, named for the version and the architecture it was built on,
 /// since that is what goes up on the release page.
 fn dmg() -> Result<PathBuf> {
@@ -299,14 +313,7 @@ fn dmg() -> Result<PathBuf> {
         std::fs::remove_dir_all(&staging)?;
     }
     std::fs::create_dir_all(&staging)?;
-    for app in APPS {
-        let bundle = bundle_path(app);
-        if !bundle.exists() {
-            bail!(
-                "{} is not there — run `cargo xtask bundle` first",
-                bundle.display()
-            );
-        }
+    for bundle in &shipped_bundles()? {
         let target = staging.join(bundle.file_name().expect("a bundle has a name"));
         run(
             "ditto",
