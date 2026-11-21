@@ -10,13 +10,13 @@
     "tauri": "TAURI_APP_PATH=../apps/leveller-tauri TAURI_FRONTEND_PATH=. tauri"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/api": "^2.12.5",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.12.3",
-    "@types/bun": "^1.4.3",
+    "@tauri-apps/cli": "^2.12.5",
+    "@types/bun": "^1.4.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "typescript": "^7.0.2"
